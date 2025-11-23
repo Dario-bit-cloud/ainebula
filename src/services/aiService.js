@@ -159,7 +159,12 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     throw new Error('Nessuna risposta ricevuta dall\'API');
     
   } catch (error) {
-    console.error('Error calling Electron Hub API:', error);
+    console.error('❌ Error calling Electron Hub API:', error);
+    console.error('📍 API Config:', {
+      baseURL: API_CONFIG.baseURL,
+      apiKey: API_CONFIG.apiKey.substring(0, 20) + '...',
+      model: apiModel
+    });
     console.error('Error details:', {
       name: error.name,
       message: error.message,
