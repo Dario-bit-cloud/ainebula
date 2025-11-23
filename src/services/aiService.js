@@ -75,11 +75,14 @@ function formatChatHistory(chatHistory, systemPrompt) {
 }
 
 /**
- * Genera una risposta con streaming utilizzando l'API Electron Hub
+ * Genera una risposta con streaming utilizzando l'API Electron Hub o ZukiJourney
  */
 export async function* generateResponseStream(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = [], abortController = null) {
   try {
-    // Mappa il modello locale al modello Electron Hub
+    // Verifica se è un modello thinking che usa ZukiJourney
+    const isThinkingModel = modelId === 'nebula-5.1-thinking' || modelId === 'nebula-5-thinking';
+    
+    // Mappa il modello locale al modello API
     const apiModel = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-5.1-instant'];
     
     // Prepara il messaggio corrente
@@ -114,21 +117,34 @@ export async function* generateResponseStream(message, modelId = 'nebula-5.1-ins
     const controller = abortController || new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
     
-    // Headers per Electron Hub (compatibile OpenAI)
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_CONFIG.apiKey}`
-    };
+    // Determina URL e headers in base al modello
+    let apiUrl, headers;
     
-    console.log('Calling Electron Hub API (Streaming):', {
-      url: `${API_CONFIG.baseURL}/chat/completions`,
+    if (isThinkingModel) {
+      // Usa ZukiJourney API per i modelli thinking
+      apiUrl = 'https://zukijourney.com/api/v1/chat/completions';
+      headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer zu-6c87d9a495bbda6c71ebbe7bc17f6c4a`
+      };
+    } else {
+      // Usa Electron Hub API per gli altri modelli
+      apiUrl = `${API_CONFIG.baseURL}/chat/completions`;
+      headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_CONFIG.apiKey}`
+      };
+    }
+    
+    console.log(`Calling ${isThinkingModel ? 'ZukiJourney' : 'Electron Hub'} API (Streaming):`, {
+      url: apiUrl,
       model: apiModel,
       messageCount: formattedMessages.length,
       temperature: settings.temperature,
       maxTokens: settings.maxTokens
     });
     
-    const response = await fetch(`${API_CONFIG.baseURL}/chat/completions`, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(requestBody),
