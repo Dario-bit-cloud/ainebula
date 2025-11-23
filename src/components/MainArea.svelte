@@ -72,13 +72,6 @@
         </button>
       </div>
     </div>
-    <button class="company-info-button">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
-        <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
-      </svg>
-      <span>Informazioni aziendali</span>
-    </button>
   </div>
   
   <div class="disclaimer">
@@ -232,29 +225,6 @@
   .voice-button:hover,
   .waveform-button:hover {
     color: var(--text-primary);
-  }
-
-  .company-info-button {
-    margin-top: 12px;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .company-info-button:hover {
-    background-color: var(--hover-bg);
-    color: var(--text-primary);
-    border-color: var(--border-color);
   }
 
   .disclaimer {

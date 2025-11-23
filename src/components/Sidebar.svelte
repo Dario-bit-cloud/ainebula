@@ -1,4 +1,6 @@
 <script>
+  import { user as userStore } from '../stores/user.js';
+  
   let activeItem = null;
   
   const menuItems = [
@@ -47,8 +49,8 @@
         </svg>
       </div>
       <div class="user-details">
-        <div class="username">andrea.winkler</div>
-        <div class="workspace">Godfrey's Workspace</div>
+        <div class="username">{$userStore.name || 'Utente'}</div>
+        <div class="workspace">{$userStore.email || 'Nessun workspace'}</div>
       </div>
     </div>
     <button class="invite-button">
