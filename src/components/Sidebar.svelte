@@ -5,7 +5,7 @@
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { createProject } from '../stores/projects.js';
   
-  let activeItem = 'chat';
+  let activeItem = 'new-chat';
   let searchInput = '';
   let filteredChats = [];
   let showChatList = true;
@@ -21,13 +21,24 @@
     }
   }
   
+  // Aggiorna activeItem in base alla vista corrente
+  $: {
+    if ($sidebarView === 'chat') {
+      // Quando si è in una chat, nessun item del menu è attivo
+      activeItem = null;
+    } else if ($sidebarView === 'search') {
+      activeItem = 'search';
+    } else if ($sidebarView === 'library') {
+      activeItem = 'library';
+    }
+  }
+  
   function handleMenuClick(itemId) {
-    activeItem = itemId;
-    
     switch(itemId) {
       case 'new-chat':
         createNewChat();
         sidebarView.set('chat');
+        activeItem = null; // Nessun item attivo quando si è in una chat
         if ($isMobile) {
           isSidebarOpen.set(false);
         }
@@ -35,14 +46,17 @@
       case 'search':
         isSearchOpen.set(true);
         sidebarView.set('search');
+        activeItem = 'search';
         break;
       case 'library':
         sidebarView.set('library');
+        activeItem = 'library';
         showChatList = true;
         break;
       case 'codex':
         setModel('codex');
         sidebarView.set('chat');
+        activeItem = null;
         if ($isMobile) {
           isSidebarOpen.set(false);
         }
@@ -50,12 +64,16 @@
       case 'gpt':
         setModel('gpt-4');
         sidebarView.set('chat');
+        activeItem = null;
         if ($isMobile) {
           isSidebarOpen.set(false);
         }
         break;
       case 'projects':
         isProjectModalOpen.set(true);
+        if ($isMobile) {
+          isSidebarOpen.set(false);
+        }
         break;
     }
   }
@@ -63,6 +81,7 @@
   function handleChatClick(chatId) {
     loadChat(chatId);
     sidebarView.set('chat');
+    activeItem = null; // Nessun item attivo quando si è in una chat
     isSearchOpen.set(false);
     searchQuery.set('');
     if ($isMobile) {
@@ -99,10 +118,6 @@
     if (days < 7) return `${days} giorni fa`;
     return date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
   }
-  
-  $: if ($sidebarView !== 'chat') {
-    activeItem = $sidebarView;
-  }
 </script>
 
 {#if $isMobile && $isSidebarOpen}
@@ -132,7 +147,7 @@
     ] as item}
       <button 
         class="nav-item" 
-        class:active={activeItem === item.id || ($sidebarView === 'search' && item.id === 'search') || ($sidebarView === 'library' && item.id === 'library')}
+        class:active={activeItem === item.id}
         on:click={() => handleMenuClick(item.id)}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
