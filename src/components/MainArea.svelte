@@ -367,6 +367,7 @@
     object-fit: cover;
     cursor: pointer;
     transition: transform 0.2s;
+    border: 1px solid var(--border-color);
   }
 
   .message-image:hover {
