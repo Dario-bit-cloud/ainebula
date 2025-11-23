@@ -1,6 +1,32 @@
 <script>
-  let isSettingsOpen = false;
+  import { selectedModel, availableModels } from '../stores/models.js';
+  import { isGenerating } from '../stores/chat.js';
+  import { isSettingsOpen } from '../stores/app.js';
+  
+  let isModelDropdownOpen = false;
+  
+  function toggleModelDropdown() {
+    isModelDropdownOpen = !isModelDropdownOpen;
+  }
+  
+  function selectModel(modelId) {
+    selectedModel.set(modelId);
+    isModelDropdownOpen = false;
+  }
+  
+  function toggleSettings() {
+    isSettingsOpen.update(open => !open);
+  }
+  
+  // Chiudi dropdown quando si clicca fuori
+  function handleClickOutside(event) {
+    if (!event.target.closest('.model-selector-wrapper')) {
+      isModelDropdownOpen = false;
+    }
+  }
 </script>
+
+<svelte:window on:click={handleClickOutside} />
 
 <div class="top-bar">
   <div class="left-section">
@@ -10,25 +36,52 @@
         <circle cx="12" cy="12" r="3"/>
       </svg>
     </div>
-    <div class="model-selector">
-      <span class="model-name">Nebula AI 5.1 Instant</span>
-      <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="6 9 12 15 18 9"/>
-      </svg>
+    <div class="model-selector-wrapper">
+      <button class="model-selector" on:click={toggleModelDropdown}>
+        <span class="model-name">
+          {$availableModels.find(m => m.id === $selectedModel)?.name || 'Nebula AI 5.1 Instant'}
+        </span>
+        <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {#if isModelDropdownOpen}
+        <div class="model-dropdown">
+          {#each $availableModels as model}
+            <button 
+              class="model-option" 
+              class:selected={model.id === $selectedModel}
+              on:click={() => selectModel(model.id)}
+            >
+              <div class="model-info">
+                <div class="model-name">{model.name}</div>
+                <div class="model-description">{model.description}</div>
+              </div>
+              {#if model.id === $selectedModel}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
   </div>
   <div class="right-section">
-    <button class="icon-button" title="Impostazioni">
+    <button class="icon-button" title="Impostazioni" on:click={toggleSettings}>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/>
       </svg>
     </button>
-    <div class="loading-indicator">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 12a9 9 0 11-6.219-8.56"/>
-      </svg>
-    </div>
+    {#if $isGenerating}
+      <div class="loading-indicator" title="Generazione in corso">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12a9 9 0 11-6.219-8.56"/>
+        </svg>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -41,6 +94,8 @@
     background-color: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
     height: 56px;
+    position: relative;
+    z-index: 100;
   }
 
   .left-section {
@@ -56,6 +111,10 @@
     color: var(--text-primary);
   }
 
+  .model-selector-wrapper {
+    position: relative;
+  }
+
   .model-selector {
     display: flex;
     align-items: center;
@@ -64,6 +123,9 @@
     padding: 4px 8px;
     border-radius: 6px;
     transition: background-color 0.2s;
+    background: none;
+    border: none;
+    color: var(--text-primary);
   }
 
   .model-selector:hover {
@@ -77,6 +139,56 @@
   }
 
   .dropdown-icon {
+    color: var(--text-secondary);
+  }
+
+  .model-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 280px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    z-index: 1000;
+  }
+
+  .model-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: var(--text-primary);
+  }
+
+  .model-option:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .model-option.selected {
+    background-color: var(--bg-tertiary);
+  }
+
+  .model-info {
+    flex: 1;
+  }
+
+  .model-info .model-name {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .model-description {
+    font-size: 12px;
     color: var(--text-secondary);
   }
 
@@ -118,4 +230,3 @@
     }
   }
 </style>
-

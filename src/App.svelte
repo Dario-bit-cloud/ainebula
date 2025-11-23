@@ -2,6 +2,9 @@
   import TopBar from './components/TopBar.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import MainArea from './components/MainArea.svelte';
+  import SettingsModal from './components/SettingsModal.svelte';
+  import InviteModal from './components/InviteModal.svelte';
+  import ProjectModal from './components/ProjectModal.svelte';
 </script>
 
 <div class="app-container">
@@ -10,6 +13,9 @@
     <Sidebar />
     <MainArea />
   </div>
+  <SettingsModal />
+  <InviteModal />
+  <ProjectModal />
 </div>
 
 <style>
@@ -26,4 +32,3 @@
     overflow: hidden;
   }
 </style>
-

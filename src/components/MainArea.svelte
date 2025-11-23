@@ -1,15 +1,69 @@
 <script>
-  let inputValue = '';
-  let messages = [];
+  import { onMount } from 'svelte';
+  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat } from '../stores/chat.js';
+  import { selectedModel } from '../stores/models.js';
+  import { generateResponse } from '../services/aiService.js';
+  import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable } from '../services/voiceService.js';
   
-  function handleSubmit() {
-    if (inputValue.trim()) {
-      messages = [...messages, { type: 'user', content: inputValue }];
+  let inputValue = '';
+  let inputRef;
+  let isRecording = false;
+  let voiceAvailable = false;
+  let fileInput;
+  let attachedFiles = [];
+  
+  onMount(() => {
+    voiceAvailable = isVoiceAvailable();
+    
+    // Inizializza riconoscimento vocale
+    if (voiceAvailable) {
+      initVoiceRecognition(
+        (transcript) => {
+          inputValue = transcript;
+          stopListening();
+          isRecording = false;
+        },
+        (error) => {
+          console.error('Voice recognition error:', error);
+          isRecording = false;
+          stopListening();
+        }
+      );
+    }
+    
+    // Se non c'è una chat corrente, creane una nuova
+    currentChatId.subscribe(id => {
+      if (!id) {
+        createNewChat();
+      }
+    })();
+  });
+  
+  async function handleSubmit() {
+    if (inputValue.trim() && !isGenerating) {
+      const chatId = $currentChatId || createNewChat();
+      const userMessage = { type: 'user', content: inputValue, timestamp: new Date().toISOString() };
+      
+      addMessage(chatId, userMessage);
+      const messageText = inputValue;
       inputValue = '';
-      // Simulazione risposta AI
-      setTimeout(() => {
-        messages = [...messages, { type: 'ai', content: 'Grazie per il tuo messaggio. Sono Nebula AI e sono qui per aiutarti!' }];
-      }, 1000);
+      
+      isGenerating.set(true);
+      
+      try {
+        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || []);
+        const aiMessage = { type: 'ai', content: response, timestamp: new Date().toISOString() };
+        addMessage(chatId, aiMessage);
+      } catch (error) {
+        console.error('Error generating response:', error);
+        addMessage(chatId, { 
+          type: 'ai', 
+          content: 'Mi dispiace, si è verificato un errore. Riprova.', 
+          timestamp: new Date().toISOString() 
+        });
+      } finally {
+        isGenerating.set(false);
+      }
     }
   }
   
@@ -19,6 +73,36 @@
       handleSubmit();
     }
   }
+  
+  function handleVoiceClick() {
+    if (!voiceAvailable) {
+      alert('Il riconoscimento vocale non è disponibile nel tuo browser.');
+      return;
+    }
+    
+    if (isRecording) {
+      stopListening();
+      isRecording = false;
+    } else {
+      startListening();
+      isRecording = true;
+    }
+  }
+  
+  function handleAttachClick() {
+    fileInput?.click();
+  }
+  
+  function handleFileSelect(event) {
+    const files = Array.from(event.target.files || []);
+    attachedFiles = [...attachedFiles, ...files];
+  }
+  
+  function removeFile(index) {
+    attachedFiles = attachedFiles.filter((_, i) => i !== index);
+  }
+  
+  $: messages = $currentChat?.messages || [];
 </script>
 
 <main class="main-area">
@@ -35,26 +119,61 @@
           </div>
         </div>
       {/each}
+      {#if $isGenerating}
+        <div class="message ai-message">
+          <div class="message-content">
+            <div class="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
   {/if}
   
   <div class="input-container">
+    {#if attachedFiles.length > 0}
+      <div class="attached-files">
+        {#each attachedFiles as file, index}
+          <div class="file-item">
+            <span class="file-name">{file.name}</span>
+            <button class="file-remove" on:click={() => removeFile(index)}>×</button>
+          </div>
+        {/each}
+      </div>
+    {/if}
     <div class="input-wrapper">
-      <button class="attach-button">
+      <button class="attach-button" on:click={handleAttachClick} title="Allega file">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="5" x2="12" y2="19"/>
-          <line x1="5" y1="12" x2="19" y2="12"/>
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
         </svg>
       </button>
+      <input 
+        type="file"
+        bind:this={fileInput}
+        on:change={handleFileSelect}
+        multiple
+        style="display: none;"
+      />
       <input 
         type="text" 
         class="message-input" 
         placeholder="Fai una domanda"
         bind:value={inputValue}
+        bind:this={inputRef}
         on:keypress={handleKeyPress}
+        disabled={$isGenerating}
       />
       <div class="input-actions">
-        <button class="voice-button" title="Input vocale">
+        <button 
+          class="voice-button" 
+          class:recording={isRecording}
+          title={voiceAvailable ? "Input vocale" : "Riconoscimento vocale non disponibile"}
+          on:click={handleVoiceClick}
+          disabled={!voiceAvailable || $isGenerating}
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
             <path d="M19 10v2a7 7 0 01-14 0v-2"/>
@@ -62,7 +181,7 @@
             <line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
         </button>
-        <button class="waveform-button" title="Waveform">
+        <button class="waveform-button" title="Waveform" disabled={$isGenerating}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <rect x="2" y="10" width="3" height="4" rx="1"/>
             <rect x="7" y="8" width="3" height="8" rx="1"/>
@@ -138,6 +257,39 @@
     word-wrap: break-word;
   }
 
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .typing-indicator span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-secondary);
+    animation: typing 1.4s infinite;
+  }
+
+  .typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes typing {
+    0%, 60%, 100% {
+      transform: translateY(0);
+      opacity: 0.5;
+    }
+    30% {
+      transform: translateY(-10px);
+      opacity: 1;
+    }
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -153,6 +305,51 @@
     padding: 16px 24px;
     background-color: var(--bg-primary);
     border-top: 1px solid var(--border-color);
+  }
+
+  .attached-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .file-name {
+    color: var(--text-primary);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-remove {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .file-remove:hover {
+    color: var(--text-primary);
   }
 
   .input-wrapper {
@@ -198,6 +395,11 @@
     padding: 4px 0;
   }
 
+  .message-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .message-input::placeholder {
     color: var(--text-secondary);
   }
@@ -222,9 +424,29 @@
     transition: color 0.2s;
   }
 
-  .voice-button:hover,
-  .waveform-button:hover {
+  .voice-button:disabled,
+  .waveform-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .voice-button:hover:not(:disabled),
+  .waveform-button:hover:not(:disabled) {
     color: var(--text-primary);
+  }
+
+  .voice-button.recording {
+    color: #ef4444;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
   }
 
   .disclaimer {
@@ -235,4 +457,3 @@
     border-top: 1px solid var(--border-color);
   }
 </style>
-
