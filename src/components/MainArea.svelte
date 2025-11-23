@@ -1465,6 +1465,9 @@
     display: flex;
     flex-direction: column;
     gap: 24px;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
   
   .message.highlighted {
