@@ -74,7 +74,7 @@ function formatChatHistory(chatHistory) {
  */
 export async function generateResponse(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = []) {
   try {
-    // Mappa il modello locale al modello AIMLAPI
+    // Mappa il modello locale al modello OpenRouter
     const apiModel = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-5.1-instant'];
     
     // Prepara il messaggio corrente
