@@ -72,10 +72,14 @@
   });
   
   async function handleSubmit() {
+    console.log('handleSubmit chiamato');
     const hasText = inputValue.trim().length > 0;
     const hasImages = attachedImages.length > 0;
     
-    if ((hasText || hasImages) && !isGenerating) {
+    console.log('Stato:', { hasText, hasImages, isGenerating: $isGenerating, inputValue });
+    
+    if ((hasText || hasImages) && !$isGenerating) {
+      console.log('Invio messaggio...');
       const chatId = $currentChatId || createNewChat();
       
       // Prepara le immagini come base64
@@ -97,6 +101,7 @@
         timestamp: new Date().toISOString() 
       };
       
+      console.log('Aggiungo messaggio utente:', userMessage);
       addMessage(chatId, userMessage);
       const messageText = inputValue.trim() || (hasImages ? '[Immagine allegata]' : '');
       const imagesForAI = images;
@@ -107,7 +112,9 @@
       isGenerating.set(true);
       
       try {
+        console.log('Chiamata API con:', { messageText, model: $selectedModel, chatId });
         const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || [], imagesForAI);
+        console.log('Risposta ricevuta:', response);
         const aiMessage = { type: 'ai', content: response, timestamp: new Date().toISOString() };
         addMessage(chatId, aiMessage);
       } catch (error) {
@@ -121,6 +128,8 @@
       } finally {
         isGenerating.set(false);
       }
+    } else {
+      console.log('Messaggio non inviato:', { hasText, hasImages, isGenerating: $isGenerating });
     }
   }
   
