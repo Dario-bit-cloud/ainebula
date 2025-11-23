@@ -48,7 +48,10 @@
   }
   
   function usePrompt(template) {
-    dispatch('select', template);
+    // Se il prompt ha variabili, usa il template così com'è
+    // Altrimenti invia il prompt direttamente
+    const promptToUse = template.prompt || template;
+    dispatch('select', { ...template, prompt: promptToUse });
     closeModal();
   }
   

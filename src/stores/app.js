@@ -12,6 +12,7 @@ export const isSidebarOpen = writable(true);
 export const isPremiumModalOpen = writable(false);
 export const isAISettingsModalOpen = writable(false);
 export const isPromptLibraryModalOpen = writable(false);
+export const selectedPrompt = writable(null);
 export const isVoiceSelectionModalOpen = writable(false);
 
 // Store per rilevare la dimensione dello schermo

@@ -5,7 +5,7 @@
   import { selectedModel } from '../stores/models.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
   import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable } from '../services/voiceService.js';
-  import { isPremiumModalOpen, isVoiceSelectionModalOpen } from '../stores/app.js';
+  import { isPremiumModalOpen, isVoiceSelectionModalOpen, selectedPrompt } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
   import { renderMarkdown } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
@@ -68,6 +68,31 @@
       maxTokens = 4000;
       tokenUsagePercentage = 0;
       tokenWarning = false;
+    }
+  }
+  
+  // Gestisci prompt selezionato dalla libreria
+  $: {
+    if ($selectedPrompt) {
+      // Inserisci il prompt nell'input
+      const promptText = $selectedPrompt.prompt || '';
+      if (promptText) {
+        // Se c'è già testo, aggiungi una nuova riga prima del prompt
+        if (inputValue.trim()) {
+          inputValue = inputValue + '\n\n' + promptText;
+        } else {
+          inputValue = promptText;
+        }
+        // Focus sul textarea e resize dopo un tick per assicurarsi che sia renderizzato
+        tick().then(() => {
+          if (textareaRef) {
+            textareaRef.focus();
+            handleInputResize();
+          }
+        });
+        // Reset del prompt selezionato
+        selectedPrompt.set(null);
+      }
     }
   }
   

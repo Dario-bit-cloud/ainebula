@@ -53,22 +53,6 @@
         activeItem = 'library';
         showChatList = true;
         break;
-      case 'codex':
-        setModel('codex');
-        sidebarView.set('chat');
-        activeItem = null;
-        if ($isMobile) {
-          isSidebarOpen.set(false);
-        }
-        break;
-      case 'gpt':
-        setModel('gpt-4');
-        sidebarView.set('chat');
-        activeItem = null;
-        if ($isMobile) {
-          isSidebarOpen.set(false);
-        }
-        break;
       case 'projects':
         isProjectModalOpen.set(true);
         if ($isMobile) {
@@ -141,8 +125,6 @@
       { id: 'new-chat', label: 'Nuova chat', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' },
       { id: 'search', label: 'Cerca chat', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
       { id: 'library', label: 'Libreria', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-      { id: 'codex', label: 'Codex', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-      { id: 'gpt', label: 'GPT', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
       { id: 'projects', label: 'Progetti', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
     ] as item}
       <button 

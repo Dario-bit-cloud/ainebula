@@ -1,8 +1,73 @@
 <script>
   import { isPremiumModalOpen } from '../stores/app.js';
+  import { isMobile } from '../stores/app.js';
+  
+  let selectedPlan = 'monthly'; // 'monthly' o 'yearly'
+  let showPaymentForm = false;
+  let couponCode = '';
+  let couponApplied = false;
+  let couponDiscount = 0;
+  
+  // Dati del form di pagamento
+  let paymentData = {
+    cardNumber: '',
+    cardHolder: '',
+    expiryMonth: '',
+    expiryYear: '',
+    cvv: '',
+    billingAddress: '',
+    city: '',
+    postalCode: '',
+    country: 'IT'
+  };
+  
+  const plans = {
+    monthly: {
+      name: 'Pro',
+      price: 30,
+      period: 'mese',
+      badge: 'Popolare',
+      description: 'Migliora la produttività e l\'apprendimento con accessi aggiuntivi.',
+      features: [
+        'Accesso a Nebula AI 5.1 (Auto, Instant, Thinking, Pro)',
+        '10 volte più token disponibili per chat',
+        'Caricamenti illimitati di file e immagini',
+        'Accesso esteso a modelli legacy (Nebula AI 5, Nebula AI 4o)',
+        'Esportazione chat avanzata (Markdown, PDF, JSON)',
+        'Accesso prioritario ai nuovi modelli Nebula AI',
+        'Supporto prioritario',
+        'Un abbonamento per tutti gli ultimi modelli AI Nebula'
+      ]
+    },
+    yearly: {
+      name: 'Massimo',
+      price: 300,
+      period: 'mese',
+      badge: null,
+      description: 'Sblocca tutte le funzionalità di Nebula AI con accesso anticipato a nuovi prodotti.',
+      features: [
+        'Tutto incluso in Pro',
+        'Accesso anticipato ai nostri nuovi modelli AI',
+        'Accesso illimitato a tutti i modelli Nebula AI',
+        'Accesso illimitato a modelli avanzati come Nebula AI 5.1 Pro e Thinking',
+        'Priorità massima nelle richieste API',
+        'Generazione avanzata di contenuti',
+        'Supporto prioritario dedicato',
+        'Analisi avanzata di immagini e documenti',
+        'API access illimitato incluso',
+        'Dashboard analytics personalizzata'
+      ]
+    }
+  };
   
   function closeModal() {
     isPremiumModalOpen.set(false);
+    showPaymentForm = false;
+    selectedPlan = 'monthly';
+    couponCode = '';
+    couponApplied = false;
+    couponDiscount = 0;
+    resetPaymentForm();
   }
   
   function handleBackdropClick(event) {
@@ -11,16 +76,142 @@
     }
   }
   
-  function handleUpgrade() {
-    // Qui puoi aggiungere la logica per aprire la pagina di upgrade
-    alert('Funzionalità Premium - Upgrade in arrivo!');
+  function selectPlan(plan) {
+    selectedPlan = plan;
+    showPaymentForm = true;
+  }
+  
+  function applyCoupon() {
+    // Simula validazione coupon (in produzione collegheresti a un'API)
+    const validCoupons = {
+      'WELCOME10': 10,
+      'PREMIUM20': 20,
+      'SAVE50': 50
+    };
+    
+    const discount = validCoupons[couponCode.toUpperCase()];
+    if (discount) {
+      couponApplied = true;
+      couponDiscount = discount;
+    } else {
+      alert('Codice coupon non valido');
+      couponCode = '';
+    }
+  }
+  
+  function removeCoupon() {
+    couponCode = '';
+    couponApplied = false;
+    couponDiscount = 0;
+  }
+  
+  function formatCardNumber(value) {
+    // Rimuovi spazi e caratteri non numerici
+    const cleaned = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    // Aggiungi spazi ogni 4 cifre
+    const matches = cleaned.match(/\d{4,16}/g);
+    const match = matches && matches[0] || '';
+    const parts = [];
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+    if (parts.length) {
+      return parts.join(' ');
+    } else {
+      return cleaned;
+    }
+  }
+  
+  function handleCardNumberInput(event) {
+    const formatted = formatCardNumber(event.target.value);
+    paymentData.cardNumber = formatted;
+    event.target.value = formatted;
+  }
+  
+  function handleExpiryInput(event) {
+    let value = event.target.value.replace(/\D/g, '');
+    if (value.length >= 2) {
+      value = value.substring(0, 2) + '/' + value.substring(2, 4);
+    }
+    const parts = value.split('/');
+    paymentData.expiryMonth = parts[0] || '';
+    paymentData.expiryYear = parts[1] || '';
+    event.target.value = value;
+  }
+  
+  function handleCvvInput(event) {
+    paymentData.cvv = event.target.value.replace(/\D/g, '').substring(0, 4);
+    event.target.value = paymentData.cvv;
+  }
+  
+  function resetPaymentForm() {
+    paymentData = {
+      cardNumber: '',
+      cardHolder: '',
+      expiryMonth: '',
+      expiryYear: '',
+      cvv: '',
+      billingAddress: '',
+      city: '',
+      postalCode: '',
+      country: 'IT'
+    };
+  }
+  
+  function calculateTotal() {
+    const plan = plans[selectedPlan];
+    let total = plan.price;
+    if (couponApplied && couponDiscount > 0) {
+      total = total - (total * couponDiscount / 100);
+    }
+    return total.toFixed(2);
+  }
+  
+  function handlePayment(event) {
+    event.preventDefault();
+    
+    // Validazione form
+    if (!paymentData.cardNumber || paymentData.cardNumber.replace(/\s/g, '').length < 16) {
+      alert('Inserisci un numero di carta valido');
+      return;
+    }
+    if (!paymentData.cardHolder || paymentData.cardHolder.trim().length < 3) {
+      alert('Inserisci il nome del titolare della carta');
+      return;
+    }
+    if (!paymentData.expiryMonth || !paymentData.expiryYear) {
+      alert('Inserisci la data di scadenza');
+      return;
+    }
+    if (!paymentData.cvv || paymentData.cvv.length < 3) {
+      alert('Inserisci il CVV');
+      return;
+    }
+    
+    // Qui implementeresti la chiamata API per processare il pagamento
+    console.log('Processing payment:', {
+      plan: selectedPlan,
+      amount: calculateTotal(),
+      coupon: couponCode || null,
+      paymentData: {
+        ...paymentData,
+        cvv: '***' // Non inviare il CVV reale nei log
+      }
+    });
+    
+    // Simula pagamento
+    alert(`Pagamento di €${calculateTotal()} processato con successo! Benvenuto in Premium!`);
     closeModal();
+  }
+  
+  function goBack() {
+    showPaymentForm = false;
   }
 </script>
 
 {#if $isPremiumModalOpen}
   <div class="modal-backdrop" on:click={handleBackdropClick} on:keydown={(e) => e.key === 'Escape' && closeModal()}>
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="premium-modal-title">
+    <div class="modal-content" class:modal-mobile={$isMobile} role="dialog" aria-modal="true" aria-labelledby="premium-modal-title">
       <div class="modal-header">
         <div class="premium-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -29,7 +220,7 @@
             <path d="M2 12l10 5 10-5"/>
           </svg>
         </div>
-        <h2 id="premium-modal-title">Funzionalità Premium</h2>
+        <h2 id="premium-modal-title">Abbonamento Premium</h2>
         <button class="close-button" on:click={closeModal} aria-label="Chiudi">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -39,46 +230,232 @@
       </div>
       
       <div class="modal-body">
-        <div class="premium-message">
-          <p class="main-message">L'analisi delle immagini richiede un abbonamento Premium.</p>
-          <p class="sub-message">Passa a Premium per sbloccare questa e altre funzionalità avanzate.</p>
-        </div>
-        
-        <div class="premium-features">
-          <div class="feature-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            <span>Analisi di immagini e foto</span>
+        {#if !showPaymentForm}
+          <!-- Selezione Piano -->
+          <div class="plans-selection">
+            <p class="section-description">Scegli il piano che fa per te</p>
+            
+            <div class="plans-grid">
+              <div class="plan-card" class:selected={selectedPlan === 'monthly'} on:click={() => selectPlan('monthly')}>
+                {#if plans.monthly.badge}
+                  <div class="plan-badge">{plans.monthly.badge}</div>
+                {/if}
+                <div class="plan-header">
+                  <h3>{plans.monthly.name}</h3>
+                  <div class="plan-price">
+                    <span class="price-amount">€{plans.monthly.price.toFixed(2)}</span>
+                    <span class="price-period">/{plans.monthly.period}</span>
+                  </div>
+                </div>
+                <p class="plan-description">{plans.monthly.description}</p>
+                <ul class="plan-features">
+                  {#each plans.monthly.features as feature}
+                    <li>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      {feature}
+                    </li>
+                  {/each}
+                </ul>
+                <button class="select-plan-button">Ottieni Pro</button>
+              </div>
+              
+              <div class="plan-card" class:selected={selectedPlan === 'yearly'} on:click={() => selectPlan('yearly')}>
+                {#if plans.yearly.badge}
+                  <div class="plan-badge">{plans.yearly.badge}</div>
+                {/if}
+                <div class="plan-header">
+                  <h3>{plans.yearly.name}</h3>
+                  <div class="plan-price">
+                    <span class="price-amount">€{plans.yearly.price.toFixed(2)}</span>
+                    <span class="price-period">/{plans.yearly.period}</span>
+                  </div>
+                </div>
+                <p class="plan-description">{plans.yearly.description}</p>
+                <ul class="plan-features">
+                  {#each plans.yearly.features as feature}
+                    <li>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      {feature}
+                    </li>
+                  {/each}
+                </ul>
+                <button class="select-plan-button">Ottieni Massimo</button>
+              </div>
+            </div>
           </div>
-          <div class="feature-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            <span>Modelli AI più avanzati</span>
-          </div>
-          <div class="feature-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            <span>Chat illimitate</span>
-          </div>
-          <div class="feature-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            <span>Supporto prioritario</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="modal-footer">
-        <button class="cancel-button" on:click={closeModal}>
-          Annulla
-        </button>
-        <button class="upgrade-button" on:click={handleUpgrade}>
-          Passa a Premium
-        </button>
+        {:else}
+          <!-- Form di Pagamento -->
+          <form class="payment-form" on:submit={handlePayment}>
+            <div class="form-section">
+              <h3>Riepilogo Ordine</h3>
+              <div class="order-summary">
+                <div class="summary-row">
+                  <span>Piano selezionato:</span>
+                  <span>{plans[selectedPlan].name}</span>
+                </div>
+                <div class="summary-row">
+                  <span>Prezzo:</span>
+                  <span>€{plans[selectedPlan].price.toFixed(2)}</span>
+                </div>
+                {#if couponApplied}
+                  <div class="summary-row discount">
+                    <span>Sconto ({couponDiscount}%):</span>
+                    <span>-€{(plans[selectedPlan].price * couponDiscount / 100).toFixed(2)}</span>
+                  </div>
+                {/if}
+                <div class="summary-row total">
+                  <span>Totale:</span>
+                  <span>€{calculateTotal()}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-section">
+              <h3>Codice Coupon</h3>
+              <div class="coupon-section">
+                {#if !couponApplied}
+                  <div class="coupon-input-group">
+                    <input
+                      type="text"
+                      class="form-input"
+                      placeholder="Inserisci codice coupon"
+                      bind:value={couponCode}
+                      disabled={couponApplied}
+                    />
+                    <button type="button" class="apply-coupon-button" on:click={applyCoupon}>
+                      Applica
+                    </button>
+                  </div>
+                {:else}
+                  <div class="coupon-applied">
+                    <span>Coupon {couponCode} applicato (-{couponDiscount}%)</span>
+                    <button type="button" class="remove-coupon-button" on:click={removeCoupon}>
+                      Rimuovi
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            </div>
+            
+            <div class="form-section">
+              <h3>Dati di Pagamento</h3>
+              
+              <div class="form-group">
+                <label for="cardNumber">Numero Carta</label>
+                <input
+                  id="cardNumber"
+                  type="text"
+                  class="form-input"
+                  placeholder="1234 5678 9012 3456"
+                  maxlength="19"
+                  on:input={handleCardNumberInput}
+                  required
+                />
+              </div>
+              
+              <div class="form-group">
+                <label for="cardHolder">Nome Titolare</label>
+                <input
+                  id="cardHolder"
+                  type="text"
+                  class="form-input"
+                  placeholder="Mario Rossi"
+                  bind:value={paymentData.cardHolder}
+                  required
+                />
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="expiry">Scadenza (MM/AA)</label>
+                  <input
+                    id="expiry"
+                    type="text"
+                    class="form-input"
+                    placeholder="MM/AA"
+                    maxlength="5"
+                    on:input={handleExpiryInput}
+                    required
+                  />
+                </div>
+                
+                <div class="form-group">
+                  <label for="cvv">CVV</label>
+                  <input
+                    id="cvv"
+                    type="text"
+                    class="form-input"
+                    placeholder="123"
+                    maxlength="4"
+                    on:input={handleCvvInput}
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="billingAddress">Indirizzo di Fatturazione</label>
+                <input
+                  id="billingAddress"
+                  type="text"
+                  class="form-input"
+                  placeholder="Via Roma 123"
+                  bind:value={paymentData.billingAddress}
+                />
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="city">Città</label>
+                  <input
+                    id="city"
+                    type="text"
+                    class="form-input"
+                    placeholder="Roma"
+                    bind:value={paymentData.city}
+                  />
+                </div>
+                
+                <div class="form-group">
+                  <label for="postalCode">CAP</label>
+                  <input
+                    id="postalCode"
+                    type="text"
+                    class="form-input"
+                    placeholder="00100"
+                    bind:value={paymentData.postalCode}
+                    maxlength="10"
+                  />
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="country">Paese</label>
+                <select id="country" class="form-input" bind:value={paymentData.country}>
+                  <option value="IT">Italia</option>
+                  <option value="US">Stati Uniti</option>
+                  <option value="GB">Regno Unito</option>
+                  <option value="DE">Germania</option>
+                  <option value="FR">Francia</option>
+                  <option value="ES">Spagna</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="form-footer">
+              <button type="button" class="back-button" on:click={goBack}>
+                Indietro
+              </button>
+              <button type="submit" class="pay-button">
+                Paga €{calculateTotal()}
+              </button>
+            </div>
+          </form>
+        {/if}
       </div>
     </div>
   </div>
@@ -110,7 +487,7 @@
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    max-width: 480px;
+    max-width: 600px;
     width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -179,93 +556,316 @@
     overflow-y: auto;
   }
 
-  .premium-message {
+  .section-description {
     text-align: center;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+
+  .plans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
     margin-bottom: 24px;
   }
 
-  .main-message {
-    font-size: 18px;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin: 0 0 8px 0;
+  .plan-card {
+    background-color: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
   }
 
-  .sub-message {
+  .plan-card:hover {
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .plan-card.selected {
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+  }
+
+  .plan-badge {
+    position: absolute;
+    top: -12px;
+    right: 20px;
+    background: #10b981;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    border: 1px solid #10b981;
+  }
+
+  .plan-header {
+    margin-bottom: 20px;
+  }
+
+  .plan-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+  }
+
+  .plan-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .price-amount {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .price-period {
+    font-size: 16px;
+    color: var(--text-secondary);
+  }
+
+  .plan-description {
     font-size: 14px;
     color: var(--text-secondary);
-    margin: 0;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
   }
 
-  .premium-features {
+  .plan-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    margin-top: 24px;
+    gap: 12px;
   }
 
-  .feature-item {
+  .plan-features li {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background-color: var(--bg-tertiary);
-    border-radius: 8px;
-    color: var(--text-primary);
+    gap: 10px;
     font-size: 14px;
-    transition: background-color 0.2s;
+    color: var(--text-primary);
   }
 
-  .feature-item:hover {
-    background-color: var(--hover-bg);
-  }
-
-  .feature-item svg {
-    color: #fbbf24;
+  .plan-features li svg {
+    color: #10b981;
     flex-shrink: 0;
   }
 
-  .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding: 20px 24px;
-    border-top: 1px solid var(--border-color);
-  }
-
-  .cancel-button,
-  .upgrade-button {
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-  }
-
-  .cancel-button {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
-  }
-
-  .cancel-button:hover {
-    background-color: var(--hover-bg);
-  }
-
-  .upgrade-button {
+  .select-plan-button {
+    width: 100%;
+    padding: 12px;
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    border: none;
+    border-radius: 8px;
     color: #000;
     font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
   }
 
-  .upgrade-button:hover {
+  .select-plan-button:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
   }
 
-  .upgrade-button:active {
-    transform: translateY(0);
+  .payment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .form-section {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .form-section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 16px 0;
+  }
+
+  .order-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .summary-row.discount {
+    color: #10b981;
+  }
+
+  .summary-row.total {
+    font-weight: 600;
+    font-size: 18px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .coupon-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .coupon-input-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .coupon-input-group .form-input {
+    flex: 1;
+  }
+
+  .apply-coupon-button {
+    padding: 10px 20px;
+    background-color: var(--accent-blue);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    white-space: nowrap;
+  }
+
+  .apply-coupon-button:hover {
+    background-color: #2563eb;
+  }
+
+  .coupon-applied {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background-color: rgba(16, 185, 129, 0.1);
+    border: 1px solid #10b981;
+    border-radius: 6px;
+    color: #10b981;
+    font-size: 14px;
+  }
+
+  .remove-coupon-button {
+    background: none;
+    border: none;
+    color: #10b981;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: underline;
+    padding: 4px;
+  }
+
+  .remove-coupon-button:hover {
+    color: #059669;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .form-input {
+    padding: 10px 12px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-input:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .form-input::placeholder {
+    color: var(--text-secondary);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .form-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .back-button {
+    padding: 12px 24px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .back-button:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .pay-button {
+    flex: 1;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .pay-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
   }
 
   @media (max-width: 768px) {
@@ -273,7 +873,7 @@
       padding: 0;
     }
 
-    .modal-content {
+    .modal-content.modal-mobile {
       max-width: 100%;
       max-height: 100vh;
       height: 100vh;
@@ -285,33 +885,25 @@
       padding: 20px 16px;
     }
 
-    .modal-header h2 {
-      font-size: 20px;
-    }
-
     .modal-body {
       padding: 20px 16px;
     }
 
-    .main-message {
-      font-size: 16px;
+    .plans-grid {
+      grid-template-columns: 1fr;
     }
 
-    .feature-item {
-      padding: 10px;
-      font-size: 13px;
+    .form-row {
+      grid-template-columns: 1fr;
     }
 
-    .modal-footer {
-      padding: 16px;
+    .form-footer {
       flex-direction: column-reverse;
     }
 
-    .cancel-button,
-    .upgrade-button {
+    .back-button,
+    .pay-button {
       width: 100%;
-      padding: 12px;
     }
   }
 </style>
-

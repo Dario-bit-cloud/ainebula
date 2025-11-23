@@ -11,6 +11,11 @@
   import PromptLibraryModal from './components/PromptLibraryModal.svelte';
   import VoiceSelectModal from './components/VoiceSelectModal.svelte';
   import VoiceModeView from './components/VoiceModeView.svelte';
+  import { selectedPrompt } from './stores/app.js';
+  
+  function handlePromptSelect(event) {
+    selectedPrompt.set(event.detail);
+  }
 </script>
 
 <div class="app-container">
@@ -25,7 +30,7 @@
   <UserMenu />
   <PremiumModal />
   <AISettingsModal />
-  <PromptLibraryModal on:select={(e) => console.log('Prompt selected:', e.detail)} />
+  <PromptLibraryModal on:select={handlePromptSelect} />
   <VoiceSelectModal on:voiceSelected={(e) => console.log('Voice selected:', e.detail)} />
   <VoiceModeView />
 </div>

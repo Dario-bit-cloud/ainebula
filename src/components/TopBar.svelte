@@ -2,16 +2,53 @@
   import { selectedModel, availableModels } from '../stores/models.js';
   import { isGenerating } from '../stores/chat.js';
   import { isSettingsOpen, isSidebarOpen, isMobile, isAISettingsModalOpen, isPromptLibraryModalOpen } from '../stores/app.js';
+  import { onMount } from 'svelte';
   
   let isModelDropdownOpen = false;
+  let modelSelectorButton;
+  let modelDropdown;
+  let dropdownPosition = { top: 0, left: 0 };
+  let showLegacyModels = false;
+  let legacySubmenuPosition = { top: 0, left: 0 };
+  let legacyHeaderElement;
   
   function toggleModelDropdown() {
     isModelDropdownOpen = !isModelDropdownOpen;
+    if (isModelDropdownOpen && modelSelectorButton) {
+      updateDropdownPosition();
+      showLegacyModels = false;
+    }
+  }
+  
+  function updateDropdownPosition() {
+    if (modelSelectorButton) {
+      const rect = modelSelectorButton.getBoundingClientRect();
+      dropdownPosition = {
+        top: rect.bottom + 8,
+        left: rect.left
+      };
+    }
   }
   
   function selectModel(modelId) {
+    if (modelId === 'legacy-header') {
+      return; // Non selezionare l'header
+    }
     selectedModel.set(modelId);
     isModelDropdownOpen = false;
+    showLegacyModels = false;
+  }
+  
+  function toggleLegacyModels(event) {
+    event.stopPropagation();
+    if (legacyHeaderElement) {
+      const rect = legacyHeaderElement.getBoundingClientRect();
+      legacySubmenuPosition = {
+        top: rect.top,
+        left: rect.right + 8
+      };
+    }
+    showLegacyModels = !showLegacyModels;
   }
   
   function toggleSettings() {
@@ -32,10 +69,28 @@
   
   // Chiudi dropdown quando si clicca fuori
   function handleClickOutside(event) {
-    if (!event.target.closest('.model-selector-wrapper')) {
+    if (!event.target.closest('.model-selector-wrapper') && !event.target.closest('.legacy-submenu')) {
       isModelDropdownOpen = false;
+      showLegacyModels = false;
     }
   }
+  
+  // Aggiorna posizione quando la finestra viene ridimensionata o scrollata
+  onMount(() => {
+    const handleResize = () => {
+      if (isModelDropdownOpen) {
+        updateDropdownPosition();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleResize, true);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleResize, true);
+    };
+  });
 </script>
 
 <svelte:window on:click={handleClickOutside} />
@@ -58,17 +113,27 @@
       </svg>
     </div>
     <div class="model-selector-wrapper">
-      <button class="model-selector" on:click={toggleModelDropdown}>
+      <button class="model-selector" bind:this={modelSelectorButton} on:click={toggleModelDropdown}>
         <span class="model-name">
-          {$availableModels.find(m => m.id === $selectedModel)?.name || 'Nebula AI 5.1 Instant'}
+          {#if $availableModels.find(m => m.id === $selectedModel)}
+            {@const selected = $availableModels.find(m => m.id === $selectedModel)}
+            {#if selected.group === 'Legacy'}
+              {selected.name}
+            {:else}
+              Nebula AI 5.1 {selected.name}
+            {/if}
+          {:else}
+            Nebula AI 5.1 Instant
+          {/if}
         </span>
         <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
       {#if isModelDropdownOpen}
-        <div class="model-dropdown">
-          {#each $availableModels as model}
+        <div class="model-dropdown" bind:this={modelDropdown} style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;">
+          <div class="model-group-header">Nebula AI 5.1</div>
+          {#each $availableModels.filter(m => m.group === 'Nebula AI 5.1' && !m.isHeader) as model}
             <button 
               class="model-option" 
               class:selected={model.id === $selectedModel}
@@ -76,7 +141,9 @@
             >
               <div class="model-info">
                 <div class="model-name">{model.name}</div>
-                <div class="model-description">{model.description}</div>
+                {#if model.description}
+                  <div class="model-description">{model.description}</div>
+                {/if}
               </div>
               {#if model.id === $selectedModel}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -85,6 +152,39 @@
               {/if}
             </button>
           {/each}
+          <button 
+            class="model-option model-option-header" 
+            bind:this={legacyHeaderElement}
+            on:click={toggleLegacyModels}
+            on:mouseenter={toggleLegacyModels}
+          >
+            <div class="model-info">
+              <div class="model-name">Modelli legacy</div>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+          {#if showLegacyModels}
+            <div class="legacy-submenu" style="top: {legacySubmenuPosition.top}px; left: {legacySubmenuPosition.left}px;">
+              {#each $availableModels.filter(m => m.group === 'Legacy') as model}
+                <button 
+                  class="model-option" 
+                  class:selected={model.id === $selectedModel}
+                  on:click={() => selectModel(model.id)}
+                >
+                  <div class="model-info">
+                    <div class="model-name">{model.name}</div>
+                  </div>
+                  {#if model.id === $selectedModel}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -128,7 +228,8 @@
     border-bottom: 1px solid var(--border-color);
     height: 56px;
     position: relative;
-    z-index: 100;
+    z-index: 1000;
+    isolation: isolate;
   }
 
   .left-section {
@@ -248,10 +349,11 @@
       font-size: 13px;
     }
 
-    .model-selector-wrapper {
-      flex: 1;
-      min-width: 0;
-    }
+  .model-selector-wrapper {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+  }
   }
 
   .model-selector:hover {
@@ -269,17 +371,57 @@
   }
 
   .model-dropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
+    position: fixed;
     min-width: 280px;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-    z-index: 1000;
+    overflow: visible;
+    z-index: 10000;
     animation: dropdownSlideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .model-group-header {
+    padding: 12px 16px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4px;
+  }
+  
+  .legacy-submenu {
+    position: fixed;
+    min-width: 240px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    z-index: 10001;
+    animation: dropdownSlideRight 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @keyframes dropdownSlideRight {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  .model-option-header {
+    cursor: pointer;
+  }
+  
+  .model-option-header:hover {
+    background-color: var(--hover-bg);
   }
 
   @keyframes dropdownSlideDown {
@@ -373,3 +515,4 @@
     }
   }
 </style>
+
