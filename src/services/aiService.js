@@ -136,7 +136,19 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
       } catch (e) {
         errorData = { error: { message: errorText || `HTTP ${response.status}: ${response.statusText}` } };
       }
-      throw new Error(errorData.error?.message || `API Error: ${response.status} ${response.statusText}`);
+      
+      // Messaggio più chiaro per errori comuni
+      let errorMessage = errorData.error?.message || `API Error: ${response.status} ${response.statusText}`;
+      
+      if (response.status === 401) {
+        errorMessage = 'API Key non valida o scaduta. Verifica la tua API key in src/config/api.js o ottieni una nuova chiave da https://openrouter.ai/keys';
+      } else if (response.status === 429) {
+        errorMessage = 'Troppe richieste. Limite giornaliero raggiunto. Riprova più tardi.';
+      } else if (response.status === 402) {
+        errorMessage = 'Crediti insufficienti. Aggiungi fondi al tuo account OpenRouter.';
+      }
+      
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
