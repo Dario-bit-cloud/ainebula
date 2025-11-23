@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 
 // Store per le chat
 export const chats = writable([]);
@@ -71,7 +71,8 @@ export function addMessage(chatId, message) {
   });
   
   // Salva solo se non è una chat temporanea
-  const chat = $chats.find(c => c.id === chatId);
+  const allChats = get(chats);
+  const chat = allChats.find(c => c.id === chatId);
   if (chat && !chat.isTemporary) {
     saveChatsToStorage();
   }
@@ -93,7 +94,8 @@ export function deleteChat(chatId) {
 
 export function loadChat(chatId) {
   // Se si carica una chat normale, rimuovi eventuali chat temporanee
-  const chat = $chats.find(c => c.id === chatId);
+  const allChats = get(chats);
+  const chat = allChats.find(c => c.id === chatId);
   if (chat && !chat.isTemporary) {
     chats.update(allChats => allChats.filter(c => !c.isTemporary || c.id === chatId));
   }

@@ -1,5 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
+  import { get } from 'svelte/store';
   import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, createTemporaryChat, saveChatsToStorage } from '../stores/chat.js';
   import { selectedModel } from '../stores/models.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
@@ -227,7 +228,7 @@
           $selectedModel, 
           chatHistory,
           [],
-          abortController.signal
+          abortController
         )) {
           fullResponse += chunk;
           // Aggiorna il messaggio in tempo reale
@@ -330,6 +331,9 @@
     // Aggiorna il messaggio
     updateMessage(chatId, editingMessageIndex, { content: inputValue.trim() });
     
+    // Salva l'indice prima di resettarlo
+    const savedIndex = editingMessageIndex;
+    
     // Elimina tutti i messaggi dopo quello modificato
     const messagesToDelete = messages.length - editingMessageIndex - 1;
     for (let i = 0; i < messagesToDelete; i++) {
@@ -340,7 +344,6 @@
     inputValue = '';
     
     // Rigenera la risposta se c'era una risposta AI dopo
-    const savedIndex = editingMessageIndex;
     await tick();
     const currentMessages = $currentChat?.messages || [];
     if (currentMessages[savedIndex + 1]?.type === 'ai' || currentMessages.length === savedIndex + 1) {
@@ -394,25 +397,44 @@
           $selectedModel,
           chatHistory.slice(0, -1),
           [],
-          abortController.signal
+          abortController
         )) {
           fullResponse += chunk;
-          updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+          const currentChatData = get(currentChat);
+          if (currentChatData && currentChatData.messages.length > 0) {
+            updateMessage(chatId, currentChatData.messages.length - 1, { content: fullResponse });
+          }
           await tick();
           scrollToBottom(false);
         }
         
-        updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+        const currentChatData = get(currentChat);
+        if (currentChatData && currentChatData.messages.length > 0) {
+          updateMessage(chatId, currentChatData.messages.length - 1, { content: fullResponse });
+        }
         currentStreamingMessageId = null;
         
       } catch (error) {
         console.error('Error regenerating response:', error);
-        if (currentStreamingMessageId && error.message.includes('interrotta')) {
-          deleteMessage(chatId, $currentChat.messages.length - 1);
+        const currentChatData = get(currentChat);
+        if (currentStreamingMessageId && error?.message && error.message.includes('interrotta')) {
+          if (currentChatData && currentChatData.messages.length > 0) {
+            deleteMessage(chatId, currentChatData.messages.length - 1);
+          }
         } else {
-          updateMessage(chatId, $currentChat.messages.length - 1, { 
-            content: `❌ Errore: ${error.message || 'Errore sconosciuto'}`
-          });
+          const errorMsg = error?.message || 'Errore sconosciuto';
+          if (currentChatData && currentChatData.messages.length > 0) {
+            updateMessage(chatId, currentChatData.messages.length - 1, { 
+              content: `❌ Errore: ${errorMsg}`
+            });
+          } else {
+            // Se non c'è un messaggio AI, aggiungilo
+            addMessage(chatId, {
+              type: 'ai',
+              content: `❌ Errore: ${errorMsg}`,
+              timestamp: new Date().toISOString()
+            });
+          }
         }
         currentStreamingMessageId = null;
       } finally {
@@ -496,7 +518,7 @@
         showMoreOptions = !showMoreOptions;
         break;
       case 'voice-mode':
-        isVoiceSelectModalOpen.set(true);
+        isVoiceSelectionModalOpen.set(true);
         showAttachMenu = false;
         break;
       case 'web-search':
