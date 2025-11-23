@@ -19,7 +19,21 @@ function createMediaQuery(query) {
   const mediaQuery = window.matchMedia(query);
   const { set, subscribe } = writable(mediaQuery.matches);
   
-  const handler = (e) => set(e.matches);
+  // Imposta lo stato iniziale della sidebar in base alla dimensione dello schermo
+  if (mediaQuery.matches) {
+    isSidebarOpen.set(false);
+  }
+  
+  const handler = (e) => {
+    set(e.matches);
+    // Su mobile, chiudi la sidebar quando si passa da desktop a mobile
+    if (e.matches) {
+      isSidebarOpen.set(false);
+    } else {
+      isSidebarOpen.set(true);
+    }
+  };
+  
   mediaQuery.addEventListener('change', handler);
   
   return {

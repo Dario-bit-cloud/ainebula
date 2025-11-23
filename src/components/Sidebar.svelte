@@ -4,11 +4,19 @@
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { createProject } from '../stores/projects.js';
+  import { onMount } from 'svelte';
   
   let activeItem = 'chat';
   let searchInput = '';
   let filteredChats = [];
   let showChatList = true;
+
+  // Su mobile, la sidebar è chiusa di default
+  onMount(() => {
+    if ($isMobile) {
+      isSidebarOpen.set(false);
+    }
+  });
   
   $: {
     if ($searchQuery) {
@@ -83,6 +91,9 @@
   
   function handleInviteClick() {
     isInviteModalOpen.set(true);
+    if ($isMobile) {
+      isSidebarOpen.set(false);
+    }
   }
   
   function formatDate(dateString) {
