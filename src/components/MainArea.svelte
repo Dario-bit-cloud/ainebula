@@ -427,27 +427,6 @@
     margin-top: 12px;
   }
 
-  .message-images {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .message-image {
-    max-width: 300px;
-    max-height: 300px;
-    border-radius: 8px;
-    object-fit: cover;
-    cursor: pointer;
-    transition: transform 0.2s;
-    border: 1px solid var(--border-color);
-  }
-
-  .message-image:hover {
-    transform: scale(1.02);
-  }
-
   .user-message .message-images {
     justify-content: flex-end;
   }
