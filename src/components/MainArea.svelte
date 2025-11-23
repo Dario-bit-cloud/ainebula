@@ -74,18 +74,36 @@
   onMount(() => {
     voiceAvailable = isVoiceAvailable();
     
-    // Inizializza riconoscimento vocale
+    // Inizializza riconoscimento vocale per input testo
     if (voiceAvailable) {
       initVoiceRecognition(
         (transcript) => {
-          inputValue = transcript;
+          // Aggiungi il testo riconosciuto all'input (append se c'è già testo)
+          if (inputValue.trim()) {
+            inputValue = inputValue + ' ' + transcript;
+          } else {
+            inputValue = transcript;
+          }
           stopListening();
           isRecording = false;
+          // Focus sul textarea e resize
+          if (textareaRef) {
+            textareaRef.focus();
+            handleInputResize();
+          }
         },
         (error) => {
           console.error('Voice recognition error:', error);
           isRecording = false;
           stopListening();
+          // Mostra errore all'utente solo se non è un'interruzione volontaria
+          if (error !== 'no-speech' && error !== 'aborted') {
+            showError = true;
+            errorMessage = 'Errore nel riconoscimento vocale. Riprova.';
+            setTimeout(() => {
+              showError = false;
+            }, 3000);
+          }
         }
       );
     }
@@ -492,22 +510,25 @@
       return;
     }
     
-    // Apri il modal di selezione voce
-    isVoiceSelectionModalOpen.set(true);
-  }
-  
-  function handleVoiceSelected(event) {
-    const selectedVoice = event.detail;
-    console.log('Voce selezionata:', selectedVoice);
-    
-    // Avvia la registrazione con la voce selezionata
+    // Avvia/ferma il riconoscimento vocale per inserire testo
     if (!isRecording) {
       startListening();
       isRecording = true;
+      // Focus sul textarea per vedere il testo inserito
+      if (textareaRef) {
+        textareaRef.focus();
+      }
     } else {
       stopListening();
       isRecording = false;
     }
+  }
+  
+  function handleVoiceSelected(event) {
+    // Questa funzione è per la modalità vocale (quando l'AI parla)
+    // Non per l'input vocale
+    const selectedVoice = event.detail;
+    console.log('Voce selezionata per modalità vocale:', selectedVoice);
   }
   
   function handleAttachClick(event) {
@@ -1054,9 +1075,9 @@
         <button 
           class="voice-button" 
           class:recording={isRecording}
-          title={voiceAvailable ? "Input vocale" : "Riconoscimento vocale non disponibile"}
+          title={isRecording ? "Ferma registrazione" : (voiceAvailable ? "Input vocale - Parla per inserire testo" : "Riconoscimento vocale non disponibile")}
           on:click={handleVoiceClick}
-          disabled={!voiceAvailable || $isGenerating}
+          disabled={!voiceAvailable || $isGenerating || editingMessageIndex !== null}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
@@ -1065,7 +1086,12 @@
             <line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
         </button>
-        <button class="waveform-button" title="Waveform" disabled={$isGenerating}>
+        <button 
+          class="waveform-button" 
+          title="Modalità vocale - Ascolta le risposte dell'AI"
+          on:click={() => isVoiceSelectionModalOpen.set(true)}
+          disabled={$isGenerating || editingMessageIndex !== null}
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <rect x="2" y="10" width="3" height="4" rx="1"/>
             <rect x="7" y="8" width="3" height="8" rx="1"/>
