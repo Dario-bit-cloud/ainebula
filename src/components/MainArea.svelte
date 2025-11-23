@@ -426,49 +426,55 @@
     border-top: 1px solid var(--border-color);
   }
 
-  .attached-files {
+  .attached-images {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 8px;
+    padding: 0 4px;
   }
 
-  .file-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-size: 12px;
-  }
-
-  .file-name {
-    color: var(--text-primary);
-    max-width: 150px;
+  .image-preview {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 8px;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-tertiary);
   }
 
-  .file-remove {
-    background: none;
+  .image-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .image-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background-color: rgba(0, 0, 0, 0.7);
     border: none;
-    color: var(--text-secondary);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    color: white;
     cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-    padding: 0;
-    width: 16px;
-    height: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background-color 0.2s;
+    padding: 0;
   }
 
-  .file-remove:hover {
-    color: var(--text-primary);
+  .image-remove:hover {
+    background-color: rgba(0, 0, 0, 0.9);
+  }
+
+  .image-remove svg {
+    width: 14px;
+    height: 14px;
   }
 
   .input-wrapper {
