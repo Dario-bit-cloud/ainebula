@@ -7,4 +7,5 @@ export const searchQuery = writable('');
 export const isSettingsOpen = writable(false);
 export const isProjectModalOpen = writable(false);
 export const isInviteModalOpen = writable(false);
+export const isUserMenuOpen = writable(false);
 

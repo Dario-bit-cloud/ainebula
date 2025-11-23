@@ -2,7 +2,7 @@
   import { user as userStore } from '../stores/user.js';
   import { chats, currentChatId, createNewChat, loadChat, deleteChat } from '../stores/chat.js';
   import { selectedModel, setModel } from '../stores/models.js';
-  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen } from '../stores/app.js';
+  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen } from '../stores/app.js';
   import { createProject } from '../stores/projects.js';
   
   let activeItem = 'chat';
@@ -166,7 +166,7 @@
   </nav>
   
   <div class="user-section">
-    <div class="user-info">
+    <button class="user-info" on:click={() => isUserMenuOpen.set(!$isUserMenuOpen)}>
       <div class="user-avatar">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -178,7 +178,7 @@
         <div class="username">{$userStore.name || 'Utente'}</div>
         <div class="workspace">{$userStore.email || 'Nessun workspace'}</div>
       </div>
-    </div>
+    </button>
     <button class="invite-button" on:click={handleInviteClick}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -364,6 +364,15 @@
     margin-bottom: 12px;
     padding: 8px;
     border-radius: 8px;
+    background: none;
+    border: none;
+    width: 100%;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .user-info:hover {
+    background-color: var(--hover-bg);
   }
 
   .user-avatar {
