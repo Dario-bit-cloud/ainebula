@@ -1,14 +1,59 @@
 <script>
   import { user as userStore } from '../stores/user.js';
-  import { chats, currentChatId, createNewChat, loadChat, deleteChat } from '../stores/chat.js';
+  import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject } from '../stores/chat.js';
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
-  import { createProject } from '../stores/projects.js';
+  import { projects, updateProject, deleteProject } from '../stores/projects.js';
   
   let activeItem = 'new-chat';
   let searchInput = '';
   let filteredChats = [];
   let showChatList = true;
+  let expandedProjects = new Set();
+  let showMoveMenu = false;
+  let moveMenuChatId = null;
+  let moveMenuPosition = { x: 0, y: 0 };
+  
+  // Organizza le chat per progetto
+  $: organizedChats = (() => {
+    const organized = {
+      projects: {},
+      unassigned: []
+    };
+    
+    $chats.forEach(chat => {
+      if (chat.isTemporary) return;
+      if (chat.projectId) {
+        if (!organized.projects[chat.projectId]) {
+          organized.projects[chat.projectId] = [];
+        }
+        organized.projects[chat.projectId].push(chat);
+      } else {
+        organized.unassigned.push(chat);
+      }
+    });
+    
+    // Ordina le chat per data di aggiornamento
+    Object.keys(organized.projects).forEach(projectId => {
+      organized.projects[projectId].sort((a, b) => 
+        new Date(b.updatedAt) - new Date(a.updatedAt)
+      );
+    });
+    organized.unassigned.sort((a, b) => 
+      new Date(b.updatedAt) - new Date(a.updatedAt)
+    );
+    
+    return organized;
+  })();
+  
+  // Espandi automaticamente i progetti con chat
+  $: {
+    Object.keys(organizedChats.projects).forEach(projectId => {
+      if (organizedChats.projects[projectId].length > 0) {
+        expandedProjects.add(projectId);
+      }
+    });
+  }
   
   $: {
     if ($searchQuery) {
@@ -102,6 +147,61 @@
     if (days < 7) return `${days} giorni fa`;
     return date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
   }
+  
+  function toggleProject(projectId) {
+    if (expandedProjects.has(projectId)) {
+      expandedProjects.delete(projectId);
+    } else {
+      expandedProjects.add(projectId);
+    }
+    expandedProjects = expandedProjects; // Trigger reactivity
+  }
+  
+  function handleMoveChat(event, chatId) {
+    event.stopPropagation();
+    moveMenuChatId = chatId;
+    const rect = event.currentTarget.getBoundingClientRect();
+    moveMenuPosition = { x: rect.right + 5, y: rect.top };
+    showMoveMenu = true;
+  }
+  
+  function closeMoveMenu() {
+    showMoveMenu = false;
+    moveMenuChatId = null;
+  }
+  
+  function handleMoveToProject(projectId) {
+    if (moveMenuChatId) {
+      moveChatToProject(moveMenuChatId, projectId);
+      showMoveMenu = false;
+      moveMenuChatId = null;
+    }
+  }
+  
+  function handleRemoveFromProject() {
+    if (moveMenuChatId) {
+      removeChatFromProject(moveMenuChatId);
+      showMoveMenu = false;
+      moveMenuChatId = null;
+    }
+  }
+  
+  function handleProjectClick(projectId) {
+    toggleProject(projectId);
+  }
+  
+  function handleProjectDelete(event, projectId) {
+    event.stopPropagation();
+    if (confirm('Sei sicuro di voler eliminare questa cartella? Le chat non verranno eliminate.')) {
+      // Rimuovi projectId dalle chat prima di eliminare la cartella
+      $chats.forEach(chat => {
+        if (chat.projectId === projectId) {
+          removeChatFromProject(chat.id);
+        }
+      });
+      deleteProject(projectId);
+    }
+  }
 </script>
 
 {#if $isMobile && $isSidebarOpen}
@@ -159,39 +259,182 @@
           </div>
         {/if}
         
-        {#if filteredChats.length > 0}
-          {#each filteredChats as chat}
-            <div 
-              class="chat-item" 
-              class:active={chat.id === $currentChatId}
-              on:click={() => handleChatClick(chat.id)}
-            >
-              <div class="chat-info">
-                <div class="chat-title">{chat.title}</div>
-                <div class="chat-date">{formatDate(chat.updatedAt)}</div>
+        {#if $sidebarView === 'library'}
+          <!-- Mostra cartelle e chat organizzate -->
+          {#each $projects as project}
+            {#if organizedChats.projects[project.id] && organizedChats.projects[project.id].length > 0}
+              <div class="project-folder">
+                <div 
+                  class="project-header"
+                  on:click={() => handleProjectClick(project.id)}
+                >
+                  <div class="project-icon-wrapper" style="background-color: {project.color}20; color: {project.color}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d={project.icon}/>
+                    </svg>
+                  </div>
+                  <span class="project-name">{project.name}</span>
+                  <span class="project-count">({organizedChats.projects[project.id].length})</span>
+                  <svg 
+                    class="expand-icon" 
+                    class:expanded={expandedProjects.has(project.id)}
+                    width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  >
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                  <button 
+                    class="project-delete" 
+                    on:click={(e) => handleProjectDelete(e, project.id)}
+                    title="Elimina cartella"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+                {#if expandedProjects.has(project.id)}
+                  <div class="project-chats">
+                    {#each organizedChats.projects[project.id] as chat}
+                      <div 
+                        class="chat-item nested" 
+                        class:active={chat.id === $currentChatId}
+                        on:click={() => handleChatClick(chat.id)}
+                      >
+                        <div class="chat-info">
+                          <div class="chat-title">{chat.title}</div>
+                          <div class="chat-date">{formatDate(chat.updatedAt)}</div>
+                        </div>
+                        <div class="chat-actions">
+                          <button 
+                            class="chat-move" 
+                            on:click={(e) => handleMoveChat(e, chat.id)}
+                            title="Sposta chat"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                          </button>
+                          <button 
+                            class="chat-delete" 
+                            on:click={(e) => handleDeleteChat(e, chat.id)}
+                            title="Elimina chat"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polyline points="3 6 5 6 21 6"/>
+                              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
               </div>
-              <button 
-                class="chat-delete" 
-                on:click={(e) => handleDeleteChat(e, chat.id)}
-                title="Elimina chat"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                </svg>
-              </button>
-            </div>
+            {/if}
           {/each}
-        {:else if $sidebarView === 'search' && $searchQuery}
-          <div class="empty-state">
-            <p>Nessuna chat trovata</p>
-          </div>
-        {:else}
-          <div class="empty-state">
-            <p>Nessuna chat ancora</p>
-            <p class="empty-hint">Crea una nuova chat per iniziare</p>
-          </div>
+          
+          <!-- Chat non assegnate -->
+          {#if organizedChats.unassigned.length > 0}
+            <div class="project-folder">
+              <div class="project-header unassigned-header">
+                <span class="project-name">Chat senza cartella</span>
+                <span class="project-count">({organizedChats.unassigned.length})</span>
+              </div>
+              <div class="project-chats">
+                {#each organizedChats.unassigned as chat}
+                  <div 
+                    class="chat-item nested" 
+                    class:active={chat.id === $currentChatId}
+                    on:click={() => handleChatClick(chat.id)}
+                  >
+                    <div class="chat-info">
+                      <div class="chat-title">{chat.title}</div>
+                      <div class="chat-date">{formatDate(chat.updatedAt)}</div>
+                    </div>
+                    <div class="chat-actions">
+                      <button 
+                        class="chat-move" 
+                        on:click={(e) => handleMoveChat(e, chat.id)}
+                        title="Sposta chat"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                      </button>
+                      <button 
+                        class="chat-delete" 
+                        on:click={(e) => handleDeleteChat(e, chat.id)}
+                        title="Elimina chat"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        {:else if $sidebarView === 'search'}
+          {#if filteredChats.length > 0}
+            {#each filteredChats as chat}
+              <div 
+                class="chat-item" 
+                class:active={chat.id === $currentChatId}
+                on:click={() => handleChatClick(chat.id)}
+              >
+                <div class="chat-info">
+                  <div class="chat-title">{chat.title}</div>
+                  <div class="chat-date">{formatDate(chat.updatedAt)}</div>
+                </div>
+                <button 
+                  class="chat-delete" 
+                  on:click={(e) => handleDeleteChat(e, chat.id)}
+                  title="Elimina chat"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                  </svg>
+                </button>
+              </div>
+            {/each}
+          {:else if $searchQuery}
+            <div class="empty-state">
+              <p>Nessuna chat trovata</p>
+            </div>
+          {:else}
+            <div class="empty-state">
+              <p>Nessuna chat ancora</p>
+              <p class="empty-hint">Crea una nuova chat per iniziare</p>
+            </div>
+          {/if}
         {/if}
+      </div>
+    {/if}
+    
+    {#if showMoveMenu}
+      <div class="move-menu-backdrop" on:click={closeMoveMenu}></div>
+      <div class="move-menu" style="left: {moveMenuPosition.x}px; top: {moveMenuPosition.y}px">
+        <div class="move-menu-header">Sposta in cartella</div>
+        <div class="move-menu-options">
+          <button class="move-option" on:click={handleRemoveFromProject}>
+            <span>Rimuovi da cartella</span>
+          </button>
+          {#each $projects as project}
+            <button class="move-option" on:click={() => handleMoveToProject(project.id)}>
+              <div class="move-option-icon" style="background-color: {project.color}20; color: {project.color}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d={project.icon}/>
+                </svg>
+              </div>
+              <span>{project.name}</span>
+            </button>
+          {/each}
+        </div>
       </div>
     {/if}
   </nav>
@@ -554,6 +797,195 @@
     font-size: 11px;
     margin-top: 4px;
     opacity: 0.7;
+  }
+
+  .project-folder {
+    margin-bottom: 8px;
+  }
+
+  .project-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative;
+  }
+
+  .project-header:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .project-header.unassigned-header {
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  .project-icon-wrapper {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .project-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: left;
+  }
+
+  .project-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .expand-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+
+  .expand-icon.expanded {
+    transform: rotate(180deg);
+  }
+
+  .project-delete {
+    opacity: 0;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .project-header:hover .project-delete {
+    opacity: 1;
+  }
+
+  .project-delete:hover {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+  }
+
+  .project-chats {
+    margin-left: 32px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .chat-item.nested {
+    padding: 8px 12px;
+    margin-left: 0;
+  }
+
+  .chat-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .chat-item:hover .chat-actions {
+    opacity: 1;
+  }
+
+  .chat-move {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .chat-move:hover {
+    color: var(--accent-blue);
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+
+  .move-menu-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: transparent;
+  }
+
+  .move-menu {
+    position: fixed;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1001;
+    min-width: 200px;
+    max-width: 300px;
+    overflow: hidden;
+    transform: translateY(-50%);
+  }
+
+  .move-menu-header {
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .move-menu-options {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .move-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-align: left;
+  }
+
+  .move-option:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .move-option-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
   }
 
   .user-section {

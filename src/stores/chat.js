@@ -14,11 +14,12 @@ export const currentChat = derived(
 );
 
 // Funzioni helper
-export function createNewChat() {
+export function createNewChat(projectId = null) {
   const newChat = {
     id: Date.now().toString(),
     title: 'Nuova chat',
     messages: [],
+    projectId: projectId || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     isTemporary: false
@@ -28,6 +29,21 @@ export function createNewChat() {
   currentChatId.set(newChat.id);
   saveChatsToStorage();
   return newChat.id;
+}
+
+export function moveChatToProject(chatId, projectId) {
+  chats.update(allChats => 
+    allChats.map(chat => 
+      chat.id === chatId 
+        ? { ...chat, projectId, updatedAt: new Date().toISOString() }
+        : chat
+    )
+  );
+  saveChatsToStorage();
+}
+
+export function removeChatFromProject(chatId) {
+  moveChatToProject(chatId, null);
 }
 
 export function createTemporaryChat() {
