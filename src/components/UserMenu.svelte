@@ -190,6 +190,13 @@
     bottom: 0;
     z-index: 1000;
     background-color: transparent;
+    animation: backdropFadeIn 0.2s ease forwards;
+  }
+
+  @keyframes backdropFadeIn {
+    to {
+      background-color: rgba(0, 0, 0, 0.3);
+    }
   }
 
   .menu-container {
@@ -199,6 +206,18 @@
     display: flex;
     gap: 8px;
     z-index: 1001;
+    animation: menuSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes menuSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .main-menu,
@@ -209,6 +228,18 @@
     padding: 8px;
     min-width: 280px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    animation: submenuSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes submenuSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   .user-header {
@@ -283,8 +314,13 @@
     text-align: left;
     cursor: pointer;
     border-radius: 8px;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    transform: translateX(0);
+  }
+
+  .menu-item:hover {
+    transform: translateX(4px);
   }
 
   .menu-item:hover,

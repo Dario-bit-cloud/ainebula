@@ -122,7 +122,7 @@
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 6px;
-    transition: background-color 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     background: none;
     border: none;
     color: var(--text-primary);
@@ -153,6 +153,18 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     overflow: hidden;
     z-index: 1000;
+    animation: dropdownSlideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes dropdownSlideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .model-option {
@@ -208,7 +220,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: scale(1);
+  }
+
+  .icon-button:active {
+    transform: scale(0.95);
   }
 
   .icon-button:hover {

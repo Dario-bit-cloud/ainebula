@@ -311,6 +311,18 @@
     font-weight: 400;
     color: var(--text-primary);
     text-align: center;
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .messages-container {
@@ -326,7 +338,24 @@
     max-width: 80%;
     padding: 16px 20px;
     border-radius: 12px;
-    animation: fadeIn 0.3s ease-in;
+    animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .message:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  @keyframes messageSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .user-message {
@@ -360,13 +389,26 @@
     border-radius: 8px;
     object-fit: cover;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, box-shadow 0.3s ease;
     border: 1px solid var(--border-color);
+    animation: imageFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes imageFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   .message-image:hover {
-    transform: scale(1.02);
+    transform: scale(1.05);
     opacity: 0.9;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 
   .user-message .message-images {
@@ -447,15 +489,21 @@
     }
   }
 
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .image-preview {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-tertiary);
+    animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .image-preview:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
   .input-container {
@@ -472,20 +520,15 @@
     padding: 0 4px;
   }
 
-  .image-preview {
-    position: relative;
-    width: 100px;
-    height: 100px;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-    background-color: var(--bg-tertiary);
-  }
-
   .image-preview img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .image-preview:hover img {
+    transform: scale(1.1);
   }
 
   .image-remove {
@@ -540,12 +583,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
+    border-radius: 4px;
+    transform: scale(1) rotate(0deg);
   }
 
   .attach-button:hover {
     color: var(--text-primary);
+    background-color: var(--hover-bg);
+    transform: scale(1.1) rotate(90deg);
   }
 
   .message-input {

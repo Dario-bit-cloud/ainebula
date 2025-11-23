@@ -199,6 +199,18 @@
     flex-direction: column;
     border-right: 1px solid var(--border-color);
     height: 100%;
+    animation: sidebarSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes sidebarSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   .sidebar-nav {
@@ -221,10 +233,19 @@
     cursor: pointer;
     border-radius: 8px;
     font-size: 14px;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     text-align: left;
     flex-shrink: 0;
+    transform: translateX(0);
+  }
+
+  .nav-item:hover {
+    transform: translateX(4px);
+  }
+
+  .nav-item:active {
+    transform: translateX(2px) scale(0.98);
   }
 
   .nav-item:hover {
@@ -286,7 +307,26 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    transition: background-color 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: chatItemSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: both;
+  }
+
+  .chat-item:nth-child(1) { animation-delay: 0.05s; }
+  .chat-item:nth-child(2) { animation-delay: 0.1s; }
+  .chat-item:nth-child(3) { animation-delay: 0.15s; }
+  .chat-item:nth-child(4) { animation-delay: 0.2s; }
+  .chat-item:nth-child(n+5) { animation-delay: 0.25s; }
+
+  @keyframes chatItemSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   .chat-item:hover {
