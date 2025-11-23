@@ -1,11 +1,11 @@
 // Configurazione API
 export const API_CONFIG = {
   baseURL: 'https://api.electronhub.ai/v1',
-  apiKey: 'ek-1Nr31Tdp53bBR3y04Apz6MCSCC4FMTOcYpmb0DVxoDTZO0FR2e',
+  apiKey: 'ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ',
   timeout: 30000 // 30 secondi
 };
 
-// Verifica: API key Electron Hub configurata
+// API key Electron Hub aggiornata
 
 // Mappatura modelli locali ai modelli Electron Hub (OpenAI compatibile)
 export const MODEL_MAPPING = {
