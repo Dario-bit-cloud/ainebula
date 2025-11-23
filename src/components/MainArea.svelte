@@ -30,6 +30,16 @@
   let attachMenuRef;
   let showMoreOptions = false;
   
+  // Variabili reattive
+  let messages = [];
+  let isTemporaryChat = false;
+  let currentChatTokens = 0;
+  let maxTokens = 4000;
+  let tokenUsagePercentage = 0;
+  let tokenWarning = false;
+  let showError = false;
+  let errorMessage = '';
+  
   // Usa textarea invece di input
   $: isTextarea = true;
   
@@ -116,16 +126,33 @@
     
     // Scroll automatico quando arrivano nuovi messaggi
     const unsubscribe = currentChat.subscribe(async (chat) => {
-      if (chat && messagesContainer) {
+      if (chat) {
         await tick();
-        scrollToBottom();
+        if (messagesContainer) {
+          scrollToBottom();
+        }
       }
     });
     
     // Monitor scroll per mostrare/nascondere pulsante scroll to top
-    if (messagesContainer) {
-      messagesContainer.addEventListener('scroll', handleScroll);
+    // Usa afterUpdate per assicurarsi che messagesContainer sia disponibile
+    const setupScrollListener = () => {
+      if (messagesContainer) {
+        messagesContainer.addEventListener('scroll', handleScroll);
+        return true;
+      }
+      return false;
+    };
+    
+    // Prova a impostare il listener, se non è disponibile, riprova dopo un tick
+    if (!setupScrollListener()) {
+      tick().then(() => {
+        setupScrollListener();
+      });
     }
+    
+    // Aggiungi listener per chiudere il menu quando si clicca fuori
+    document.addEventListener('click', handleClickOutside);
     
     // Cleanup
     return () => {
@@ -133,7 +160,8 @@
       if (messagesContainer) {
         messagesContainer.removeEventListener('scroll', handleScroll);
       }
-      unsubscribe();
+      document.removeEventListener('click', handleClickOutside);
+      if (unsubscribe) unsubscribe();
     };
   });
   
@@ -558,15 +586,6 @@
       showAttachMenu = false;
     }
   }
-  
-  onMount(() => {
-    // Aggiungi listener per chiudere il menu quando si clicca fuori
-    document.addEventListener('click', handleClickOutside);
-    
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  });
   
   async function handleFileSelect(event) {
     const files = Array.from(event.target.files || []);
