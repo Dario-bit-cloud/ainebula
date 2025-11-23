@@ -280,6 +280,17 @@
             <rect x="17" y="9" width="3" height="6" rx="1"/>
           </svg>
         </button>
+        <button 
+          class="send-button" 
+          title="Invia messaggio"
+          on:click={handleSubmit}
+          disabled={$isGenerating || (!inputValue.trim() && attachedImages.length === 0)}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
@@ -640,7 +651,8 @@
   }
 
   .voice-button,
-  .waveform-button {
+  .waveform-button,
+  .send-button {
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -655,21 +667,33 @@
   }
 
   .voice-button:disabled,
-  .waveform-button:disabled {
+  .waveform-button:disabled,
+  .send-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 
   .voice-button:hover:not(:disabled),
-  .waveform-button:hover:not(:disabled) {
+  .waveform-button:hover:not(:disabled),
+  .send-button:hover:not(:disabled) {
     color: var(--text-primary);
     background-color: var(--hover-bg);
     transform: scale(1.1);
   }
 
   .voice-button:active:not(:disabled),
-  .waveform-button:active:not(:disabled) {
+  .waveform-button:active:not(:disabled),
+  .send-button:active:not(:disabled) {
     transform: scale(0.95);
+  }
+
+  .send-button:not(:disabled) {
+    color: var(--accent-blue);
+  }
+
+  .send-button:hover:not(:disabled) {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: var(--accent-blue);
   }
 
   .voice-button.recording {
