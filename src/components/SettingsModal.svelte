@@ -778,12 +778,15 @@
     font-size: 14px;
     font-family: inherit;
     outline: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .setting-select:focus,
   .setting-input:focus,
   .setting-textarea:focus {
     border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    transform: scale(1.01);
   }
 
   .setting-textarea {
@@ -835,7 +838,7 @@
     right: 0;
     bottom: 0;
     background-color: var(--bg-tertiary);
-    transition: 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 24px;
   }
 
@@ -847,16 +850,22 @@
     left: 3px;
     bottom: 3px;
     background-color: white;
-    transition: 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 
   .toggle-switch input:checked + .toggle-slider {
     background-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
   }
 
   .toggle-switch input:checked + .toggle-slider:before {
     transform: translateX(20px);
+  }
+
+  .toggle-switch:hover .toggle-slider {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
   .style-pills {
