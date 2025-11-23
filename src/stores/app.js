@@ -9,6 +9,7 @@ export const isProjectModalOpen = writable(false);
 export const isInviteModalOpen = writable(false);
 export const isUserMenuOpen = writable(false);
 export const isSidebarOpen = writable(true);
+export const isPremiumModalOpen = writable(false);
 
 // Store per rilevare la dimensione dello schermo
 function createMediaQuery(query) {

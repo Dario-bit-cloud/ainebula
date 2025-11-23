@@ -4,6 +4,7 @@
   import { selectedModel } from '../stores/models.js';
   import { generateResponse } from '../services/aiService.js';
   import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable } from '../services/voiceService.js';
+  import { isPremiumModalOpen } from '../stores/app.js';
   
   let inputValue = '';
   let inputRef;
@@ -78,33 +79,25 @@
     
     console.log('Stato:', { hasText, hasImages, isGenerating: $isGenerating, inputValue });
     
-    if ((hasText || hasImages) && !$isGenerating) {
+    // Se ci sono immagini, mostra il modal premium invece di inviare
+    if (hasImages) {
+      isPremiumModalOpen.set(true);
+      return;
+    }
+    
+    if (hasText && !$isGenerating) {
       console.log('Invio messaggio...');
       const chatId = $currentChatId || createNewChat();
-      
-      // Prepara le immagini come base64
-      const images = await Promise.all(
-        attachedImages.map(async (img) => {
-          return {
-            url: img.preview,
-            name: img.file.name,
-            type: img.file.type,
-            size: img.file.size
-          };
-        })
-      );
       
       const userMessage = { 
         type: 'user', 
         content: inputValue.trim() || '',
-        images: images.length > 0 ? images : undefined,
         timestamp: new Date().toISOString() 
       };
       
       console.log('Aggiungo messaggio utente:', userMessage);
       addMessage(chatId, userMessage);
-      const messageText = inputValue.trim() || (hasImages ? '[Immagine allegata]' : '');
-      const imagesForAI = images;
+      const messageText = inputValue.trim();
       
       inputValue = '';
       attachedImages = [];
@@ -113,7 +106,7 @@
       
       try {
         console.log('Chiamata API con:', { messageText, model: $selectedModel, chatId });
-        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || [], imagesForAI);
+        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || [], []);
         console.log('Risposta ricevuta:', response);
         const aiMessage = { type: 'ai', content: response, timestamp: new Date().toISOString() };
         addMessage(chatId, aiMessage);
@@ -163,6 +156,17 @@
     const files = Array.from(event.target.files || []);
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
     
+    // Se ci sono immagini, mostra il modal premium
+    if (imageFiles.length > 0) {
+      isPremiumModalOpen.set(true);
+      // Reset input per permettere di selezionare di nuovo lo stesso file
+      if (fileInput) {
+        fileInput.value = '';
+      }
+      return;
+    }
+    
+    // Questo codice non verrà mai eseguito se ci sono immagini, ma lo lascio per sicurezza
     for (const file of imageFiles) {
       const preview = await readFileAsDataURL(file);
       attachedImages = [...attachedImages, { file, preview }];

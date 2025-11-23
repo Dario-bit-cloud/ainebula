@@ -6,6 +6,7 @@
   import InviteModal from './components/InviteModal.svelte';
   import ProjectModal from './components/ProjectModal.svelte';
   import UserMenu from './components/UserMenu.svelte';
+  import PremiumModal from './components/PremiumModal.svelte';
 </script>
 
 <div class="app-container">
@@ -18,6 +19,7 @@
   <InviteModal />
   <ProjectModal />
   <UserMenu />
+  <PremiumModal />
 </div>
 
 <style>
