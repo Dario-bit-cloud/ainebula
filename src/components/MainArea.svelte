@@ -112,9 +112,10 @@
         addMessage(chatId, aiMessage);
       } catch (error) {
         console.error('Error generating response:', error);
+        const errorMessage = error.message || 'Si è verificato un errore sconosciuto.';
         addMessage(chatId, { 
           type: 'ai', 
-          content: 'Mi dispiace, si è verificato un errore. Riprova.', 
+          content: `❌ Errore: ${errorMessage}`, 
           timestamp: new Date().toISOString() 
         });
       } finally {
