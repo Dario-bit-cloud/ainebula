@@ -102,13 +102,19 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
     
-    // Headers per OpenRouter (richiede HTTP-Referer e X-Title opzionali)
+    // Headers per OpenRouter
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${API_CONFIG.apiKey}`,
       'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://nebula-ai.app',
       'X-Title': 'Nebula AI'
     };
+    
+    console.log('Calling OpenRouter API:', {
+      url: `${API_CONFIG.baseURL}/chat/completions`,
+      model: apiModel,
+      messageCount: formattedMessages.length
+    });
     
     const response = await fetch(`${API_CONFIG.baseURL}/chat/completions`, {
       method: 'POST',
@@ -119,8 +125,17 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     
     clearTimeout(timeoutId);
     
+    console.log('API Response status:', response.status, response.statusText);
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorText = await response.text();
+      console.error('API Error response:', errorText);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: { message: errorText || `HTTP ${response.status}: ${response.statusText}` } };
+      }
       throw new Error(errorData.error?.message || `API Error: ${response.status} ${response.statusText}`);
     }
     
@@ -135,6 +150,11 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     
   } catch (error) {
     console.error('Error calling OpenRouter API:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     
     // Se è un errore di timeout o rete, ritorna un messaggio specifico
     if (error.name === 'AbortError') {
