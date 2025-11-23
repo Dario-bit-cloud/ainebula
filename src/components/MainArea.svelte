@@ -1088,8 +1088,8 @@
         </button>
         <button 
           class="waveform-button" 
-          title="Modalità vocale - Ascolta le risposte dell'AI"
-          on:click={() => isVoiceSelectionModalOpen.set(true)}
+          title="Modalità vocale - Presto in arrivo"
+          on:click={() => alert('Modalità vocale - Funzionalità in arrivo')}
           disabled={$isGenerating || editingMessageIndex !== null}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
