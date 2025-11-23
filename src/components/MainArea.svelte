@@ -337,30 +337,106 @@
 
   @media (max-width: 768px) {
     .welcome-text {
-      font-size: 24px;
+      font-size: 22px;
+      padding: 0 12px;
     }
 
     .welcome-section {
-      padding: 24px 16px;
+      padding: 20px 12px;
     }
 
     .messages-container {
-      padding: 20px 16px;
+      padding: 16px 12px;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 85%;
+      padding: 10px 14px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .input-container {
+      padding: 10px 12px;
+    }
+
+    .input-wrapper {
+      padding: 10px 12px;
+      gap: 6px;
+    }
+
+    .message-image {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 8px;
+    }
+
+    .attached-images {
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .image-preview {
+      width: 80px;
+      height: 80px;
+    }
+
+    .disclaimer {
+      font-size: 11px;
+      padding: 8px 12px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .message-input {
+      font-size: 16px; /* Previene zoom su iOS */
+    }
+
+    .voice-button,
+    .waveform-button,
+    .send-button,
+    .attach-button {
+      padding: 6px;
+      min-width: 36px;
+      min-height: 36px;
+    }
+
+    .voice-button svg,
+    .waveform-button svg,
+    .send-button svg,
+    .attach-button svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .welcome-text {
+      font-size: 20px;
+    }
+
+    .messages-container {
+      padding: 12px 8px;
+      gap: 12px;
     }
 
     .message {
       max-width: 90%;
-      padding: 12px 16px;
-      font-size: 14px;
+      padding: 8px 12px;
+      font-size: 13px;
     }
 
     .input-container {
-      padding: 12px 16px;
+      padding: 8px;
+    }
+
+    .input-wrapper {
+      padding: 8px 10px;
     }
 
     .message-image {
-      max-width: 250px;
-      max-height: 250px;
+      max-height: 180px;
     }
   }
 

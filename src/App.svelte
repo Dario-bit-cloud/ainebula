@@ -39,5 +39,27 @@
     .main-layout {
       width: 100%;
     }
+
+    .app-container {
+      overflow: hidden;
+      position: fixed;
+      width: 100vw;
+      height: 100vh;
+    }
+  }
+
+  /* Previeni scroll orizzontale su mobile */
+  @media (max-width: 768px) {
+    body {
+      overflow-x: hidden;
+      position: fixed;
+      width: 100%;
+    }
+
+    #app {
+      width: 100vw;
+      max-width: 100vw;
+      overflow-x: hidden;
+    }
   }
 </style>

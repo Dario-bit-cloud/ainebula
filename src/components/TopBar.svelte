@@ -145,10 +145,60 @@
   }
 
   @media (max-width: 768px) {
+    .top-bar {
+      padding: 10px 12px;
+      height: 52px;
+    }
+
     .menu-toggle {
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 8px;
+      min-width: 40px;
+      min-height: 40px;
+    }
+
+    .logo-icon {
+      display: none; /* Nascondi logo su mobile per più spazio */
+    }
+
+    .left-section {
+      gap: 8px;
+    }
+
+    .model-selector {
+      padding: 6px 8px;
+    }
+
+    .model-name {
+      font-size: 13px;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .right-section {
+      gap: 8px;
+    }
+
+    .icon-button {
+      padding: 8px;
+      min-width: 36px;
+      min-height: 36px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .top-bar {
+      padding: 8px 10px;
+      height: 50px;
+    }
+
+    .model-name {
+      max-width: 120px;
+      font-size: 12px;
     }
   }
 

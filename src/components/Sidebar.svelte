@@ -322,11 +322,13 @@
       position: fixed;
       top: 0;
       left: 0;
+      width: 280px;
+      max-width: 85vw;
       height: 100vh;
       z-index: 999;
       transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+      box-shadow: 2px 0 12px rgba(0, 0, 0, 0.5);
     }
 
     .sidebar.sidebar-open {
@@ -335,6 +337,50 @@
 
     .sidebar-header-mobile {
       display: flex;
+    }
+
+    .nav-item {
+      padding: 12px 14px;
+      font-size: 15px;
+    }
+
+    .chat-item {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    .user-info {
+      padding: 12px 14px;
+    }
+
+    .username {
+      font-size: 14px;
+    }
+
+    .workspace {
+      font-size: 12px;
+    }
+
+    .invite-button {
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .sidebar {
+      width: 260px;
+      max-width: 90vw;
+    }
+
+    .nav-item {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    .chat-item {
+      padding: 8px 10px;
+      font-size: 13px;
     }
   }
 
