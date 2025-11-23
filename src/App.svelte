@@ -40,7 +40,9 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh; /* Dynamic viewport height per mobile */
     width: 100%;
+    overflow: hidden;
   }
 
   .main-layout {
@@ -48,6 +50,7 @@
     flex: 1;
     overflow: hidden;
     position: relative;
+    min-height: 0;
   }
 
   @media (max-width: 768px) {
@@ -60,6 +63,7 @@
       position: fixed;
       width: 100vw;
       height: 100vh;
+      height: 100dvh; /* Dynamic viewport height per mobile */
     }
   }
 

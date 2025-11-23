@@ -29,6 +29,42 @@
   let showAttachMenu = false;
   let attachMenuRef;
   let showMoreOptions = false;
+  let showImageStyles = false;
+  let selectedImageIndex = null;
+  let imageDescription = '';
+  
+  const imageStyles = [
+    {
+      id: 'cyberpunk',
+      name: 'Cyberpunk',
+      icon: 'https://cdn.openai.com/API/images/image-picker-styles/v2/cyberpunk.webp'
+    },
+    {
+      id: 'anime',
+      name: 'Anime',
+      icon: 'https://cdn.openai.com/API/images/image-picker-styles/v2/anime.webp'
+    },
+    {
+      id: 'dramatic-headshot',
+      name: 'Primo piano d\'effetto',
+      icon: 'https://cdn.openai.com/API/images/image-picker-styles/v2/dramatic-headshot.webp'
+    },
+    {
+      id: 'coloring-book',
+      name: 'Album da colorare',
+      icon: 'https://cdn.openai.com/API/images/image-picker-styles/v2/coloring-book.webp'
+    },
+    {
+      id: 'photo-shoot',
+      name: 'Servizio fotografico',
+      icon: 'https://cdn.openai.com/API/images/image-picker-styles/v2/photo-shoot.webp'
+    },
+    {
+      id: 'retro-cartoon',
+      name: 'Cartone retro',
+      icon: 'https://cdn.openai.com/API/images/image-picker-styles/v2/retro-cartoon.webp'
+    }
+  ];
   
   // Variabili reattive
   let messages = [];
@@ -637,14 +673,20 @@
     const files = Array.from(event.target.files || []);
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
     
-    // Se ci sono immagini, mostra il modal premium
-    if (imageFiles.length > 0) {
-      isPremiumModalOpen.set(true);
-      // Reset input per permettere di selezionare di nuovo lo stesso file
-      if (fileInput) {
-        fileInput.value = '';
-      }
-      return;
+    // Carica le immagini senza mostrare il modal premium
+    for (const file of imageFiles) {
+      const preview = await readFileAsDataURL(file);
+      attachedImages = [...attachedImages, { 
+        file, 
+        preview,
+        style: null,
+        description: ''
+      }];
+    }
+    
+    // Reset input per permettere di selezionare di nuovo lo stesso file
+    if (fileInput) {
+      fileInput.value = '';
     }
     
     // Questo codice non verrà mai eseguito se ci sono immagini, ma lo lascio per sicurezza
@@ -670,6 +712,51 @@
   
   function removeImage(index) {
     attachedImages = attachedImages.filter((_, i) => i !== index);
+    if (selectedImageIndex === index) {
+      selectedImageIndex = null;
+      showImageStyles = false;
+      imageDescription = '';
+    }
+  }
+  
+  function openImageStyles(index) {
+    selectedImageIndex = index;
+    showImageStyles = true;
+    imageDescription = attachedImages[index]?.description || '';
+  }
+  
+  function applyImageStyle(styleId) {
+    if (selectedImageIndex !== null && attachedImages[selectedImageIndex]) {
+      attachedImages[selectedImageIndex].style = styleId;
+      attachedImages = [...attachedImages]; // Trigger reactivity
+    }
+  }
+  
+  function handleCreateImage() {
+    if (attachedImages.length > 0) {
+      const targetIndex = selectedImageIndex !== null ? selectedImageIndex : 0;
+      const image = attachedImages[targetIndex];
+      if (image && image.style) {
+        // Qui implementeresti la chiamata API per modificare l'immagine
+        console.log('Creating image with style:', {
+          image: image.preview,
+          style: image.style,
+          description: image.description || imageDescription
+        });
+        alert(`Immagine modificata con stile: ${imageStyles.find(s => s.id === image.style)?.name}`);
+      } else {
+        alert('Seleziona uno stile prima di creare');
+        showImageStyles = true;
+        if (selectedImageIndex === null && attachedImages.length > 0) {
+          selectedImageIndex = 0;
+        }
+      }
+    }
+  }
+  
+  function closeImageStyles() {
+    showImageStyles = false;
+    selectedImageIndex = null;
   }
   
   // Funzioni per export chat
@@ -943,16 +1030,84 @@
       {#if attachedImages.length > 0}
         <div class="attached-images">
           {#each attachedImages as imageItem, index}
-            <div class="image-preview">
+            <div class="image-preview" class:selected={selectedImageIndex === index}>
               <img src={imageItem.preview} alt={imageItem.file.name} />
-              <button class="image-remove" on:click={() => removeImage(index)} title="Rimuovi">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18"/>
-                  <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
+              <div class="image-overlay">
+                <button class="image-edit" on:click={() => openImageStyles(index)} title="Modifica immagine">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button class="image-remove" on:click={() => removeImage(index)} title="Rimuovi">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+              {#if imageItem.style}
+                <div class="image-style-badge">
+                  {imageStyles.find(s => s.id === imageItem.style)?.name}
+                </div>
+              {/if}
             </div>
           {/each}
+        </div>
+        
+        <div class="image-actions-bar">
+          <button class="image-action-button" on:click={handleCreateImage}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            <span>Crea</span>
+          </button>
+          <div class="styles-dropdown-wrapper">
+            <button class="image-action-button" on:click={() => { showImageStyles = !showImageStyles; if (!selectedImageIndex && attachedImages.length > 0) selectedImageIndex = 0; }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+              <span>Stili</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            {#if showImageStyles}
+              <div class="styles-menu">
+                <div class="styles-grid">
+                  {#each imageStyles as style}
+                    <button 
+                      class="style-option"
+                      class:selected={selectedImageIndex !== null && attachedImages[selectedImageIndex]?.style === style.id}
+                      on:click={() => applyImageStyle(style.id)}
+                      title={style.name}
+                    >
+                      <img src={style.icon} alt={style.name} />
+                      <span>{style.name}</span>
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          </div>
+          {#if attachedImages.length > 0 && selectedImageIndex !== null && attachedImages[selectedImageIndex]?.style}
+            <div class="image-description-input">
+              <input
+                type="text"
+                placeholder="Descrivi un'immagine"
+                bind:value={imageDescription}
+                on:input={(e) => {
+                  if (selectedImageIndex !== null) {
+                    attachedImages[selectedImageIndex].description = e.target.value;
+                  }
+                }}
+              />
+            </div>
+          {/if}
         </div>
       {/if}
     <div class="input-wrapper">
@@ -1164,6 +1319,7 @@
     background-color: var(--bg-primary);
     position: relative;
     overflow: hidden;
+    min-height: 0;
   }
   
   .search-bar {
@@ -1393,6 +1549,7 @@
 
     .messages-container {
       padding: 16px 12px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
       gap: 16px;
     }
 
@@ -1405,6 +1562,7 @@
 
     .input-container {
       padding: 10px 12px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
     }
 
     .input-wrapper {
@@ -1464,6 +1622,7 @@
 
     .messages-container {
       padding: 12px 8px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
       gap: 12px;
     }
 
@@ -1475,6 +1634,7 @@
 
     .input-container {
       padding: 8px;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
     }
 
     .input-wrapper {
@@ -1665,15 +1825,78 @@
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
 
+  .image-preview.selected {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  }
+
   .image-preview:hover {
     transform: scale(1.05);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .image-preview:hover .image-overlay {
+    opacity: 1;
+  }
+
+  .image-edit {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .image-edit:hover {
+    background: rgba(0, 0, 0, 0.9);
+  }
+
+  .image-style-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .input-container {
     padding: 16px 24px;
     background-color: var(--bg-primary);
     border-top: 1px solid var(--border-color);
+    position: relative;
   }
 
   .attached-images {
@@ -1693,6 +1916,121 @@
 
   .image-preview:hover img {
     transform: scale(1.1);
+  }
+
+  .image-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .image-action-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .image-action-button:hover {
+    background-color: var(--hover-bg);
+    border-color: var(--accent-blue);
+  }
+
+  .styles-dropdown-wrapper {
+    position: relative;
+  }
+
+  .styles-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    min-width: 300px;
+  }
+
+  .styles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .style-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background-color: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .style-option:hover {
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+  }
+
+  .style-option.selected {
+    border-color: var(--accent-blue);
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+
+  .style-option img {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    object-fit: cover;
+  }
+
+  .style-option span {
+    font-size: 11px;
+    color: var(--text-primary);
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .image-description-input {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .image-description-input input {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .image-description-input input:focus {
+    border-color: var(--accent-blue);
+  }
+
+  .image-description-input input::placeholder {
+    color: var(--text-secondary);
   }
 
   .image-remove {
