@@ -524,17 +524,26 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 0;
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  .image-preview:hover .image-remove {
+    opacity: 1;
+    transform: scale(1);
   }
 
   .image-remove:hover {
-    background-color: rgba(0, 0, 0, 0.9);
+    background-color: rgba(239, 68, 68, 0.9);
+    transform: scale(1.1) rotate(90deg);
   }
 
   .image-remove svg {
     width: 14px;
     height: 14px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .input-wrapper {
@@ -610,7 +619,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 4px;
+    transform: scale(1);
   }
 
   .voice-button:disabled,
@@ -622,11 +633,18 @@
   .voice-button:hover:not(:disabled),
   .waveform-button:hover:not(:disabled) {
     color: var(--text-primary);
+    background-color: var(--hover-bg);
+    transform: scale(1.1);
+  }
+
+  .voice-button:active:not(:disabled),
+  .waveform-button:active:not(:disabled) {
+    transform: scale(0.95);
   }
 
   .voice-button.recording {
     color: #ef4444;
-    animation: pulse 1.5s infinite;
+    animation: pulse 1.5s infinite, recordingScale 0.3s ease;
   }
 
   @keyframes pulse {
@@ -634,7 +652,19 @@
       opacity: 1;
     }
     50% {
-      opacity: 0.5;
+      opacity: 0.7;
+    }
+  }
+
+  @keyframes recordingScale {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.15);
+    }
+    100% {
+      transform: scale(1);
     }
   }
 

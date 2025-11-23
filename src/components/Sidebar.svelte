@@ -289,10 +289,13 @@
     color: var(--text-primary);
     font-size: 13px;
     outline: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .search-input:focus {
     border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    transform: scale(1.02);
   }
 
   .search-input::placeholder {
@@ -370,12 +373,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
+    border-radius: 4px;
+    transform: scale(0.9);
+  }
+
+  .chat-item:hover .chat-delete {
+    opacity: 1;
+    transform: scale(1);
   }
 
   .chat-delete:hover {
     color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+    transform: scale(1.1);
   }
 
   .empty-state {
@@ -461,12 +473,19 @@
     color: var(--text-primary);
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
   }
 
   .invite-button:hover {
     background-color: var(--hover-bg);
     border-color: var(--accent-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  }
+
+  .invite-button:active {
+    transform: translateY(0);
   }
 
   .invite-button svg {
