@@ -5,6 +5,8 @@ export const API_CONFIG = {
   timeout: 30000 // 30 secondi
 };
 
+// Verifica: API key Electron Hub configurata
+
 // Mappatura modelli locali ai modelli Electron Hub (OpenAI compatibile)
 export const MODEL_MAPPING = {
   'nebula-5.1-instant': 'gpt-4o-mini', // Modello veloce
