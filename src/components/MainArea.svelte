@@ -195,41 +195,42 @@
 </script>
 
 <main class="main-area">
-  {#if messages.length === 0}
-    <div class="welcome-section">
-      <h1 class="welcome-text">In cosa posso essere utile?</h1>
-    </div>
-  {:else}
-    <div class="messages-container">
-      {#each messages as message}
-        <div class="message" class:user-message={message.type === 'user'} class:ai-message={message.type === 'ai'}>
-              {#if message.images && message.images.length > 0}
-            <div class="message-images">
-              {#each message.images as image}
-                <img src={image.url} alt={image.name} class="message-image" on:click={() => window.open(image.url, '_blank')} />
-              {/each}
-            </div>
-          {/if}
-          {#if message.content}
-            <div class="message-content">
-              {message.content}
-            </div>
-          {/if}
-        </div>
-      {/each}
-      {#if $isGenerating}
-        <div class="message ai-message">
+  <div class="messages-container">
+    {#if messages.length === 0}
+      <div class="welcome-message">
+        <h1 class="welcome-text">In cosa posso essere utile?</h1>
+      </div>
+    {/if}
+    
+    {#each messages as message}
+      <div class="message" class:user-message={message.type === 'user'} class:ai-message={message.type === 'ai'}>
+        {#if message.images && message.images.length > 0}
+          <div class="message-images">
+            {#each message.images as image}
+              <img src={image.url} alt={image.name} class="message-image" on:click={() => window.open(image.url, '_blank')} />
+            {/each}
+          </div>
+        {/if}
+        {#if message.content}
           <div class="message-content">
-            <div class="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
+            {message.content}
+          </div>
+        {/if}
+      </div>
+    {/each}
+    
+    {#if $isGenerating}
+      <div class="message ai-message">
+        <div class="message-content">
+          <div class="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
           </div>
         </div>
-      {/if}
-    </div>
-  {/if}
+      </div>
+    {/if}
+  </div>
   
   <div class="input-container">
       {#if attachedImages.length > 0}
@@ -323,12 +324,21 @@
     overflow: hidden;
   }
 
-  .welcome-section {
+  .messages-container {
     flex: 1;
+    overflow-y: auto;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .welcome-message {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 40px;
+    min-height: 60vh;
+    width: 100%;
   }
 
   .welcome-text {
@@ -337,6 +347,7 @@
     color: var(--text-primary);
     text-align: center;
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: 0;
   }
 
   @media (max-width: 768px) {
@@ -345,8 +356,8 @@
       padding: 0 12px;
     }
 
-    .welcome-section {
-      padding: 20px 12px;
+    .welcome-message {
+      min-height: 50vh;
     }
 
     .messages-container {
