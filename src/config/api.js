@@ -1,7 +1,7 @@
 // Configurazione API
 export const API_CONFIG = {
   baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: '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',
+  apiKey: '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',
   timeout: 30000 // 30 secondi
 };
 
