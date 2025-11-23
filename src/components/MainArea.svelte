@@ -32,6 +32,10 @@
   // Usa textarea invece di input
   $: isTextarea = true;
   
+  // Ottieni i messaggi dalla chat corrente
+  $: messages = $currentChat?.messages || [];
+  $: isTemporaryChat = $currentChat?.isTemporary || false;
+  
   // Calcola token per la chat corrente
   $: currentChatTokens = messages.length > 0 ? estimateChatTokens(messages) : 0;
   $: maxTokens = 4000; // Limite di default
@@ -542,9 +546,6 @@
   function removeImage(index) {
     attachedImages = attachedImages.filter((_, i) => i !== index);
   }
-  
-  $: messages = $currentChat?.messages || [];
-  $: isTemporaryChat = $currentChat?.isTemporary || false;
   
   // Funzioni per export chat
   function exportChat(format = 'txt') {

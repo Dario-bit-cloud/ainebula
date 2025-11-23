@@ -132,7 +132,7 @@
             />
             <textarea
               class="form-textarea"
-              placeholder="Contenuto del prompt (usa {variabile} per variabili dinamiche)"
+              placeholder="Contenuto del prompt (usa {nome_variabile} per variabili dinamiche)"
               bind:value={newPrompt.prompt}
               rows="6"
             ></textarea>
