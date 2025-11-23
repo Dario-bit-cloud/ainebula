@@ -186,16 +186,21 @@
   {/if}
   
   <div class="input-container">
-    {#if attachedFiles.length > 0}
-      <div class="attached-files">
-        {#each attachedFiles as file, index}
-          <div class="file-item">
-            <span class="file-name">{file.name}</span>
-            <button class="file-remove" on:click={() => removeFile(index)}>×</button>
-          </div>
-        {/each}
-      </div>
-    {/if}
+      {#if attachedImages.length > 0}
+        <div class="attached-images">
+          {#each attachedImages as imageItem, index}
+            <div class="image-preview">
+              <img src={imageItem.preview} alt={imageItem.file.name} />
+              <button class="image-remove" on:click={() => removeImage(index)} title="Rimuovi">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          {/each}
+        </div>
+      {/if}
     <div class="input-wrapper">
       <button class="attach-button" on:click={handleAttachClick} title="Allega file">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
