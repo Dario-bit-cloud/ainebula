@@ -10,7 +10,7 @@
   let isRecording = false;
   let voiceAvailable = false;
   let fileInput;
-  let attachedFiles = [];
+  let attachedImages = [];
   
   onMount(() => {
     voiceAvailable = isVoiceAvailable();
@@ -40,18 +40,42 @@
   });
   
   async function handleSubmit() {
-    if (inputValue.trim() && !isGenerating) {
+    const hasText = inputValue.trim().length > 0;
+    const hasImages = attachedImages.length > 0;
+    
+    if ((hasText || hasImages) && !isGenerating) {
       const chatId = $currentChatId || createNewChat();
-      const userMessage = { type: 'user', content: inputValue, timestamp: new Date().toISOString() };
+      
+      // Prepara le immagini come base64
+      const images = await Promise.all(
+        attachedImages.map(async (img) => {
+          return {
+            url: img.preview,
+            name: img.file.name,
+            type: img.file.type,
+            size: img.file.size
+          };
+        })
+      );
+      
+      const userMessage = { 
+        type: 'user', 
+        content: inputValue.trim() || '',
+        images: images.length > 0 ? images : undefined,
+        timestamp: new Date().toISOString() 
+      };
       
       addMessage(chatId, userMessage);
-      const messageText = inputValue;
+      const messageText = inputValue.trim() || (hasImages ? '[Immagine allegata]' : '');
+      const imagesForAI = images;
+      
       inputValue = '';
+      attachedImages = [];
       
       isGenerating.set(true);
       
       try {
-        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || []);
+        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || [], attachedImages.length > 0 ? imagesForAI : []);
         const aiMessage = { type: 'ai', content: response, timestamp: new Date().toISOString() };
         addMessage(chatId, aiMessage);
       } catch (error) {
@@ -93,13 +117,32 @@
     fileInput?.click();
   }
   
-  function handleFileSelect(event) {
+  async function handleFileSelect(event) {
     const files = Array.from(event.target.files || []);
-    attachedFiles = [...attachedFiles, ...files];
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    for (const file of imageFiles) {
+      const preview = await readFileAsDataURL(file);
+      attachedImages = [...attachedImages, { file, preview }];
+    }
+    
+    // Reset input per permettere di selezionare di nuovo lo stesso file
+    if (fileInput) {
+      fileInput.value = '';
+    }
   }
   
-  function removeFile(index) {
-    attachedFiles = attachedFiles.filter((_, i) => i !== index);
+  function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  function removeImage(index) {
+    attachedImages = attachedImages.filter((_, i) => i !== index);
   }
   
   $: messages = $currentChat?.messages || [];
@@ -114,9 +157,18 @@
     <div class="messages-container">
       {#each messages as message}
         <div class="message" class:user-message={message.type === 'user'} class:ai-message={message.type === 'ai'}>
-          <div class="message-content">
-            {message.content}
-          </div>
+              {#if message.images && message.images.length > 0}
+            <div class="message-images">
+              {#each message.images as image}
+                <img src={image.url} alt={image.name} class="message-image" on:click={() => window.open(image.url, '_blank')} />
+              {/each}
+            </div>
+          {/if}
+          {#if message.content}
+            <div class="message-content">
+              {message.content}
+            </div>
+          {/if}
         </div>
       {/each}
       {#if $isGenerating}
@@ -154,6 +206,7 @@
         type="file"
         bind:this={fileInput}
         on:change={handleFileSelect}
+        accept="image/*"
         multiple
         style="display: none;"
       />
@@ -255,6 +308,72 @@
     line-height: 1.6;
     white-space: pre-wrap;
     word-wrap: break-word;
+  }
+
+  .message-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .message-image {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 1px solid var(--border-color);
+  }
+
+  .message-image:hover {
+    transform: scale(1.02);
+    opacity: 0.9;
+  }
+
+  .user-message .message-images {
+    justify-content: flex-end;
+  }
+
+  .ai-message .message-images {
+    justify-content: flex-start;
+  }
+
+  .message:has(.message-images) .message-content {
+    margin-top: 12px;
+  }
+
+  .message:has(.message-images) .message-content {
+    margin-top: 12px;
+  }
+
+  .message-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .message-image {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .message-image:hover {
+    transform: scale(1.02);
+  }
+
+  .user-message .message-images {
+    justify-content: flex-end;
+  }
+
+  .ai-message .message-images {
+    justify-content: flex-start;
   }
 
   .typing-indicator {
