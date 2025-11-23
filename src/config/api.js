@@ -1,11 +1,11 @@
 // Configurazione API
 export const API_CONFIG = {
-  baseURL: 'https://api.aimlapi.com/v1',
-  apiKey: '7a743a4c085a4fe2bea0d155b826a39e',
+  baseURL: 'https://api.electronhub.ai/v1',
+  apiKey: 'ek-1Nr31Tdp53bBR3y04Apz6MCSCC4FMTOcYpmb0DVxoDTZO0FR2e',
   timeout: 30000 // 30 secondi
 };
 
-// Mappatura modelli locali ai modelli AIMLAPI/OpenAI
+// Mappatura modelli locali ai modelli Electron Hub/OpenAI
 export const MODEL_MAPPING = {
   'nebula-5.1-instant': 'gpt-4o-mini', // Modello veloce
   'nebula-5.1': 'gpt-4o', // Modello standard
