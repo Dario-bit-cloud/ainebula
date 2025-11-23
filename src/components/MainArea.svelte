@@ -254,7 +254,7 @@
         placeholder="Fai una domanda"
         bind:value={inputValue}
         bind:this={inputRef}
-        on:keypress={handleKeyPress}
+        on:keydown={handleKeyPress}
         disabled={$isGenerating}
       />
       <div class="input-actions">
