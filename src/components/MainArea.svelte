@@ -107,7 +107,7 @@
       isGenerating.set(true);
       
       try {
-        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || [], attachedImages.length > 0 ? imagesForAI : []);
+        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || [], imagesForAI);
         const aiMessage = { type: 'ai', content: response, timestamp: new Date().toISOString() };
         addMessage(chatId, aiMessage);
       } catch (error) {
