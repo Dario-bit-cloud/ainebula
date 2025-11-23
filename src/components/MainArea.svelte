@@ -37,6 +37,38 @@
         createNewChat();
       }
     })();
+    
+    // Gestione incolla immagini con Ctrl+V
+    const handlePaste = async (event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      
+      const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'));
+      
+      if (imageItems.length > 0) {
+        event.preventDefault();
+        
+        for (const item of imageItems) {
+          const file = item.getAsFile();
+          if (file) {
+            try {
+              const preview = await readFileAsDataURL(file);
+              attachedImages = [...attachedImages, { file, preview }];
+            } catch (error) {
+              console.error('Error processing pasted image:', error);
+            }
+          }
+        }
+      }
+    };
+    
+    // Aggiungi listener globale per l'incolla
+    window.addEventListener('paste', handlePaste);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+    };
   });
   
   async function handleSubmit() {
