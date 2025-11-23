@@ -6,13 +6,13 @@ export const API_CONFIG = {
 };
 
 // Mappatura modelli locali ai modelli OpenRouter
-// Nota: i modelli con :free sono gratuiti, altrimenti richiedono crediti
+// I modelli con :free sono completamente gratuiti
 export const MODEL_MAPPING = {
   'nebula-5.1-instant': 'google/gemini-flash-1.5-8b:free', // Modello veloce e gratuito
-  'nebula-5.1': 'openai/gpt-3.5-turbo', // Modello standard (richiede crediti)
-  'nebula-5.0': 'openai/gpt-3.5-turbo', // Versione precedente
-  'codex': 'openai/gpt-3.5-turbo', // Specializzato per codice
-  'gpt-4': 'openai/gpt-3.5-turbo', // Fallback a 3.5 se non ci sono crediti
-  'gpt-3.5': 'openai/gpt-3.5-turbo'
+  'nebula-5.1': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
+  'nebula-5.0': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
+  'codex': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
+  'gpt-4': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
+  'gpt-3.5': 'google/gemini-flash-1.5-8b:free' // Usa modello gratuito
 };
 
