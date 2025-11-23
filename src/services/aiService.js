@@ -1,7 +1,7 @@
 import { API_CONFIG, MODEL_MAPPING } from '../config/api.js';
 
 /**
- * Converte la storia della chat nel formato richiesto dall'API OpenAI/AIMLAPI
+ * Converte la storia della chat nel formato richiesto dall'API OpenAI/OpenRouter
  */
 function formatChatHistory(chatHistory) {
   const messages = [];
@@ -70,7 +70,7 @@ function formatChatHistory(chatHistory) {
 }
 
 /**
- * Genera una risposta utilizzando l'API AIMLAPI
+ * Genera una risposta utilizzando l'API OpenRouter
  */
 export async function generateResponse(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = []) {
   try {
@@ -102,12 +102,17 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
     
+    // Headers per OpenRouter (richiede HTTP-Referer e X-Title opzionali)
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${API_CONFIG.apiKey}`,
+      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://nebula-ai.app',
+      'X-Title': 'Nebula AI'
+    };
+    
     const response = await fetch(`${API_CONFIG.baseURL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_CONFIG.apiKey}`
-      },
+      headers: headers,
       body: JSON.stringify(requestBody),
       signal: controller.signal
     });
@@ -129,7 +134,7 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     throw new Error('Nessuna risposta ricevuta dall\'API');
     
   } catch (error) {
-    console.error('Error calling AIMLAPI:', error);
+    console.error('Error calling OpenRouter API:', error);
     
     // Se è un errore di timeout o rete, ritorna un messaggio specifico
     if (error.name === 'AbortError') {
