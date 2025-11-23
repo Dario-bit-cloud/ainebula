@@ -1,6 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, createTemporaryChat } from '../stores/chat.js';
+  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, createTemporaryChat, saveChatsToStorage } from '../stores/chat.js';
   import { selectedModel } from '../stores/models.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
   import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable } from '../services/voiceService.js';
@@ -33,14 +33,32 @@
   $: isTextarea = true;
   
   // Ottieni i messaggi dalla chat corrente
-  $: messages = $currentChat?.messages || [];
-  $: isTemporaryChat = $currentChat?.isTemporary || false;
+  $: {
+    try {
+      messages = $currentChat?.messages || [];
+      isTemporaryChat = $currentChat?.isTemporary || false;
+    } catch (error) {
+      console.error('Error accessing currentChat:', error);
+      messages = [];
+      isTemporaryChat = false;
+    }
+  }
   
   // Calcola token per la chat corrente
-  $: currentChatTokens = messages.length > 0 ? estimateChatTokens(messages) : 0;
-  $: maxTokens = 4000; // Limite di default
-  $: tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-  $: tokenWarning = tokenUsagePercentage > 80;
+  $: {
+    try {
+      currentChatTokens = messages.length > 0 ? estimateChatTokens(messages) : 0;
+      maxTokens = 4000; // Limite di default
+      tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
+      tokenWarning = tokenUsagePercentage > 80;
+    } catch (error) {
+      console.error('Error calculating tokens:', error);
+      currentChatTokens = 0;
+      maxTokens = 4000;
+      tokenUsagePercentage = 0;
+      tokenWarning = false;
+    }
+  }
   
   onMount(() => {
     voiceAvailable = isVoiceAvailable();
@@ -196,35 +214,55 @@
         let fullResponse = '';
         
         // Usa streaming per aggiornare in tempo reale
+        const currentChatData = get(currentChat);
+        if (!currentChatData) {
+          throw new Error('Chat corrente non disponibile');
+        }
+        
+        const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
+        const messageIndex = currentChatData.messages.length - 1;
+        
         for await (const chunk of generateResponseStream(
           messageText, 
           $selectedModel, 
-          $currentChat?.messages.slice(0, -1) || [], // Escludi il messaggio corrente
+          chatHistory,
           [],
           abortController.signal
         )) {
           fullResponse += chunk;
           // Aggiorna il messaggio in tempo reale
-          updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+          updateMessage(chatId, messageIndex, { content: fullResponse });
           await tick();
           scrollToBottom(false); // Scroll continuo ma non smooth per performance
         }
         
         // Salva la risposta finale
-        updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+        updateMessage(chatId, messageIndex, { content: fullResponse });
         currentStreamingMessageId = null;
         
       } catch (error) {
         console.error('Error generating response:', error);
         
         // Rimuovi il messaggio vuoto se è stato interrotto
-        if (currentStreamingMessageId && error.message.includes('interrotta')) {
-          deleteMessage(chatId, $currentChat.messages.length - 1);
+        const currentChatData = get(currentChat);
+        if (currentStreamingMessageId && error.message && error.message.includes('interrotta')) {
+          if (currentChatData && currentChatData.messages.length > 0) {
+            deleteMessage(chatId, currentChatData.messages.length - 1);
+          }
         } else {
-          const errorMessage = error.message || 'Si è verificato un errore sconosciuto.';
-          updateMessage(chatId, $currentChat.messages.length - 1, { 
-            content: `❌ Errore: ${errorMessage}`
-          });
+          const errorMsg = error?.message || 'Si è verificato un errore sconosciuto.';
+          if (currentChatData && currentChatData.messages.length > 0) {
+            updateMessage(chatId, currentChatData.messages.length - 1, { 
+              content: `❌ Errore: ${errorMsg}`
+            });
+          } else {
+            // Se non c'è un messaggio AI, aggiungilo
+            addMessage(chatId, {
+              type: 'ai',
+              content: `❌ Errore: ${errorMsg}`,
+              timestamp: new Date().toISOString()
+            });
+          }
         }
         currentStreamingMessageId = null;
       } finally {
@@ -646,6 +684,18 @@
 </script>
 
 <main class="main-area">
+  {#if showError}
+    <div class="error-banner">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span>{errorMessage}</span>
+      <button class="error-close" on:click={() => showError = false}>×</button>
+    </div>
+  {/if}
+  
   {#if showSearchBar}
     <div class="search-bar">
       <input
