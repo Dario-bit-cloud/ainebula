@@ -1,15 +1,20 @@
 import { API_CONFIG, MODEL_MAPPING } from '../config/api.js';
+import { get } from 'svelte/store';
+import { aiSettings } from '../stores/aiSettings.js';
 
 /**
  * Converte la storia della chat nel formato richiesto dall'API OpenAI/Electron Hub
  */
-function formatChatHistory(chatHistory) {
+function formatChatHistory(chatHistory, systemPrompt) {
   const messages = [];
   
-  // Messaggio di sistema per impostare il comportamento dell'AI
+  // Messaggio di sistema personalizzabile
+  const settings = get(aiSettings);
+  const currentSystemPrompt = systemPrompt || settings.systemPrompt || 'Sei Nebula AI, un assistente AI utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
+  
   messages.push({
     role: 'system',
-    content: 'Sei Nebula AI, un assistente AI utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.'
+    content: currentSystemPrompt
   });
   
   // Converti la cronologia della chat
@@ -70,9 +75,9 @@ function formatChatHistory(chatHistory) {
 }
 
 /**
- * Genera una risposta utilizzando l'API Electron Hub
+ * Genera una risposta con streaming utilizzando l'API Electron Hub
  */
-export async function generateResponse(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = []) {
+export async function* generateResponseStream(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = [], abortController = null) {
   try {
     // Mappa il modello locale al modello Electron Hub
     const apiModel = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-5.1-instant'];
@@ -90,16 +95,23 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     // Formatta i messaggi per l'API
     const formattedMessages = formatChatHistory(allMessages);
     
-    // Prepara la richiesta
+    // Ottieni le impostazioni AI
+    const settings = get(aiSettings);
+    
+    // Prepara la richiesta con streaming
     const requestBody = {
       model: apiModel,
       messages: formattedMessages,
-      temperature: 0.7,
-      max_tokens: 2000
+      temperature: settings.temperature || 0.7,
+      max_tokens: settings.maxTokens || 2000,
+      top_p: settings.topP || 1.0,
+      frequency_penalty: settings.frequencyPenalty || 0.0,
+      presence_penalty: settings.presencePenalty || 0.0,
+      stream: true
     };
     
-    // Esegui la chiamata API
-    const controller = new AbortController();
+    // Crea controller se non fornito
+    const controller = abortController || new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
     
     // Headers per Electron Hub (compatibile OpenAI)
@@ -108,10 +120,12 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
       'Authorization': `Bearer ${API_CONFIG.apiKey}`
     };
     
-    console.log('Calling Electron Hub API:', {
+    console.log('Calling Electron Hub API (Streaming):', {
       url: `${API_CONFIG.baseURL}/chat/completions`,
       model: apiModel,
-      messageCount: formattedMessages.length
+      messageCount: formattedMessages.length,
+      temperature: settings.temperature,
+      maxTokens: settings.maxTokens
     });
     
     const response = await fetch(`${API_CONFIG.baseURL}/chat/completions`, {
@@ -149,31 +163,54 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
       throw new Error(errorMessage);
     }
     
-    const data = await response.json();
+    // Leggi lo stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
     
-    // Estrai la risposta
-    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-      return data.choices[0].message.content;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Mantieni l'ultima riga incompleta
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+          
+          const dataStr = trimmedLine.slice(6); // Rimuovi "data: "
+          
+          if (dataStr === '[DONE]') {
+            return;
+          }
+          
+          try {
+            const data = JSON.parse(dataStr);
+            const delta = data.choices?.[0]?.delta?.content;
+            
+            if (delta) {
+              yield delta;
+            }
+          } catch (e) {
+            // Ignora errori di parsing per linee non JSON
+            console.warn('Error parsing stream data:', e, dataStr);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
     }
-    
-    throw new Error('Nessuna risposta ricevuta dall\'API');
     
   } catch (error) {
     console.error('❌ Error calling Electron Hub API:', error);
-    console.error('📍 API Config:', {
-      baseURL: API_CONFIG.baseURL,
-      apiKey: API_CONFIG.apiKey.substring(0, 20) + '...',
-      model: apiModel
-    });
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
     
     // Se è un errore di timeout o rete, ritorna un messaggio specifico
     if (error.name === 'AbortError') {
-      throw new Error('Timeout: la richiesta ha impiegato troppo tempo. Riprova.');
+      throw new Error('Generazione interrotta dall\'utente.');
     }
     
     if (error.message.includes('API Error')) {
@@ -185,3 +222,19 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
   }
 }
 
+/**
+ * Genera una risposta senza streaming (compatibilità backward)
+ */
+export async function generateResponse(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = [], abortController = null) {
+  let fullResponse = '';
+  
+  try {
+    for await (const chunk of generateResponseStream(message, modelId, chatHistory, images, abortController)) {
+      fullResponse += chunk;
+    }
+    
+    return fullResponse;
+  } catch (error) {
+    throw error;
+  }
+}

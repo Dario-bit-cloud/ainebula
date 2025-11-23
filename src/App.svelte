@@ -7,6 +7,10 @@
   import ProjectModal from './components/ProjectModal.svelte';
   import UserMenu from './components/UserMenu.svelte';
   import PremiumModal from './components/PremiumModal.svelte';
+  import AISettingsModal from './components/AISettingsModal.svelte';
+  import PromptLibraryModal from './components/PromptLibraryModal.svelte';
+  import VoiceSelectModal from './components/VoiceSelectModal.svelte';
+  import VoiceModeView from './components/VoiceModeView.svelte';
 </script>
 
 <div class="app-container">
@@ -20,6 +24,10 @@
   <ProjectModal />
   <UserMenu />
   <PremiumModal />
+  <AISettingsModal />
+  <PromptLibraryModal on:select={(e) => console.log('Prompt selected:', e.detail)} />
+  <VoiceSelectModal on:voiceSelected={(e) => console.log('Voice selected:', e.detail)} />
+  <VoiceModeView />
 </div>
 
 <style>

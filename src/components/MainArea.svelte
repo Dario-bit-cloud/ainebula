@@ -1,17 +1,42 @@
 <script>
-  import { onMount } from 'svelte';
-  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat } from '../stores/chat.js';
+  import { onMount, tick } from 'svelte';
+  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, createTemporaryChat } from '../stores/chat.js';
   import { selectedModel } from '../stores/models.js';
-  import { generateResponse } from '../services/aiService.js';
+  import { generateResponseStream, generateResponse } from '../services/aiService.js';
   import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable } from '../services/voiceService.js';
-  import { isPremiumModalOpen } from '../stores/app.js';
+  import { isPremiumModalOpen, isVoiceSelectionModalOpen } from '../stores/app.js';
+  import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
+  import { renderMarkdown } from '../utils/markdown.js';
+  import MessageActions from './MessageActions.svelte';
+  import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
   
   let inputValue = '';
   let inputRef;
+  let textareaRef;
   let isRecording = false;
   let voiceAvailable = false;
   let fileInput;
   let attachedImages = [];
+  let messagesContainer;
+  let currentStreamingMessageId = null;
+  let editingMessageIndex = null;
+  let searchQuery = '';
+  let showScrollToTop = false;
+  let showSearchBar = false;
+  let showTokenCounter = true;
+  let highlightedMessageIndex = null;
+  let showAttachMenu = false;
+  let attachMenuRef;
+  let showMoreOptions = false;
+  
+  // Usa textarea invece di input
+  $: isTextarea = true;
+  
+  // Calcola token per la chat corrente
+  $: currentChatTokens = messages.length > 0 ? estimateChatTokens(messages) : 0;
+  $: maxTokens = 4000; // Limite di default
+  $: tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
+  $: tokenWarning = tokenUsagePercentage > 80;
   
   onMount(() => {
     voiceAvailable = isVoiceAvailable();
@@ -66,18 +91,61 @@
     // Aggiungi listener globale per l'incolla
     window.addEventListener('paste', handlePaste);
     
+    // Scroll automatico quando arrivano nuovi messaggi
+    const unsubscribe = currentChat.subscribe(async (chat) => {
+      if (chat && messagesContainer) {
+        await tick();
+        scrollToBottom();
+      }
+    });
+    
+    // Monitor scroll per mostrare/nascondere pulsante scroll to top
+    if (messagesContainer) {
+      messagesContainer.addEventListener('scroll', handleScroll);
+    }
+    
     // Cleanup
     return () => {
       window.removeEventListener('paste', handlePaste);
+      if (messagesContainer) {
+        messagesContainer.removeEventListener('scroll', handleScroll);
+      }
+      unsubscribe();
     };
   });
   
+  function handleScroll() {
+    if (messagesContainer) {
+      showScrollToTop = messagesContainer.scrollTop > 300;
+    }
+  }
+  
+  function scrollToBottom(smooth = true) {
+    if (messagesContainer) {
+      messagesContainer.scrollTo({
+        top: messagesContainer.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  }
+  
+  function scrollToTop() {
+    if (messagesContainer) {
+      messagesContainer.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+  }
+  
   async function handleSubmit() {
-    console.log('handleSubmit chiamato');
+    if (editingMessageIndex !== null) {
+      handleEditSave();
+      return;
+    }
+    
     const hasText = inputValue.trim().length > 0;
     const hasImages = attachedImages.length > 0;
-    
-    console.log('Stato:', { hasText, hasImages, isGenerating: $isGenerating, inputValue });
     
     // Se ci sono immagini, mostra il modal premium invece di inviare
     if (hasImages) {
@@ -86,7 +154,6 @@
     }
     
     if (hasText && !$isGenerating) {
-      console.log('Invio messaggio...');
       const chatId = $currentChatId || createNewChat();
       
       const userMessage = { 
@@ -95,42 +162,236 @@
         timestamp: new Date().toISOString() 
       };
       
-      console.log('Aggiungo messaggio utente:', userMessage);
       addMessage(chatId, userMessage);
       const messageText = inputValue.trim();
       
       inputValue = '';
       attachedImages = [];
       
+      await tick();
+      scrollToBottom();
+      
       isGenerating.set(true);
       
+      // Crea AbortController per poter fermare la generazione
+      const abortController = new AbortController();
+      setAbortController(abortController);
+      
+      // Crea messaggio AI vuoto per lo streaming
+      const aiMessageId = Date.now().toString();
+      currentStreamingMessageId = aiMessageId;
+      const aiMessage = { 
+        id: aiMessageId,
+        type: 'ai', 
+        content: '', 
+        timestamp: new Date().toISOString() 
+      };
+      addMessage(chatId, aiMessage);
+      
       try {
-        console.log('Chiamata API con:', { messageText, model: $selectedModel, chatId });
-        const response = await generateResponse(messageText, $selectedModel, $currentChat?.messages || [], []);
-        console.log('Risposta ricevuta:', response);
-        const aiMessage = { type: 'ai', content: response, timestamp: new Date().toISOString() };
-        addMessage(chatId, aiMessage);
+        let fullResponse = '';
+        
+        // Usa streaming per aggiornare in tempo reale
+        for await (const chunk of generateResponseStream(
+          messageText, 
+          $selectedModel, 
+          $currentChat?.messages.slice(0, -1) || [], // Escludi il messaggio corrente
+          [],
+          abortController.signal
+        )) {
+          fullResponse += chunk;
+          // Aggiorna il messaggio in tempo reale
+          updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+          await tick();
+          scrollToBottom(false); // Scroll continuo ma non smooth per performance
+        }
+        
+        // Salva la risposta finale
+        updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+        currentStreamingMessageId = null;
+        
       } catch (error) {
         console.error('Error generating response:', error);
-        const errorMessage = error.message || 'Si è verificato un errore sconosciuto.';
-        addMessage(chatId, { 
-          type: 'ai', 
-          content: `❌ Errore: ${errorMessage}`, 
-          timestamp: new Date().toISOString() 
-        });
+        
+        // Rimuovi il messaggio vuoto se è stato interrotto
+        if (currentStreamingMessageId && error.message.includes('interrotta')) {
+          deleteMessage(chatId, $currentChat.messages.length - 1);
+        } else {
+          const errorMessage = error.message || 'Si è verificato un errore sconosciuto.';
+          updateMessage(chatId, $currentChat.messages.length - 1, { 
+            content: `❌ Errore: ${errorMessage}`
+          });
+        }
+        currentStreamingMessageId = null;
       } finally {
         isGenerating.set(false);
+        setAbortController(null);
+        await tick();
+        scrollToBottom();
       }
-    } else {
-      console.log('Messaggio non inviato:', { hasText, hasImages, isGenerating: $isGenerating });
     }
   }
   
+  function handleStop() {
+    abortCurrentRequest();
+    isGenerating.set(false);
+  }
+  
   function handleKeyPress(event) {
+    // Shift+Enter per nuova riga, Enter per inviare
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       handleSubmit();
     }
+    // Auto-resize textarea
+    if (textareaRef) {
+      textareaRef.style.height = 'auto';
+      textareaRef.style.height = Math.min(textareaRef.scrollHeight, 200) + 'px';
+    }
+  }
+  
+  function handleInputResize() {
+    if (textareaRef) {
+      textareaRef.style.height = 'auto';
+      textareaRef.style.height = Math.min(textareaRef.scrollHeight, 200) + 'px';
+    }
+  }
+  
+  // Funzioni per gestione messaggi
+  async function handleCopyMessage(messageIndex) {
+    const message = messages[messageIndex];
+    if (message && message.content) {
+      await navigator.clipboard.writeText(message.content);
+      // Potresti mostrare un toast qui
+    }
+  }
+  
+  function handleEditMessage(messageIndex) {
+    const message = messages[messageIndex];
+    if (message && message.type === 'user') {
+      editingMessageIndex = messageIndex;
+      inputValue = message.content;
+      if (textareaRef) {
+        textareaRef.focus();
+        handleInputResize();
+      }
+      scrollToBottom();
+    }
+  }
+  
+  async function handleEditSave() {
+    if (editingMessageIndex === null) return;
+    
+    const chatId = $currentChatId;
+    if (!chatId || !inputValue.trim()) return;
+    
+    // Aggiorna il messaggio
+    updateMessage(chatId, editingMessageIndex, { content: inputValue.trim() });
+    
+    // Elimina tutti i messaggi dopo quello modificato
+    const messagesToDelete = messages.length - editingMessageIndex - 1;
+    for (let i = 0; i < messagesToDelete; i++) {
+      deleteMessage(chatId, editingMessageIndex + 1);
+    }
+    
+    editingMessageIndex = null;
+    inputValue = '';
+    
+    // Rigenera la risposta se c'era una risposta AI dopo
+    const savedIndex = editingMessageIndex;
+    await tick();
+    const currentMessages = $currentChat?.messages || [];
+    if (currentMessages[savedIndex + 1]?.type === 'ai' || currentMessages.length === savedIndex + 1) {
+      handleRegenerateMessage(savedIndex);
+    }
+  }
+  
+  function handleEditCancel() {
+    editingMessageIndex = null;
+    inputValue = '';
+    if (textareaRef) {
+      handleInputResize();
+    }
+  }
+  
+  async function handleRegenerateMessage(messageIndex) {
+    const chatId = $currentChatId;
+    if (!chatId) return;
+    
+    // Elimina la risposta AI corrente e tutte le successive
+    const messagesToDelete = messages.length - messageIndex - 1;
+    for (let i = 0; i < messagesToDelete; i++) {
+      deleteMessage(chatId, messageIndex + 1);
+    }
+    
+    // Ottieni il messaggio utente precedente
+    const userMessage = messages[messageIndex];
+    if (userMessage && userMessage.type === 'user') {
+      await tick();
+      
+      isGenerating.set(true);
+      const abortController = new AbortController();
+      setAbortController(abortController);
+      
+      const aiMessageId = Date.now().toString();
+      currentStreamingMessageId = aiMessageId;
+      const aiMessage = { 
+        id: aiMessageId,
+        type: 'ai', 
+        content: '', 
+        timestamp: new Date().toISOString() 
+      };
+      addMessage(chatId, aiMessage);
+      
+      try {
+        let fullResponse = '';
+        const chatHistory = messages.slice(0, messageIndex + 1);
+        
+        for await (const chunk of generateResponseStream(
+          userMessage.content,
+          $selectedModel,
+          chatHistory.slice(0, -1),
+          [],
+          abortController.signal
+        )) {
+          fullResponse += chunk;
+          updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+          await tick();
+          scrollToBottom(false);
+        }
+        
+        updateMessage(chatId, $currentChat.messages.length - 1, { content: fullResponse });
+        currentStreamingMessageId = null;
+        
+      } catch (error) {
+        console.error('Error regenerating response:', error);
+        if (currentStreamingMessageId && error.message.includes('interrotta')) {
+          deleteMessage(chatId, $currentChat.messages.length - 1);
+        } else {
+          updateMessage(chatId, $currentChat.messages.length - 1, { 
+            content: `❌ Errore: ${error.message || 'Errore sconosciuto'}`
+          });
+        }
+        currentStreamingMessageId = null;
+      } finally {
+        isGenerating.set(false);
+        setAbortController(null);
+        await tick();
+        scrollToBottom();
+      }
+    }
+  }
+  
+  function handleDeleteMessage(messageIndex) {
+    const chatId = $currentChatId;
+    if (chatId) {
+      deleteMessage(chatId, messageIndex);
+    }
+  }
+  
+  function handleMessageFeedback(messageIndex, type) {
+    // Qui puoi implementare il salvataggio del feedback
+    console.log('Feedback:', { messageIndex, type });
   }
   
   function handleVoiceClick() {
@@ -139,18 +400,109 @@
       return;
     }
     
-    if (isRecording) {
-      stopListening();
-      isRecording = false;
-    } else {
+    // Apri il modal di selezione voce
+    isVoiceSelectionModalOpen.set(true);
+  }
+  
+  function handleVoiceSelected(event) {
+    const selectedVoice = event.detail;
+    console.log('Voce selezionata:', selectedVoice);
+    
+    // Avvia la registrazione con la voce selezionata
+    if (!isRecording) {
       startListening();
       isRecording = true;
+    } else {
+      stopListening();
+      isRecording = false;
     }
   }
   
-  function handleAttachClick() {
-    fileInput?.click();
+  function handleAttachClick(event) {
+    event.stopPropagation();
+    showAttachMenu = !showAttachMenu;
   }
+  
+  function handleAttachFile() {
+    fileInput?.click();
+    showAttachMenu = false;
+  }
+  
+  function handleAttachOption(option) {
+    switch(option) {
+      case 'file':
+        handleAttachFile();
+        showAttachMenu = false;
+        break;
+      case 'business-info':
+        alert('Informazioni aziendali - Funzionalità in arrivo');
+        showAttachMenu = false;
+        break;
+      case 'deep-research':
+        alert('Deep Research - Funzionalità in arrivo');
+        showAttachMenu = false;
+        break;
+      case 'agent-mode':
+        alert('Modalità agente - Funzionalità in arrivo');
+        showAttachMenu = false;
+        break;
+      case 'create-image':
+        alert('Crea immagine - Funzionalità in arrivo');
+        showAttachMenu = false;
+        break;
+      case 'more-options':
+        showMoreOptions = !showMoreOptions;
+        break;
+      case 'voice-mode':
+        isVoiceSelectModalOpen.set(true);
+        showAttachMenu = false;
+        break;
+      case 'web-search':
+        alert('Ricerca sul web - Funzionalità in arrivo');
+        showAttachMenu = false;
+        showMoreOptions = false;
+        break;
+      case 'canvas':
+        alert('Canvas - Funzionalità in arrivo');
+        showAttachMenu = false;
+        showMoreOptions = false;
+        break;
+      case 'study-learn':
+        alert('Studia e impara - Funzionalità in arrivo');
+        showAttachMenu = false;
+        showMoreOptions = false;
+        break;
+    }
+  }
+  
+  function handleMoreOptionsMouseEnter() {
+    showMoreOptions = true;
+  }
+  
+  function handleMoreOptionsMouseLeave() {
+    // Delay per permettere il movimento al sottomenu
+    setTimeout(() => {
+      if (!attachMenuRef?.querySelector('.more-options-menu:hover')) {
+        showMoreOptions = false;
+      }
+    }, 200);
+  }
+  
+  // Chiudi menu quando si clicca fuori
+  function handleClickOutside(event) {
+    if (attachMenuRef && !attachMenuRef.contains(event.target)) {
+      showAttachMenu = false;
+    }
+  }
+  
+  onMount(() => {
+    // Aggiungi listener per chiudere il menu quando si clicca fuori
+    document.addEventListener('click', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  });
   
   async function handleFileSelect(event) {
     const files = Array.from(event.target.files || []);
@@ -192,18 +544,189 @@
   }
   
   $: messages = $currentChat?.messages || [];
+  $: isTemporaryChat = $currentChat?.isTemporary || false;
+  
+  // Funzioni per export chat
+  function exportChat(format = 'txt') {
+    const chat = $currentChat;
+    if (!chat || messages.length === 0) return;
+    
+    let content = `Nebula AI Chat Export\n`;
+    content += `Title: ${chat.title}\n`;
+    content += `Date: ${new Date(chat.createdAt).toLocaleString()}\n`;
+    content += `${'='.repeat(50)}\n\n`;
+    
+    if (format === 'markdown') {
+      messages.forEach(msg => {
+        const role = msg.type === 'user' ? '**User**' : '**AI**';
+        content += `${role}\n\n${msg.content}\n\n---\n\n`;
+      });
+    } else {
+      messages.forEach(msg => {
+        const role = msg.type === 'user' ? 'User' : 'AI';
+        content += `[${role}]\n${msg.content}\n\n`;
+      });
+    }
+    
+    const blob = new Blob([content], { type: format === 'markdown' ? 'text/markdown' : 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${chat.title || 'chat'}-${Date.now()}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  
+  // Funzione per ricerca nella chat corrente
+  function handleSearchInput(value) {
+    searchQuery = value;
+    if (searchQuery && messages.length > 0) {
+      // Trova il primo messaggio che corrisponde
+      const index = messages.findIndex(msg => 
+        msg.content && msg.content.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      if (index !== -1) {
+        highlightedMessageIndex = index;
+        setTimeout(() => {
+          const messageElements = messagesContainer?.querySelectorAll('.message');
+          if (messageElements && messageElements[index]) {
+            messageElements[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      } else {
+        highlightedMessageIndex = null;
+      }
+    } else {
+      highlightedMessageIndex = null;
+    }
+  }
+  
+  function toggleSearchBar() {
+    showSearchBar = !showSearchBar;
+    if (!showSearchBar) {
+      searchQuery = '';
+      highlightedMessageIndex = null;
+    } else if (textareaRef || inputRef) {
+      // Focus sulla search bar dopo un breve delay
+      setTimeout(() => {
+        const searchInput = document.querySelector('.chat-search-input');
+        if (searchInput) searchInput.focus();
+      }, 100);
+    }
+  }
+  
+  function convertToPermanent() {
+    const chatId = $currentChatId;
+    if (!chatId) return;
+    
+    chats.update(allChats => {
+      return allChats.map(chat => {
+        if (chat.id === chatId && chat.isTemporary) {
+          return {
+            ...chat,
+            isTemporary: false,
+            id: Date.now().toString() // Nuovo ID per la chat permanente
+          };
+        }
+        return chat;
+      });
+    });
+    
+    // Aggiorna currentChatId con il nuovo ID
+    chats.subscribe(allChats => {
+      const updatedChat = allChats.find(c => c.id !== chatId && !c.isTemporary && c.title === 'Chat temporanea');
+      if (updatedChat) {
+        currentChatId.set(updatedChat.id);
+      }
+    })();
+    
+    saveChatsToStorage();
+  }
 </script>
 
 <main class="main-area">
-  <div class="messages-container">
+  {#if showSearchBar}
+    <div class="search-bar">
+      <input
+        type="text"
+        class="chat-search-input"
+        placeholder="Cerca nella chat corrente..."
+        bind:value={searchQuery}
+        on:input={(e) => handleSearchInput(e.target.value)}
+      />
+      <button class="search-close" on:click={toggleSearchBar} title="Chiudi ricerca">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  {/if}
+  
+  {#if showTokenCounter && messages.length > 0}
+    <div class="token-counter" class:token-warning={tokenWarning}>
+      <div class="token-info">
+        <span class="token-label">Token: {currentChatTokens.toLocaleString()} / {maxTokens.toLocaleString()}</span>
+        <div class="token-bar">
+          <div class="token-bar-fill" style="width: {Math.min(tokenUsagePercentage, 100)}%"></div>
+        </div>
+      </div>
+      <button class="token-counter-toggle" on:click={() => showTokenCounter = false} title="Nascondi">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  {:else if messages.length > 0}
+    <button class="token-counter-show" on:click={() => showTokenCounter = true} title="Mostra token counter">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </button>
+  {/if}
+  
+  <div class="messages-container" bind:this={messagesContainer}>
     {#if messages.length === 0}
       <div class="welcome-message">
-        <h1 class="welcome-text">In cosa posso essere utile?</h1>
+        {#if !$currentChatId}
+          <button class="temporary-chat-button" on:click={() => createTemporaryChat()}>
+            <div class="temporary-chat-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+              </svg>
+            </div>
+            <h1 class="welcome-text">Attiva chat temporanea</h1>
+          </button>
+        {:else}
+          <h1 class="welcome-text">In cosa posso essere utile?</h1>
+        {/if}
       </div>
     {/if}
     
-    {#each messages as message}
-      <div class="message" class:user-message={message.type === 'user'} class:ai-message={message.type === 'ai'}>
+    {#if isTemporaryChat}
+      <div class="temporary-chat-banner">
+        <div class="temporary-chat-indicator">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          </svg>
+          <span>Chat temporanea - Non verrà salvata</span>
+        </div>
+        <button class="convert-to-permanent" on:click={() => convertToPermanent()}>
+          Salva chat
+        </button>
+      </div>
+    {/if}
+    
+    {#each messages as message, index (message.id || index)}
+      <div 
+        class="message" 
+        class:user-message={message.type === 'user'} 
+        class:ai-message={message.type === 'ai'}
+        class:highlighted={highlightedMessageIndex === index && searchQuery}
+      >
         {#if message.images && message.images.length > 0}
           <div class="message-images">
             {#each message.images as image}
@@ -213,13 +736,26 @@
         {/if}
         {#if message.content}
           <div class="message-content">
-            {message.content}
+            {#if message.type === 'ai'}
+              {@html renderMarkdown(message.content)}
+            {:else}
+              {message.content}
+            {/if}
           </div>
         {/if}
+        <MessageActions 
+          messageIndex={index}
+          messageType={message.type}
+          on:copy={() => handleCopyMessage(index)}
+          on:edit={() => handleEditMessage(index)}
+          on:regenerate={() => handleRegenerateMessage(index)}
+          on:delete={() => handleDeleteMessage(index)}
+          on:feedback={(e) => handleMessageFeedback(index, e.detail.type)}
+        />
       </div>
     {/each}
     
-    {#if $isGenerating}
+    {#if $isGenerating && !currentStreamingMessageId}
       <div class="message ai-message">
         <div class="message-content">
           <div class="typing-indicator">
@@ -232,7 +768,40 @@
     {/if}
   </div>
   
+  {#if showScrollToTop}
+    <button class="scroll-to-top" on:click={scrollToTop} title="Torna all'inizio">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 15l-6-6-6 6"/>
+      </svg>
+    </button>
+  {/if}
+  
   <div class="input-container">
+    <div class="input-toolbar">
+      <button 
+        class="toolbar-button" 
+        on:click={toggleSearchBar}
+        title="Cerca nella chat"
+        class:active={showSearchBar}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+      </button>
+      <button 
+        class="toolbar-button" 
+        on:click={() => exportChat('markdown')}
+        title="Esporta chat"
+        disabled={messages.length === 0}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </button>
+    </div>
       {#if attachedImages.length > 0}
         <div class="attached-images">
           {#each attachedImages as imageItem, index}
@@ -249,11 +818,121 @@
         </div>
       {/if}
     <div class="input-wrapper">
-      <button class="attach-button" on:click={handleAttachClick} title="Allega file">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-        </svg>
-      </button>
+      <div class="attach-button-wrapper" bind:this={attachMenuRef}>
+        <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title="Allega file">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </button>
+        
+        {#if showAttachMenu}
+          <div class="attach-menu">
+            <button class="menu-item" on:click={() => handleAttachOption('file')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+              </svg>
+              <span>Aggiungi foto e file</span>
+            </button>
+            
+            <button class="menu-item" on:click={() => handleAttachOption('business-info')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+              </svg>
+              <span>Informazioni aziendali</span>
+            </button>
+            
+            <button class="menu-item" on:click={() => handleAttachOption('deep-research')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+              <span>Deep Research</span>
+            </button>
+            
+            <button class="menu-item" on:click={() => handleAttachOption('agent-mode')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+                <circle cx="12" cy="12" r="3" fill="currentColor"/>
+              </svg>
+              <span>Modalità agente</span>
+            </button>
+            
+            <button class="menu-item" on:click={() => handleAttachOption('create-image')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span>Crea immagine</span>
+            </button>
+            
+            <button class="menu-item" on:click={() => handleAttachOption('voice-mode')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+              <span>Modalità vocale</span>
+            </button>
+            
+            <div class="menu-divider"></div>
+            
+            <div 
+              class="menu-item-wrapper"
+              on:mouseenter={handleMoreOptionsMouseEnter}
+              on:mouseleave={handleMoreOptionsMouseLeave}
+            >
+              <button class="menu-item" on:click={() => handleAttachOption('more-options')}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="1"/>
+                  <circle cx="19" cy="12" r="1"/>
+                  <circle cx="5" cy="12" r="1"/>
+                </svg>
+                <span>Altre opzioni</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+              
+              {#if showMoreOptions}
+                <div class="more-options-menu">
+                  <button class="menu-item" on:click={() => handleAttachOption('web-search')}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="2" y1="12" x2="22" y2="12"/>
+                      <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                    </svg>
+                    <span>Ricerca sul web</span>
+                  </button>
+                  
+                  <button class="menu-item" on:click={() => handleAttachOption('canvas')}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                      <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>Canvas</span>
+                  </button>
+                  
+                  <button class="menu-item" on:click={() => handleAttachOption('study-learn')}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+                      <line x1="8" y1="7" x2="16" y2="7"/>
+                      <line x1="8" y1="11" x2="16" y2="11"/>
+                      <line x1="8" y1="15" x2="12" y2="15"/>
+                    </svg>
+                    <span>Studia e impara</span>
+                  </button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
+      </div>
       <input 
         type="file"
         bind:this={fileInput}
@@ -262,15 +941,23 @@
         multiple
         style="display: none;"
       />
-      <input 
-        type="text" 
-        class="message-input" 
-        placeholder="Fai una domanda"
+      {#if editingMessageIndex !== null}
+        <div class="edit-mode">
+          <span class="edit-label">Modifica messaggio</span>
+          <button class="edit-cancel" on:click={handleEditCancel}>Annulla</button>
+        </div>
+      {/if}
+      <textarea
+        class="message-input"
+        class:textarea-input={isTextarea}
+        placeholder={editingMessageIndex !== null ? "Modifica il messaggio..." : "Fai una domanda (Shift+Enter per nuova riga)"}
         bind:value={inputValue}
-        bind:this={inputRef}
+        bind:this={textareaRef}
         on:keydown={handleKeyPress}
-        disabled={$isGenerating}
-      />
+        on:input={handleInputResize}
+        disabled={$isGenerating && editingMessageIndex === null}
+        rows="1"
+      ></textarea>
       <div class="input-actions">
         <button 
           class="voice-button" 
@@ -294,17 +981,29 @@
             <rect x="17" y="9" width="3" height="6" rx="1"/>
           </svg>
         </button>
-        <button 
-          class="send-button" 
-          title="Invia messaggio"
-          on:click={handleSubmit}
-          disabled={$isGenerating || (!inputValue.trim() && attachedImages.length === 0)}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-        </button>
+        {#if $isGenerating && editingMessageIndex === null}
+          <button 
+            class="stop-button" 
+            title="Ferma generazione"
+            on:click={handleStop}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+          </button>
+        {:else}
+          <button 
+            class="send-button" 
+            title={editingMessageIndex !== null ? "Salva modifica" : "Invia messaggio"}
+            on:click={handleSubmit}
+            disabled={!inputValue.trim() && attachedImages.length === 0}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        {/if}
       </div>
     </div>
   </div>
@@ -323,6 +1022,142 @@
     position: relative;
     overflow: hidden;
   }
+  
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    animation: slideDown 0.3s ease;
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .chat-search-input {
+    flex: 1;
+    padding: 8px 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  
+  .chat-search-input:focus {
+    border-color: var(--accent-blue);
+  }
+  
+  .search-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+  
+  .search-close:hover {
+    color: var(--text-primary);
+  }
+  
+  .token-counter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12px;
+    transition: background-color 0.2s;
+  }
+  
+  .token-counter.token-warning {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-bottom-color: rgba(239, 68, 68, 0.3);
+  }
+  
+  .token-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .token-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  
+  .token-bar {
+    height: 4px;
+    background-color: var(--bg-tertiary);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  
+  .token-bar-fill {
+    height: 100%;
+    background-color: var(--accent-blue);
+    transition: width 0.3s ease, background-color 0.3s ease;
+  }
+  
+  .token-counter.token-warning .token-bar-fill {
+    background-color: #ef4444;
+  }
+  
+  .token-counter-toggle {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+  
+  .token-counter-toggle:hover {
+    color: var(--text-primary);
+  }
+  
+  .token-counter-show {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+  }
+  
+  .token-counter-show:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+  }
 
   .messages-container {
     flex: 1;
@@ -331,6 +1166,59 @@
     display: flex;
     flex-direction: column;
     gap: 24px;
+  }
+  
+  .message.highlighted {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+    border: 2px solid var(--accent-blue);
+    animation: highlightPulse 1s ease;
+  }
+  
+  @keyframes highlightPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+    }
+  }
+  
+  .input-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 24px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .toolbar-button {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  
+  .toolbar-button:hover:not(:disabled) {
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+    border-color: var(--accent-blue);
+  }
+  
+  .toolbar-button.active {
+    background-color: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+  }
+  
+  .toolbar-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .welcome-message {
@@ -481,11 +1369,24 @@
     border-radius: 12px;
     animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .message:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .message :global(.message-actions) {
+    align-self: flex-end;
+    margin-top: 4px;
+  }
+  
+  .user-message :global(.message-actions) {
+    align-self: flex-start;
   }
 
   @keyframes messageSlideIn {
@@ -703,6 +1604,11 @@
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
+  .attach-button-wrapper {
+    position: relative;
+    flex-shrink: 0;
+  }
+
   .attach-button {
     background: none;
     border: none;
@@ -716,12 +1622,110 @@
     flex-shrink: 0;
     border-radius: 4px;
     transform: scale(1) rotate(0deg);
+    width: 36px;
+    height: 36px;
   }
 
-  .attach-button:hover {
+  .attach-button:hover,
+  .attach-button.active {
     color: var(--text-primary);
     background-color: var(--hover-bg);
-    transform: scale(1.1) rotate(90deg);
+    transform: scale(1.1);
+  }
+
+  .attach-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    min-width: 240px;
+    animation: menuSlideUp 0.2s ease;
+  }
+
+  @keyframes menuSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .menu-item-wrapper {
+    position: relative;
+  }
+
+  .menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+    font-size: 14px;
+    text-align: left;
+  }
+
+  .menu-item:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .menu-item svg {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .menu-item:hover svg {
+    color: var(--text-primary);
+  }
+
+  .menu-divider {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 4px 0;
+  }
+
+  .arrow-icon {
+    margin-left: auto;
+  }
+
+  .more-options-menu {
+    position: absolute;
+    left: 100%;
+    top: 0;
+    margin-left: 8px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 1001;
+    min-width: 220px;
+    animation: menuSlideRight 0.2s ease;
+  }
+
+  @keyframes menuSlideRight {
+    from {
+      opacity: 0;
+      transform: translateX(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   .message-input {
@@ -732,6 +1736,16 @@
     font-size: 15px;
     outline: none;
     padding: 4px 0;
+    resize: none;
+    min-height: 24px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: inherit;
+    line-height: 1.5;
+  }
+  
+  .message-input.textarea-input {
+    padding: 8px 0;
   }
 
   .message-input:disabled {
@@ -741,6 +1755,172 @@
 
   .message-input::placeholder {
     color: var(--text-secondary);
+  }
+  
+  .edit-mode {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  
+  .edit-label {
+    flex: 1;
+  }
+  
+  .edit-cancel {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: background-color 0.2s;
+  }
+  
+  .edit-cancel:hover {
+    background-color: var(--hover-bg);
+  }
+  
+  .stop-button {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 4px;
+    transform: scale(1);
+  }
+  
+  .stop-button:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    transform: scale(1.1);
+  }
+  
+  .scroll-to-top {
+    position: fixed;
+    bottom: 120px;
+    right: 40px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    z-index: 100;
+    animation: fadeInUp 0.3s ease;
+  }
+  
+  .scroll-to-top:hover {
+    background-color: var(--hover-bg);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+  
+  @media (max-width: 768px) {
+    .scroll-to-top {
+      bottom: 100px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+    }
+  }
+  
+  /* Stili per markdown */
+  .message-content :global(h1),
+  .message-content :global(h2),
+  .message-content :global(h3),
+  .message-content :global(h4),
+  .message-content :global(h5),
+  .message-content :global(h6) {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  
+  .message-content :global(h1) { font-size: 1.5em; }
+  .message-content :global(h2) { font-size: 1.3em; }
+  .message-content :global(h3) { font-size: 1.1em; }
+  
+  .message-content :global(p) {
+    margin: 8px 0;
+    line-height: 1.6;
+  }
+  
+  .message-content :global(ul),
+  .message-content :global(ol) {
+    margin: 8px 0;
+    padding-left: 24px;
+  }
+  
+  .message-content :global(li) {
+    margin: 4px 0;
+  }
+  
+  .message-content :global(code) {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+  }
+  
+  .message-content :global(pre) {
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+  
+  .message-content :global(pre code) {
+    background: none;
+    padding: 0;
+  }
+  
+  .message-content :global(blockquote) {
+    border-left: 3px solid var(--accent-blue);
+    padding-left: 12px;
+    margin: 8px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  
+  .message-content :global(a) {
+    color: var(--accent-blue);
+    text-decoration: underline;
+  }
+  
+  .message-content :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+  }
+  
+  .message-content :global(th),
+  .message-content :global(td) {
+    border: 1px solid var(--border-color);
+    padding: 8px;
+    text-align: left;
+  }
+  
+  .message-content :global(th) {
+    background-color: rgba(0, 0, 0, 0.2);
+    font-weight: 600;
   }
 
   .input-actions {
@@ -828,5 +2008,69 @@
     font-size: 11px;
     color: var(--text-secondary);
     border-top: 1px solid var(--border-color);
+  }
+
+  .temporary-chat-button {
+    background: none;
+    border: 2px solid white;
+    border-radius: 12px;
+    padding: 24px 32px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.3s ease;
+    color: var(--text-primary);
+  }
+
+  .temporary-chat-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .temporary-chat-icon {
+    color: var(--text-primary);
+  }
+
+  .temporary-chat-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 16px;
+    animation: slideDown 0.3s ease;
+  }
+
+  .temporary-chat-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  .temporary-chat-indicator svg {
+    color: var(--text-secondary);
+  }
+
+  .convert-to-permanent {
+    padding: 6px 12px;
+    background-color: var(--accent-blue);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .convert-to-permanent:hover {
+    background-color: #2563eb;
+    transform: translateY(-1px);
   }
 </style>

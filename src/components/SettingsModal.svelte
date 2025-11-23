@@ -45,7 +45,6 @@
   ];
   
   // Controlli dati
-  let improveModel = true;
   let remoteBrowserData = true;
   
   // Sicurezza
@@ -391,18 +390,6 @@
             <h2 class="section-title">Controlli dati</h2>
             
             <div class="setting-group">
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Migliora il modello per tutti</div>
-                </div>
-                <div class="setting-status">
-                  <span>{improveModel ? 'Attiva' : 'Disattiva'}</span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </div>
-              </div>
-              
               <div class="setting-item">
                 <div class="setting-info">
                   <div class="setting-label">Dati del browser remoto</div>
