@@ -1,7 +1,7 @@
 import { API_CONFIG, MODEL_MAPPING } from '../config/api.js';
 
 /**
- * Converte la storia della chat nel formato richiesto dall'API OpenAI/OpenRouter
+ * Converte la storia della chat nel formato richiesto dall'API OpenAI/Electron Hub
  */
 function formatChatHistory(chatHistory) {
   const messages = [];
@@ -70,11 +70,11 @@ function formatChatHistory(chatHistory) {
 }
 
 /**
- * Genera una risposta utilizzando l'API OpenRouter
+ * Genera una risposta utilizzando l'API Electron Hub
  */
 export async function generateResponse(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = []) {
   try {
-    // Mappa il modello locale al modello OpenRouter
+    // Mappa il modello locale al modello Electron Hub
     const apiModel = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-5.1-instant'];
     
     // Prepara il messaggio corrente
@@ -102,15 +102,13 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
     
-    // Headers per OpenRouter
+    // Headers per Electron Hub (compatibile OpenAI)
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_CONFIG.apiKey}`,
-      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://nebula-ai.app',
-      'X-Title': 'Nebula AI'
+      'Authorization': `Bearer ${API_CONFIG.apiKey}`
     };
     
-    console.log('Calling OpenRouter API:', {
+    console.log('Calling Electron Hub API:', {
       url: `${API_CONFIG.baseURL}/chat/completions`,
       model: apiModel,
       messageCount: formattedMessages.length
@@ -141,11 +139,11 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
       let errorMessage = errorData.error?.message || `API Error: ${response.status} ${response.statusText}`;
       
       if (response.status === 401) {
-        errorMessage = 'API Key non valida o scaduta. Verifica la tua API key in src/config/api.js o ottieni una nuova chiave da https://openrouter.ai/keys';
+        errorMessage = 'API Key non valida o scaduta. Verifica la tua API key in src/config/api.js';
       } else if (response.status === 429) {
-        errorMessage = 'Troppe richieste. Limite giornaliero raggiunto. Riprova più tardi.';
+        errorMessage = 'Troppe richieste. Limite di rate (5 RPM) raggiunto. Aspetta un attimo e riprova.';
       } else if (response.status === 402) {
-        errorMessage = 'Crediti insufficienti. Aggiungi fondi al tuo account OpenRouter.';
+        errorMessage = 'Crediti insufficienti. Piano Free: 0.25 crediti giornalieri disponibili.';
       }
       
       throw new Error(errorMessage);
@@ -161,7 +159,7 @@ export async function generateResponse(message, modelId = 'nebula-5.1-instant', 
     throw new Error('Nessuna risposta ricevuta dall\'API');
     
   } catch (error) {
-    console.error('Error calling OpenRouter API:', error);
+    console.error('Error calling Electron Hub API:', error);
     console.error('Error details:', {
       name: error.name,
       message: error.message,

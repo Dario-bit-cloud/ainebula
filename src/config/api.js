@@ -1,18 +1,17 @@
 // Configurazione API
 export const API_CONFIG = {
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: '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',
+  baseURL: 'https://api.electronhub.ai/v1',
+  apiKey: 'ek-1Nr31Tdp53bBR3y04Apz6MCSCC4FMTOcYpmb0DVxoDTZO0FR2e',
   timeout: 30000 // 30 secondi
 };
 
-// Mappatura modelli locali ai modelli OpenRouter
-// I modelli con :free sono completamente gratuiti
+// Mappatura modelli locali ai modelli Electron Hub (OpenAI compatibile)
 export const MODEL_MAPPING = {
-  'nebula-5.1-instant': 'google/gemini-flash-1.5-8b:free', // Modello veloce e gratuito
-  'nebula-5.1': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
-  'nebula-5.0': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
-  'codex': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
-  'gpt-4': 'google/gemini-flash-1.5-8b:free', // Usa modello gratuito
-  'gpt-3.5': 'google/gemini-flash-1.5-8b:free' // Usa modello gratuito
+  'nebula-5.1-instant': 'gpt-4o-mini', // Modello veloce
+  'nebula-5.1': 'gpt-4o', // Modello standard
+  'nebula-5.0': 'gpt-4-turbo', // Versione precedente
+  'codex': 'gpt-4o', // Specializzato per codice
+  'gpt-4': 'gpt-4o',
+  'gpt-3.5': 'gpt-3.5-turbo'
 };
 
