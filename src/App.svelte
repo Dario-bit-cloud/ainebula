@@ -1,0 +1,29 @@
+<script>
+  import TopBar from './components/TopBar.svelte';
+  import Sidebar from './components/Sidebar.svelte';
+  import MainArea from './components/MainArea.svelte';
+</script>
+
+<div class="app-container">
+  <TopBar />
+  <div class="main-layout">
+    <Sidebar />
+    <MainArea />
+  </div>
+</div>
+
+<style>
+  .app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+  }
+
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+</style>
+
