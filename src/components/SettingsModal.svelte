@@ -618,6 +618,31 @@
     transform-origin: center;
   }
 
+  @media (max-width: 768px) {
+    .modal-backdrop {
+      padding: 0;
+    }
+
+    .modal-content {
+      max-width: 100%;
+      max-height: 100vh;
+      border-radius: 0;
+      height: 100vh;
+    }
+
+    .settings-sidebar {
+      width: 180px;
+    }
+
+    .settings-content {
+      padding: 20px 16px;
+    }
+
+    .section-title {
+      font-size: 20px;
+    }
+  }
+
   @keyframes modalSlideIn {
     from {
       opacity: 0;

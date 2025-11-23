@@ -2,7 +2,7 @@
   import { user as userStore } from '../stores/user.js';
   import { chats, currentChatId, createNewChat, loadChat, deleteChat } from '../stores/chat.js';
   import { selectedModel, setModel } from '../stores/models.js';
-  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen } from '../stores/app.js';
+  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { createProject } from '../stores/projects.js';
   
   let activeItem = 'chat';
@@ -28,6 +28,9 @@
       case 'new-chat':
         createNewChat();
         sidebarView.set('chat');
+        if ($isMobile) {
+          isSidebarOpen.set(false);
+        }
         break;
       case 'search':
         isSearchOpen.set(true);
@@ -40,10 +43,16 @@
       case 'codex':
         setModel('codex');
         sidebarView.set('chat');
+        if ($isMobile) {
+          isSidebarOpen.set(false);
+        }
         break;
       case 'gpt':
         setModel('gpt-4');
         sidebarView.set('chat');
+        if ($isMobile) {
+          isSidebarOpen.set(false);
+        }
         break;
       case 'projects':
         isProjectModalOpen.set(true);
@@ -56,6 +65,13 @@
     sidebarView.set('chat');
     isSearchOpen.set(false);
     searchQuery.set('');
+    if ($isMobile) {
+      isSidebarOpen.set(false);
+    }
+  }
+
+  function closeSidebar() {
+    isSidebarOpen.set(false);
   }
   
   function handleDeleteChat(event, chatId) {
@@ -86,7 +102,22 @@
   }
 </script>
 
-<aside class="sidebar">
+{#if $isMobile && $isSidebarOpen}
+  <div class="sidebar-overlay" on:click={closeSidebar}></div>
+{/if}
+
+<aside class="sidebar" class:sidebar-open={$isSidebarOpen} class:sidebar-mobile={$isMobile}>
+  {#if $isMobile}
+    <div class="sidebar-header-mobile">
+      <h3>Menu</h3>
+      <button class="close-sidebar-btn" on:click={closeSidebar}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  {/if}
   <nav class="sidebar-nav">
     {#each [
       { id: 'new-chat', label: 'Nuova chat', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' },
@@ -192,6 +223,26 @@
 </aside>
 
 <style>
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+    animation: overlayFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes overlayFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
   .sidebar {
     width: 240px;
     background-color: var(--bg-secondary);
@@ -200,6 +251,8 @@
     border-right: 1px solid var(--border-color);
     height: 100%;
     animation: sidebarSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 999;
   }
 
   @keyframes sidebarSlideIn {
@@ -210,6 +263,60 @@
     to {
       opacity: 1;
       transform: translateX(0);
+    }
+  }
+
+  .sidebar-header-mobile {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .sidebar-header-mobile h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .close-sidebar-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .close-sidebar-btn:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 999;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .sidebar.sidebar-open {
+      transform: translateX(0);
+    }
+
+    .sidebar-header-mobile {
+      display: flex;
     }
   }
 

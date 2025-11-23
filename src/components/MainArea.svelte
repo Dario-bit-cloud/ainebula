@@ -314,6 +314,35 @@
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  @media (max-width: 768px) {
+    .welcome-text {
+      font-size: 24px;
+    }
+
+    .welcome-section {
+      padding: 24px 16px;
+    }
+
+    .messages-container {
+      padding: 20px 16px;
+    }
+
+    .message {
+      max-width: 90%;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .input-container {
+      padding: 12px 16px;
+    }
+
+    .message-image {
+      max-width: 250px;
+      max-height: 250px;
+    }
+  }
+
   @keyframes fadeInUp {
     from {
       opacity: 0;

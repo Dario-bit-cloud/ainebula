@@ -1,7 +1,7 @@
 <script>
   import { selectedModel, availableModels } from '../stores/models.js';
   import { isGenerating } from '../stores/chat.js';
-  import { isSettingsOpen } from '../stores/app.js';
+  import { isSettingsOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   
   let isModelDropdownOpen = false;
   
@@ -18,6 +18,10 @@
     isSettingsOpen.update(open => !open);
   }
   
+  function toggleSidebar() {
+    isSidebarOpen.update(open => !open);
+  }
+  
   // Chiudi dropdown quando si clicca fuori
   function handleClickOutside(event) {
     if (!event.target.closest('.model-selector-wrapper')) {
@@ -30,6 +34,15 @@
 
 <div class="top-bar">
   <div class="left-section">
+    {#if $isMobile}
+      <button class="menu-toggle" on:click={toggleSidebar} title="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    {/if}
     <div class="logo-icon">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
@@ -104,11 +117,39 @@
     gap: 12px;
   }
 
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-right: 8px;
+  }
+
+  .menu-toggle:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .menu-toggle svg {
+    display: block;
+  }
+
   .logo-icon {
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-primary);
+  }
+
+  @media (max-width: 768px) {
+    .menu-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 
   .model-selector-wrapper {
@@ -126,6 +167,21 @@
     background: none;
     border: none;
     color: var(--text-primary);
+  }
+
+  @media (max-width: 768px) {
+    .model-selector {
+      padding: 4px 6px;
+    }
+
+    .model-name {
+      font-size: 13px;
+    }
+
+    .model-selector-wrapper {
+      flex: 1;
+      min-width: 0;
+    }
   }
 
   .model-selector:hover {

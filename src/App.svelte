@@ -32,5 +32,12 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+    position: relative;
+  }
+
+  @media (max-width: 768px) {
+    .main-layout {
+      width: 100%;
+    }
   }
 </style>
