@@ -122,7 +122,12 @@ export async function* generateResponseStream(message, modelId = 'nebula-5.1-ins
     
     if (isThinkingModel) {
       // Usa ZukiJourney API per i modelli thinking
-      apiUrl = 'https://zukijourney.com/api/v1/chat/completions';
+      // Nota: ZukiJourney non supporta CORS, quindi usiamo un proxy CORS
+      // In produzione, dovresti usare un backend proxy invece di un servizio pubblico
+      const zukiUrl = 'https://zukijourney.com/api/v1/chat/completions';
+      // Usa un proxy CORS pubblico (per sviluppo)
+      // In produzione, sostituisci con il tuo backend proxy
+      apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(zukiUrl)}`;
       headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer zu-6c87d9a495bbda6c71ebbe7bc17f6c4a`
