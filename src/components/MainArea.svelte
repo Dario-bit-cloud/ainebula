@@ -383,10 +383,25 @@
       await tick();
       scrollToBottom();
       
-      // Verifica se il modello selezionato è Nebula Dreamer (generazione immagini)
+      // Verifica se il modello supporta generazione immagini
       const models = get(availableModels);
       const selectedModelData = models.find(m => m.id === $selectedModel);
-      const isImageGenerationModel = selectedModelData?.imageGeneration === true;
+      const modelSupportsImageGeneration = selectedModelData?.imageGeneration === true;
+      
+      // Rileva se il messaggio è una richiesta di generazione immagini
+      const imageGenerationKeywords = [
+        'genera immagine', 'crea immagine', 'disegna', 'fai un disegno', 'fai un\'immagine',
+        'immagine di', 'foto di', 'picture of', 'generate image', 'create image', 'draw',
+        'genera una immagine', 'crea una immagine', 'fai una immagine', 'fai una foto',
+        'mostrami', 'mostra', 'visualizza', 'rappresenta', 'illustra', 'mostra un\'immagine'
+      ];
+      const messageLower = messageText.toLowerCase().trim();
+      const isImageRequest = imageGenerationKeywords.some(keyword => 
+        messageLower.includes(keyword) || messageLower.startsWith(keyword)
+      );
+      
+      // Usa generazione immagini se il modello la supporta E il messaggio è una richiesta di immagine
+      const shouldGenerateImage = modelSupportsImageGeneration && isImageRequest;
       
       isGenerating.set(true);
       
@@ -400,7 +415,7 @@
       const aiMessage = { 
         id: aiMessageId,
         type: 'ai', 
-        content: isImageGenerationModel ? '🎨 Generazione immagine in corso...' : '', 
+        content: shouldGenerateImage ? '🎨 Generazione immagine in corso...' : '', 
         timestamp: new Date().toISOString() 
       };
       addMessage(chatId, aiMessage);
@@ -413,13 +428,13 @@
         
         const messageIndex = currentChatData.messages.length - 1;
         
-        if (isImageGenerationModel) {
-          // Generazione immagine con Nebula Dreamer
+        if (shouldGenerateImage) {
+          // Generazione immagine con Nebula AI
           const imageResult = await generateImage(messageText, {}, abortController);
           
           // Aggiorna il messaggio con l'immagine generata
           updateMessage(chatId, messageIndex, {
-            content: `**Prompt utilizzato:** ${imageResult.prompt}\n\n*Immagine generata con Nebula Dreamer*`,
+            content: `**Prompt utilizzato:** ${imageResult.prompt}\n\n*Immagine generata con ${selectedModelData?.name || 'Nebula AI'}*`,
             images: [{
               url: imageResult.imageUrl,
               name: 'Immagine generata',

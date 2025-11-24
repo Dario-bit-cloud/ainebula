@@ -5,39 +5,44 @@ export const availableModels = writable([
   { 
     id: 'nebula-1.0', 
     name: 'Nebula AI 1.0', 
-    description: 'Modello base con Electron Hub API',
+    description: 'Modello base versatile per conversazioni e generazione immagini',
     group: 'Nebula AI',
-    premium: false
+    premium: false,
+    imageGeneration: true
   },
   { 
     id: 'nebula-pro', 
     name: 'Nebula AI Pro', 
-    description: 'Modello avanzato con LLM7.io',
+    description: 'Modello avanzato per risposte dettagliate e generazione immagini',
     group: 'Nebula AI',
-    premium: false
+    premium: false,
+    imageGeneration: true
   },
   { 
     id: 'nebula-coder', 
     name: 'Nebula Coder', 
-    description: 'Specializzato in programmazione e sviluppo software',
+    description: 'Specializzato in programmazione e sviluppo software, con supporto generazione immagini',
     group: 'Nebula AI',
-    premium: false
+    premium: false,
+    imageGeneration: true
   },
   { 
     id: 'nebula-premium-pro', 
     name: 'Nebula AI Premium Pro', 
-    description: 'Modello premium avanzato - Richiede abbonamento Pro',
+    description: 'Modello premium avanzato con generazione immagini - Richiede abbonamento Pro',
     group: 'Nebula AI Premium',
     premium: true,
-    requiredPlan: 'pro' // Piano minimo richiesto
+    requiredPlan: 'pro', // Piano minimo richiesto
+    imageGeneration: true
   },
   { 
     id: 'nebula-premium-max', 
     name: 'Nebula AI Premium Max', 
-    description: 'Modello premium massimo - Richiede abbonamento Massimo',
+    description: 'Modello premium massimo con generazione immagini - Richiede abbonamento Massimo',
     group: 'Nebula AI Premium',
     premium: true,
-    requiredPlan: 'max' // Piano minimo richiesto
+    requiredPlan: 'max', // Piano minimo richiesto
+    imageGeneration: true
   },
   { 
     id: 'nebula-dreamer', 
