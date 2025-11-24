@@ -616,7 +616,7 @@ app.get('/api/user/settings', authenticateToken, async (req, res) => {
 // Aggiorna le impostazioni dell'utente
 app.patch('/api/user/settings', authenticateToken, async (req, res) => {
   try {
-    const updates = req.body;
+    const { theme, language, ai_temperature, ai_max_tokens, ai_top_p, ai_frequency_penalty, ai_presence_penalty, default_model, notifications_enabled, email_notifications, auto_save_chats, settings_json } = req.body;
     
     // Verifica se le impostazioni esistono
     const existing = await sql`
@@ -627,17 +627,48 @@ app.patch('/api/user/settings', authenticateToken, async (req, res) => {
       // Crea impostazioni se non esistono
       const settingsId = randomBytes(16).toString('hex');
       await sql`
-        INSERT INTO user_settings (id, user_id, ${sql(Object.keys(updates))})
-        VALUES (${settingsId}, ${req.user.id}, ${sql(Object.values(updates))})
+        INSERT INTO user_settings (
+          id, user_id, theme, language, ai_temperature, ai_max_tokens, 
+          ai_top_p, ai_frequency_penalty, ai_presence_penalty, default_model,
+          notifications_enabled, email_notifications, auto_save_chats, settings_json
+        )
+        VALUES (
+          ${settingsId}, ${req.user.id}, 
+          ${theme || 'system'}, ${language || 'it'}, 
+          ${ai_temperature || 0.7}, ${ai_max_tokens || 2000},
+          ${ai_top_p || 1.0}, ${ai_frequency_penalty || 0.0}, 
+          ${ai_presence_penalty || 0.0}, ${default_model || 'nebula-1.0'},
+          ${notifications_enabled !== undefined ? notifications_enabled : true},
+          ${email_notifications !== undefined ? email_notifications : false},
+          ${auto_save_chats !== undefined ? auto_save_chats : true},
+          ${settings_json ? JSON.stringify(settings_json) : null}
+        )
       `;
     } else {
-      // Aggiorna impostazioni esistenti
-      const updateFields = Object.keys(updates).map(key => `${key} = ${updates[key]}`).join(', ');
-      await sql`
-        UPDATE user_settings 
-        SET ${sql(updates)}, updated_at = NOW()
-        WHERE user_id = ${req.user.id}
-      `;
+      // Aggiorna impostazioni esistenti - costruisci query dinamicamente
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+      
+      if (theme !== undefined) { updates.push(`theme = $${paramIndex++}`); values.push(theme); }
+      if (language !== undefined) { updates.push(`language = $${paramIndex++}`); values.push(language); }
+      if (ai_temperature !== undefined) { updates.push(`ai_temperature = $${paramIndex++}`); values.push(ai_temperature); }
+      if (ai_max_tokens !== undefined) { updates.push(`ai_max_tokens = $${paramIndex++}`); values.push(ai_max_tokens); }
+      if (ai_top_p !== undefined) { updates.push(`ai_top_p = $${paramIndex++}`); values.push(ai_top_p); }
+      if (ai_frequency_penalty !== undefined) { updates.push(`ai_frequency_penalty = $${paramIndex++}`); values.push(ai_frequency_penalty); }
+      if (ai_presence_penalty !== undefined) { updates.push(`ai_presence_penalty = $${paramIndex++}`); values.push(ai_presence_penalty); }
+      if (default_model !== undefined) { updates.push(`default_model = $${paramIndex++}`); values.push(default_model); }
+      if (notifications_enabled !== undefined) { updates.push(`notifications_enabled = $${paramIndex++}`); values.push(notifications_enabled); }
+      if (email_notifications !== undefined) { updates.push(`email_notifications = $${paramIndex++}`); values.push(email_notifications); }
+      if (auto_save_chats !== undefined) { updates.push(`auto_save_chats = $${paramIndex++}`); values.push(auto_save_chats); }
+      if (settings_json !== undefined) { updates.push(`settings_json = $${paramIndex++}`); values.push(JSON.stringify(settings_json)); }
+      
+      if (updates.length > 0) {
+        updates.push(`updated_at = NOW()`);
+        values.push(req.user.id);
+        const query = `UPDATE user_settings SET ${updates.join(', ')} WHERE user_id = $${paramIndex}`;
+        await sql.unsafe(query, values);
+      }
     }
     
     // Restituisci le impostazioni aggiornate
