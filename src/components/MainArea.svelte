@@ -714,7 +714,11 @@
   
   function handleVoiceClick() {
     if (!voiceAvailable) {
-      alert('Il riconoscimento vocale non è disponibile nel tuo browser.');
+      if (!showMicrophoneError) {
+        showMicrophoneError = true;
+        microphoneErrorType = 'no-device';
+        microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
+      }
       return;
     }
     
