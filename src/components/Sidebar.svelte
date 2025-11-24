@@ -775,7 +775,8 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    margin-bottom: 0;
+    margin-top: 16px;
+    margin-bottom: 16px;
     cursor: pointer;
   }
   
