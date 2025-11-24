@@ -450,6 +450,7 @@
           {:else if $searchQuery && $searchQuery.trim()}
             <div class="no-results">
               <p>Nessun risultato trovato</p>
+              <p class="no-results-subtitle">Nessuna chat trovata</p>
             </div>
           {/if}
         {/if}
@@ -1232,6 +1233,12 @@
     text-align: center;
     color: var(--text-secondary);
     font-size: 14px;
+  }
+
+  .no-results-subtitle {
+    margin-top: 8px;
+    font-size: 13px;
+    opacity: 0.7;
   }
 
   @media (max-width: 768px) {
