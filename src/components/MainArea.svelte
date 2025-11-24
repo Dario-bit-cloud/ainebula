@@ -1571,6 +1571,43 @@
   </div>
 </main>
 
+<!-- Modal errore microfono -->
+{#if showMicrophoneError}
+  <div class="microphone-error-modal">
+    <div class="modal-backdrop" on:click={() => showMicrophoneError = false}></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Errore Microfono</h3>
+        <button class="modal-close" on:click={() => showMicrophoneError = false}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="error-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+        </div>
+        <p class="error-message">{microphoneError}</p>
+        {#if microphoneErrorType !== 'permission-denied'}
+          <button class="request-permission-btn" on:click={handleRequestMicrophone}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+            Richiedi accesso al microfono
+          </button>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .main-area {
     flex: 1;
