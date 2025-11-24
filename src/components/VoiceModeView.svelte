@@ -4,19 +4,18 @@
   import { isVoiceModeActive, selectedVoice, availableVoices } from '../stores/voiceSettings.js';
   import { isMobile } from '../stores/app.js';
   import { 
-    initVoiceRecognition, 
-    startListening, 
-    stopListening, 
-    isVoiceAvailable, 
-    requestMicrophonePermission, 
-    checkMicrophonePermission,
     speakText,
     stopSpeaking,
     isSpeaking,
-    isListeningActive,
-    getCurrentTranscript,
-    clearCurrentTranscript
+    requestMicrophonePermission, 
+    checkMicrophonePermission
   } from '../services/voiceService.js';
+  import {
+    initAssemblyAIRecognition,
+    isAssemblyAIAvailable,
+    getCurrentTranscript as getAssemblyAITranscript,
+    clearCurrentTranscript as clearAssemblyAITranscript
+  } from '../services/assemblyAIService.js';
   import { 
     chats, 
     currentChatId, 
@@ -44,8 +43,8 @@
   $: currentVoice = availableVoices.find(v => v.id === $selectedVoice) || availableVoices[0];
   
   onMount(async () => {
-    // Verifica disponibilità microfono
-    if (!isVoiceAvailable()) {
+    // Verifica disponibilità AssemblyAI
+    if (!isAssemblyAIAvailable()) {
       showError = true;
       errorMessage = 'Il riconoscimento vocale non è supportato nel tuo browser';
       return;
@@ -80,9 +79,9 @@
   let silenceTimer = null;
   
   function initializeVoiceRecognition() {
-    recognition = initVoiceRecognition(
+    recognition = initAssemblyAIRecognition(
       (transcript) => {
-        // Risultato finale - invia il messaggio automaticamente
+        // Risultato finale - invia il messaggio automaticamente dopo 3 secondi di silenzio
         if (transcript.trim() && !isProcessing) {
           // Cancella il timer di silenzio se presente
           if (silenceTimer) {
@@ -91,32 +90,49 @@
           }
           // Reset del testo accumulato
           accumulatedText = '';
-          clearCurrentTranscript();
+          clearAssemblyAITranscript();
           handleVoiceMessage(transcript.trim());
         }
       },
       (error) => {
-        console.error('Voice recognition error:', error);
+        console.error('AssemblyAI recognition error:', error);
         if (silenceTimer) {
           clearTimeout(silenceTimer);
           silenceTimer = null;
         }
         listeningState = 'idle';
-        if (error === 'not-allowed' || error === 'no-speech') {
-          showError = true;
+        showError = true;
+        if (error === 'permission-denied') {
+          errorMessage = 'Permesso microfono negato. Abilitalo nelle impostazioni del browser.';
+        } else if (error === 'no-device') {
+          errorMessage = 'Nessun microfono rilevato.';
+        } else if (error === 'websocket-error') {
+          errorMessage = 'Errore di connessione con AssemblyAI. Verifica la connessione internet.';
+        } else {
           errorMessage = 'Errore nel riconoscimento vocale. Riprova.';
         }
       },
       (interim) => {
         // Risultato intermedio - mostra feedback visivo
         interimTranscript = interim;
-        // Aggiorna il testo accumulato dal servizio vocale
-        accumulatedText = getCurrentTranscript() || interim;
+        // Aggiorna il testo accumulato
+        accumulatedText = getAssemblyAITranscript() || interim;
         
         // Reset timer silenzio quando c'è attività vocale
         if (silenceTimer) {
           clearTimeout(silenceTimer);
         }
+        
+        // Timer per invio automatico dopo 3 secondi di silenzio
+        silenceTimer = setTimeout(() => {
+          const finalText = getAssemblyAITranscript() || accumulatedText || interim;
+          if (finalText.trim() && !isProcessing && listeningState === 'listening') {
+            accumulatedText = '';
+            clearAssemblyAITranscript();
+            handleVoiceMessage(finalText.trim());
+          }
+          silenceTimer = null;
+        }, 3000);
       }
     );
   }
@@ -152,14 +168,14 @@
     if (!recognition && isMicrophoneEnabled) {
       initializeVoiceRecognition();
     }
-    if (recognition && !isListeningActive()) {
+    if (recognition && !recognition.isActive()) {
       currentTranscript = '';
       interimTranscript = '';
       accumulatedText = '';
-      clearCurrentTranscript();
+      clearAssemblyAITranscript();
       listeningState = 'listening';
       stopSpeaking(); // Ferma eventuale TTS in corso
-      startListening();
+      recognition.start();
     }
   }
   
@@ -168,16 +184,18 @@
       clearTimeout(silenceTimer);
       silenceTimer = null;
     }
-    stopListening();
+    if (recognition) {
+      recognition.stop();
+    }
     listeningState = 'idle';
     currentTranscript = '';
     interimTranscript = '';
     accumulatedText = '';
-    clearCurrentTranscript();
+    clearAssemblyAITranscript();
   }
   
   function handleManualSend() {
-    const textToSend = getCurrentTranscript() || accumulatedText || interimTranscript;
+    const textToSend = getAssemblyAITranscript() || accumulatedText || interimTranscript;
     if (textToSend.trim() && !isProcessing && listeningState === 'listening') {
       // Cancella il timer automatico
       if (silenceTimer) {
@@ -188,7 +206,7 @@
       const finalText = textToSend.trim();
       accumulatedText = '';
       interimTranscript = '';
-      clearCurrentTranscript();
+      clearAssemblyAITranscript();
       handleVoiceMessage(finalText);
     }
   }
@@ -299,7 +317,7 @@
       
       // Reset del testo accumulato dopo l'invio
       accumulatedText = '';
-      clearCurrentTranscript();
+      clearAssemblyAITranscript();
       
     } catch (error) {
       console.error('Error in voice mode:', error);
@@ -360,7 +378,7 @@
     if (listeningState === 'listening' && !updateInterval) {
       updateInterval = setInterval(() => {
         if (listeningState === 'listening') {
-          accumulatedText = getCurrentTranscript() || interimTranscript;
+          accumulatedText = getAssemblyAITranscript() || interimTranscript;
         }
       }, 500); // Aggiorna ogni 500ms
     } else if (listeningState !== 'listening' && updateInterval) {
@@ -372,6 +390,9 @@
   onDestroy(() => {
     if (updateInterval) {
       clearInterval(updateInterval);
+    }
+    if (recognition) {
+      recognition.stop();
     }
   });
 </script>

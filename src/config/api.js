@@ -12,6 +12,14 @@ export const LLM7_CONFIG = {
   timeout: 30000 // 30 secondi
 };
 
+// Configurazione AssemblyAI per riconoscimento vocale
+export const ASSEMBLYAI_CONFIG = {
+  apiKey: 'f3a18631d42449979ff3066fa8689a8e',
+  wsUrl: 'wss://api.assemblyai.com/v2/realtime/ws',
+  sampleRate: 16000,
+  language: 'it' // Italiano
+};
+
 // Mappatura modelli locali ai modelli API e provider
 export const MODEL_MAPPING = {
   'nebula-1.0': { model: 'gpt-4o', provider: 'electronhub' }, // Nebula AI 1.0 con Electron Hub
