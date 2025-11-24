@@ -1,6 +1,8 @@
 <script>
   import { user as userStore } from '../stores/user.js';
-  import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, createTemporaryChat } from '../stores/chat.js';
+  import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, createTemporaryChat, loadChats, syncChatsOnLogin } from '../stores/chat.js';
+  import { isAuthenticatedStore } from '../stores/auth.js';
+  import { onMount } from 'svelte';
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { projects, updateProject, deleteProject } from '../stores/projects.js';
@@ -17,6 +19,29 @@
   let searchInputRef = null;
   let showTemporaryButton = false;
   let temporaryButtonFading = false;
+  
+  // Carica le chat quando l'utente si autentica
+  let lastAuthState = false;
+  $: {
+    if ($isAuthenticatedStore && !lastAuthState) {
+      // L'utente si è appena autenticato
+      lastAuthState = true;
+      syncChatsOnLogin().catch(err => {
+        console.error('Errore caricamento chat:', err);
+      });
+    } else if (!$isAuthenticatedStore && lastAuthState) {
+      // L'utente si è disconnesso
+      lastAuthState = false;
+    }
+  }
+  
+  onMount(() => {
+    lastAuthState = $isAuthenticatedStore;
+    // Carica le chat all'avvio se autenticato
+    if ($isAuthenticatedStore) {
+      loadChats();
+    }
+  });
   
   // Organizza le chat per progetto
   $: organizedChats = (() => {
@@ -93,10 +118,14 @@
       activeItem = 'search';
     } else if ($sidebarView === 'library') {
       activeItem = 'library';
+    } else if ($sidebarView === 'projects') {
+      activeItem = 'projects';
+    } else if ($sidebarView === 'database-test') {
+      activeItem = 'database-test';
     }
   }
   
-  function handleMenuClick(itemId) {
+  async function handleMenuClick(itemId) {
     switch(itemId) {
       case 'new-chat':
         // Rimuovi chat temporanea se esiste
@@ -109,7 +138,7 @@
             temporaryButtonFading = false;
           }, 300);
         }
-        createNewChat();
+        await createNewChat();
         sidebarView.set('chat');
         activeItem = null; // Nessun item attivo quando si è in una chat
         if ($isMobile) {
@@ -146,6 +175,17 @@
         break;
       case 'projects':
         showSearchInput = false;
+        sidebarView.set('projects');
+        activeItem = 'projects';
+        break;
+      case 'database-test':
+        showSearchInput = false;
+        sidebarView.set('database-test');
+        activeItem = 'database-test';
+        if ($isMobile) {
+          isSidebarOpen.set(false);
+        }
+        break;
         isProjectModalOpen.set(true);
         if ($isMobile) {
           isSidebarOpen.set(false);
@@ -196,10 +236,10 @@
     isSidebarOpen.set(false);
   }
   
-  function handleDeleteChat(event, chatId) {
+  async function handleDeleteChat(event, chatId) {
     event.stopPropagation();
     if (confirm('Sei sicuro di voler eliminare questa chat?')) {
-      deleteChat(chatId);
+      await deleteChat(chatId);
     }
   }
   
@@ -335,7 +375,8 @@
     {#each [
       { id: 'search', label: 'Cerca chat', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
       { id: 'library', label: 'Libreria', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-      { id: 'projects', label: 'Progetti', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
+      { id: 'projects', label: 'Progetti', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
+      { id: 'database-test', label: 'Test Database', icon: 'M4 7h16M4 12h16M4 17h16', customIcon: true }
     ] as item}
       <div class="nav-item-wrapper" class:with-temporary={item.id === 'search' && showTemporaryButton}>
         {#if item.id === 'search'}
@@ -409,9 +450,17 @@
             class:active={activeItem === item.id}
             on:click={() => handleMenuClick(item.id)}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d={item.icon} />
-            </svg>
+            {#if item.customIcon}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+            {:else}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d={item.icon} />
+              </svg>
+            {/if}
             <span>{item.label}</span>
             {#if item.id === 'projects'}
               <svg class="plus-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
