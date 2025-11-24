@@ -1,4 +1,5 @@
 // Servizio AssemblyAI per riconoscimento vocale streaming
+// Basato sulla documentazione ufficiale AssemblyAI v3
 import { ASSEMBLYAI_CONFIG } from '../config/api.js';
 
 let socket = null;
@@ -30,55 +31,52 @@ export function initAssemblyAIRecognition(onResult, onError, onInterimResult = n
 }
 
 /**
- * Connette al WebSocket di AssemblyAI
+ * Connette al WebSocket di AssemblyAI v3
+ * Segue la documentazione ufficiale: https://www.assemblyai.com/docs
  */
 async function connectWebSocket() {
   return new Promise((resolve, reject) => {
     try {
-      // AssemblyAI Realtime API v2 - URL corretto con autenticazione
-      // L'API key va nell'header Authorization, ma nel browser dobbiamo usare query parameter
-      const wsUrl = `${ASSEMBLYAI_CONFIG.wsUrl}?sample_rate=${ASSEMBLYAI_CONFIG.sampleRate}&language_code=${ASSEMBLYAI_CONFIG.language}`;
+      // Costruisci URL con parametri come query string (come nella documentazione)
+      const params = new URLSearchParams({
+        sample_rate: ASSEMBLYAI_CONFIG.sampleRate.toString(),
+        format_turns: ASSEMBLYAI_CONFIG.formatTurns.toString()
+      });
       
-      socket = new WebSocket(wsUrl);
+      const wsUrl = `${ASSEMBLYAI_CONFIG.wsUrl}?${params.toString()}`;
+      
+      console.log('Connecting to AssemblyAI:', wsUrl);
+      
+      // Nota: Nel browser, WebSocket non supporta header personalizzati
+      // AssemblyAI potrebbe accettare l'API key come query parameter o primo messaggio
+      // Provo prima con query parameter, altrimenti come primo messaggio
+      const wsUrlWithAuth = `${wsUrl}&token=${ASSEMBLYAI_CONFIG.apiKey}`;
+      
+      socket = new WebSocket(wsUrlWithAuth);
       
       let connectionTimeout = setTimeout(() => {
         if (!isConnected) {
           socket.close();
           reject(new Error('Connection timeout'));
         }
-      }, 10000); // 10 secondi timeout
+      }, 10000);
       
       socket.onopen = () => {
         console.log('AssemblyAI WebSocket connected');
         clearTimeout(connectionTimeout);
-        
-        // Invia autenticazione come primo messaggio
-        socket.send(JSON.stringify({
-          authorization: ASSEMBLYAI_CONFIG.apiKey
-        }));
-        
-        // Poi invia configurazione
-        setTimeout(() => {
-          socket.send(JSON.stringify({
-            sample_rate: ASSEMBLYAI_CONFIG.sampleRate,
-            language_code: ASSEMBLYAI_CONFIG.language,
-            format_turns: true,
-            word_boost: ['italiano', 'italia'] // Migliora riconoscimento italiano
-          }));
-        }, 100);
-        
         isConnected = true;
         resolve();
       };
       
       socket.onmessage = (event) => {
         try {
+          // I messaggi sono JSON (come nella documentazione)
           const data = JSON.parse(event.data);
           handleWebSocketMessage(data);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-          // Se non è JSON, potrebbe essere un errore di testo
-          if (onErrorCallback && event.data) {
+          // Se non è JSON, potrebbe essere un errore
+          console.error('Error parsing WebSocket message:', error, event.data);
+          if (onErrorCallback) {
             onErrorCallback('parse-error');
           }
         }
@@ -100,7 +98,6 @@ async function connectWebSocket() {
         isConnected = false;
         isListening = false;
         
-        // Se la chiusura non è normale, notifica l'errore
         if (event.code !== 1000 && onErrorCallback) {
           onErrorCallback('connection-closed');
         }
@@ -115,57 +112,64 @@ async function connectWebSocket() {
 
 /**
  * Gestisce i messaggi dal WebSocket
+ * Formato dalla documentazione: { type: "Begin" | "Turn" | "Termination", ... }
  */
 function handleWebSocketMessage(data) {
-  console.log('AssemblyAI message:', data);
+  const msgType = data.type;
   
-  // AssemblyAI Realtime API v2 formato
-  if (data.message_type === 'SessionBegins') {
-    console.log('AssemblyAI session started:', data.session_id);
-  } else if (data.message_type === 'PartialTranscript') {
-    // Trascrizione parziale (interim)
-    const text = data.text || '';
-    if (text && onInterimCallback) {
-      accumulatedTranscript = text;
-      onInterimCallback(text);
-    }
-  } else if (data.message_type === 'FinalTranscript') {
-    // Trascrizione finale
-    const text = data.text || '';
-    if (text) {
-      // Accumula il testo finale
-      if (accumulatedTranscript && !accumulatedTranscript.includes(text)) {
-        accumulatedTranscript += ' ' + text;
+  if (msgType === 'Begin') {
+    // Sessione iniziata
+    const sessionId = data.id;
+    const expiresAt = data.expires_at;
+    console.log('AssemblyAI session started:', sessionId, 'Expires at:', new Date(expiresAt * 1000));
+  } else if (msgType === 'Turn') {
+    // Trascrizione di un turno
+    const transcript = data.transcript || '';
+    const formatted = data.turn_is_formatted || false;
+    const endOfTurn = data.end_of_turn || false;
+    
+    if (transcript) {
+      if (formatted) {
+        // Trascrizione formattata finale
+        accumulatedTranscript = transcript;
+        if (onInterimCallback) {
+          onInterimCallback(transcript);
+        }
       } else {
-        accumulatedTranscript = text;
+        // Trascrizione parziale (interim)
+        accumulatedTranscript = transcript;
+        if (onInterimCallback) {
+          onInterimCallback(transcript);
+        }
+      }
+      
+      // Se è la fine del turno, invia il risultato
+      if (endOfTurn && transcript.trim() && onResultCallback) {
+        onResultCallback(transcript.trim());
+        accumulatedTranscript = '';
       }
     }
-  } else if (data.message_type === 'Turn') {
-    // Fine di un turno di conversazione
-    const text = data.text || '';
-    if (text && onResultCallback) {
-      onResultCallback(text.trim());
-      accumulatedTranscript = ''; // Reset dopo invio
-    }
-  } else if (data.message_type === 'SessionTerminated') {
-    console.log('AssemblyAI session terminated');
+  } else if (msgType === 'Termination') {
+    // Sessione terminata
+    const audioDuration = data.audio_duration_seconds || 0;
+    const sessionDuration = data.session_duration_seconds || 0;
+    console.log('AssemblyAI session terminated:', {
+      audioDuration,
+      sessionDuration
+    });
     isListening = false;
   } else if (data.error) {
+    // Errore
     console.error('AssemblyAI error:', data.error);
     if (onErrorCallback) {
       onErrorCallback(data.error);
-    }
-  } else if (data.status) {
-    // Messaggi di stato
-    console.log('AssemblyAI status:', data.status);
-    if (data.status === 'error' && onErrorCallback) {
-      onErrorCallback(data.error || 'unknown-error');
     }
   }
 }
 
 /**
  * Avvia l'ascolto del microfono e streaming ad AssemblyAI
+ * L'audio viene inviato come messaggi BINARI (non JSON con base64!)
  */
 async function startListening() {
   if (isListening) {
@@ -185,20 +189,21 @@ async function startListening() {
         channelCount: 1,
         sampleRate: ASSEMBLYAI_CONFIG.sampleRate,
         echoCancellation: true,
-        noiseSuppression: true
+        noiseSuppression: true,
+        autoGainControl: true
       }
     });
     
-    // Crea AudioContext per processare l'audio
+    // Crea AudioContext
     audioContext = new (window.AudioContext || window.webkitAudioContext)({
       sampleRate: ASSEMBLYAI_CONFIG.sampleRate
     });
     
     const source = audioContext.createMediaStreamSource(mediaStream);
     
-    // Crea ScriptProcessorNode per convertire audio in PCM
-    // Nota: ScriptProcessorNode è deprecato ma ancora supportato per compatibilità
-    const bufferSize = 4096;
+    // Crea ScriptProcessorNode per processare l'audio
+    // Nota: deprecato ma ancora supportato, AudioWorkletNode sarebbe meglio ma più complesso
+    const bufferSize = 4096; // ~256ms di audio a 16kHz
     processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
     
     processor.onaudioprocess = (event) => {
@@ -209,7 +214,8 @@ async function startListening() {
       try {
         const inputData = event.inputBuffer.getChannelData(0);
         
-        // Converti Float32Array in Int16Array (PCM)
+        // Converti Float32Array (-1.0 a 1.0) in Int16Array (PCM 16-bit)
+        // Come nella documentazione Python: pyaudio.paInt16
         const pcmData = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
           // Clamp e converti a Int16
@@ -217,21 +223,11 @@ async function startListening() {
           pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
         
-        // Converti Int16Array in Uint8Array per base64
-        const uint8Array = new Uint8Array(pcmData.buffer);
-        
-        // Converti in base64 usando un metodo più efficiente
-        let binary = '';
-        for (let i = 0; i < uint8Array.length; i++) {
-          binary += String.fromCharCode(uint8Array[i]);
-        }
-        const base64Audio = btoa(binary);
-        
-        // Invia come messaggio JSON con audio_data
+        // IMPORTANTE: Invia come messaggio BINARIO, non JSON!
+        // Come nella documentazione: ws.send(audio_data, websocket.ABNF.OPCODE_BINARY)
+        // Nel browser WebSocket, inviamo direttamente l'ArrayBuffer
         if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({
-            audio_data: base64Audio
-          }));
+          socket.send(pcmData.buffer);
         }
       } catch (error) {
         console.error('Error processing audio:', error);
@@ -285,12 +281,22 @@ function stopListening() {
     audioContext = null;
   }
   
-  // Chiudi WebSocket
+  // Chiudi WebSocket (come nella documentazione: invia Terminate)
   if (socket) {
     if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ terminate_session: true }));
+      // Invia messaggio di terminazione come nella documentazione
+      try {
+        socket.send(JSON.stringify({ type: 'Terminate' }));
+        // Aspetta un po' prima di chiudere
+        setTimeout(() => {
+          socket.close();
+        }, 500);
+      } catch (e) {
+        socket.close();
+      }
+    } else {
+      socket.close();
     }
-    socket.close();
     socket = null;
   }
   
@@ -324,4 +330,3 @@ export function getCurrentTranscript() {
 export function clearCurrentTranscript() {
   accumulatedTranscript = '';
 }
-

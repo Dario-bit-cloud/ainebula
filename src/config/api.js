@@ -15,9 +15,9 @@ export const LLM7_CONFIG = {
 // Configurazione AssemblyAI per riconoscimento vocale
 export const ASSEMBLYAI_CONFIG = {
   apiKey: 'f3a18631d42449979ff3066fa8689a8e',
-  wsUrl: 'wss://api.assemblyai.com/v2/realtime/ws',
+  wsUrl: 'wss://streaming.assemblyai.com/v3/ws', // v3 come nella documentazione
   sampleRate: 16000,
-  language: 'it' // Italiano
+  formatTurns: true
 };
 
 // Mappatura modelli locali ai modelli API e provider
