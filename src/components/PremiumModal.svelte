@@ -234,6 +234,9 @@
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + (selectedPlan === 'monthly' ? 1 : 1)); // 1 mese per entrambi
     
+    // Genera una chiave univoca per l'abbonamento
+    const subscriptionKey = `NEBULA-${selectedPlan.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    
     user.update(u => ({
       ...u,
       isLoggedIn: true,

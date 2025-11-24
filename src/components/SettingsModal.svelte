@@ -145,6 +145,72 @@
     alert('Dati esportati con successo! Il file sarà valido per 7 giorni.');
   }
   
+  function handleDownloadSubscriptionKey() {
+    const userData = $userStore;
+    if (!userData.subscription?.key) {
+      alert('Nessuna chiave di abbonamento disponibile. Attiva un abbonamento per ottenere una chiave.');
+      return;
+    }
+    
+    const keyData = {
+      subscriptionKey: userData.subscription.key,
+      plan: userData.subscription.plan,
+      expiresAt: userData.subscription.expiresAt,
+      exportDate: new Date().toISOString(),
+      instructions: 'Importa questa chiave nelle impostazioni di un altro dispositivo per ripristinare il tuo abbonamento.'
+    };
+    
+    const blob = new Blob([JSON.stringify(keyData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nebula-subscription-key-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert('Chiave di abbonamento scaricata con successo! Conservala in un luogo sicuro per ripristinare l\'abbonamento su altri dispositivi.');
+  }
+  
+  function handleImportSubscriptionKey() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const keyData = JSON.parse(event.target.result);
+          if (keyData.subscriptionKey) {
+            // Aggiorna lo store utente con la chiave importata
+            userStore.update(user => ({
+              ...user,
+              subscription: {
+                ...user.subscription,
+                key: keyData.subscriptionKey,
+                plan: keyData.plan || user.subscription.plan,
+                expiresAt: keyData.expiresAt || user.subscription.expiresAt,
+                active: true
+              }
+            }));
+            alert('Chiave di abbonamento importata con successo!');
+          } else {
+            alert('File non valido. Il file deve contenere una chiave di abbonamento.');
+          }
+        } catch (error) {
+          alert('Errore durante l\'importazione della chiave. Verifica che il file sia valido.');
+          console.error('Import error:', error);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+  
   function handleDeleteAllChats() {
     if (confirm('Sei sicuro di voler eliminare tutte le chat? Questa azione è irreversibile.')) {
       chats.set([]);
@@ -306,6 +372,35 @@
                 <div class="setting-description">Questi dati includono le informazioni del tuo account e tutta la cronologia delle chat. L'esportazione potrebbe richiedere del tempo. Il link per il download sarà valido per 7 giorni.</div>
               </div>
               <button class="manage-button" on:click={handleExportData}>Esporta</button>
+            </div>
+          </div>
+          
+          {#if $userStore.subscription?.active && $userStore.subscription?.key}
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Chiave abbonamento</div>
+                <div class="setting-description">Scarica la chiave del tuo abbonamento per ripristinarlo su altri dispositivi. Conserva questa chiave in un luogo sicuro.</div>
+              </div>
+              <div class="setting-actions">
+                <button class="manage-button" on:click={handleDownloadSubscriptionKey}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Scarica chiave
+                </button>
+                <button class="manage-button secondary" on:click={handleImportSubscriptionKey}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  Importa chiave
+                </button>
+              </div>
+            </div>
+          {/if}
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'dati'}>
