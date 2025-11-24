@@ -35,19 +35,38 @@ export function initAssemblyAIRecognition(onResult, onError, onInterimResult = n
 async function connectWebSocket() {
   return new Promise((resolve, reject) => {
     try {
-      // AssemblyAI Realtime API v2 - API key come query parameter
-      const wsUrl = `${ASSEMBLYAI_CONFIG.wsUrl}?sample_rate=${ASSEMBLYAI_CONFIG.sampleRate}&language_code=${ASSEMBLYAI_CONFIG.language}&token=${ASSEMBLYAI_CONFIG.apiKey}`;
+      // AssemblyAI Realtime API v2 - URL corretto con autenticazione
+      // L'API key va nell'header Authorization, ma nel browser dobbiamo usare query parameter
+      const wsUrl = `${ASSEMBLYAI_CONFIG.wsUrl}?sample_rate=${ASSEMBLYAI_CONFIG.sampleRate}&language_code=${ASSEMBLYAI_CONFIG.language}`;
       
       socket = new WebSocket(wsUrl);
       
+      let connectionTimeout = setTimeout(() => {
+        if (!isConnected) {
+          socket.close();
+          reject(new Error('Connection timeout'));
+        }
+      }, 10000); // 10 secondi timeout
+      
       socket.onopen = () => {
         console.log('AssemblyAI WebSocket connected');
-        // Invia configurazione iniziale dopo la connessione
+        clearTimeout(connectionTimeout);
+        
+        // Invia autenticazione come primo messaggio
         socket.send(JSON.stringify({
-          sample_rate: ASSEMBLYAI_CONFIG.sampleRate,
-          language_code: ASSEMBLYAI_CONFIG.language,
-          format_turns: true
+          authorization: ASSEMBLYAI_CONFIG.apiKey
         }));
+        
+        // Poi invia configurazione
+        setTimeout(() => {
+          socket.send(JSON.stringify({
+            sample_rate: ASSEMBLYAI_CONFIG.sampleRate,
+            language_code: ASSEMBLYAI_CONFIG.language,
+            format_turns: true,
+            word_boost: ['italiano', 'italia'] // Migliora riconoscimento italiano
+          }));
+        }, 100);
+        
         isConnected = true;
         resolve();
       };
@@ -58,11 +77,16 @@ async function connectWebSocket() {
           handleWebSocketMessage(data);
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
+          // Se non è JSON, potrebbe essere un errore di testo
+          if (onErrorCallback && event.data) {
+            onErrorCallback('parse-error');
+          }
         }
       };
       
       socket.onerror = (error) => {
         console.error('AssemblyAI WebSocket error:', error);
+        clearTimeout(connectionTimeout);
         isConnected = false;
         if (onErrorCallback) {
           onErrorCallback('websocket-error');
@@ -70,10 +94,16 @@ async function connectWebSocket() {
         reject(error);
       };
       
-      socket.onclose = () => {
-        console.log('AssemblyAI WebSocket closed');
+      socket.onclose = (event) => {
+        console.log('AssemblyAI WebSocket closed', event.code, event.reason);
+        clearTimeout(connectionTimeout);
         isConnected = false;
         isListening = false;
+        
+        // Se la chiusura non è normale, notifica l'errore
+        if (event.code !== 1000 && onErrorCallback) {
+          onErrorCallback('connection-closed');
+        }
       };
       
     } catch (error) {
@@ -87,6 +117,8 @@ async function connectWebSocket() {
  * Gestisce i messaggi dal WebSocket
  */
 function handleWebSocketMessage(data) {
+  console.log('AssemblyAI message:', data);
+  
   // AssemblyAI Realtime API v2 formato
   if (data.message_type === 'SessionBegins') {
     console.log('AssemblyAI session started:', data.session_id);
@@ -122,6 +154,12 @@ function handleWebSocketMessage(data) {
     console.error('AssemblyAI error:', data.error);
     if (onErrorCallback) {
       onErrorCallback(data.error);
+    }
+  } else if (data.status) {
+    // Messaggi di stato
+    console.log('AssemblyAI status:', data.status);
+    if (data.status === 'error' && onErrorCallback) {
+      onErrorCallback(data.error || 'unknown-error');
     }
   }
 }
@@ -159,34 +197,44 @@ async function startListening() {
     const source = audioContext.createMediaStreamSource(mediaStream);
     
     // Crea ScriptProcessorNode per convertire audio in PCM
-    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    // Nota: ScriptProcessorNode è deprecato ma ancora supportato per compatibilità
+    const bufferSize = 4096;
+    processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
     
     processor.onaudioprocess = (event) => {
-      if (!isConnected || !socket || socket.readyState !== WebSocket.OPEN) {
+      if (!isConnected || !socket || socket.readyState !== WebSocket.OPEN || !isListening) {
         return;
       }
       
-      const inputData = event.inputBuffer.getChannelData(0);
-      
-      // Converti Float32Array in Int16Array (PCM)
-      const pcmData = new Int16Array(inputData.length);
-      for (let i = 0; i < inputData.length; i++) {
-        // Clamp e converti a Int16
-        const s = Math.max(-1, Math.min(1, inputData[i]));
-        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-      }
-      
-      // Invia audio al WebSocket come base64
-      // AssemblyAI richiede l'audio in formato base64
-      const base64Audio = btoa(
-        String.fromCharCode.apply(null, new Uint8Array(pcmData.buffer))
-      );
-      
-      // Invia come messaggio JSON con audio_data
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-          audio_data: base64Audio
-        }));
+      try {
+        const inputData = event.inputBuffer.getChannelData(0);
+        
+        // Converti Float32Array in Int16Array (PCM)
+        const pcmData = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          // Clamp e converti a Int16
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        
+        // Converti Int16Array in Uint8Array per base64
+        const uint8Array = new Uint8Array(pcmData.buffer);
+        
+        // Converti in base64 usando un metodo più efficiente
+        let binary = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+          binary += String.fromCharCode(uint8Array[i]);
+        }
+        const base64Audio = btoa(binary);
+        
+        // Invia come messaggio JSON con audio_data
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({
+            audio_data: base64Audio
+          }));
+        }
+      } catch (error) {
+        console.error('Error processing audio:', error);
       }
     };
     
