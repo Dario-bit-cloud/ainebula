@@ -148,6 +148,7 @@ function handleWebSocketMessage(data) {
     
     if (textToShow) {
       // Mostra sempre la trascrizione (parziale o finale)
+      console.log('AssemblyAI Turn message:', { textToShow, endOfTurn, formatted });
       if (onInterimCallback) {
         onInterimCallback(textToShow);
       }
@@ -158,13 +159,9 @@ function handleWebSocketMessage(data) {
       // Se è la fine del turno, invia il risultato automaticamente
       // IMPORTANTE: invia solo se c'è testo e non è vuoto
       if (endOfTurn && textToShow.trim() && onResultCallback) {
-        // Usa un timeout per evitare invii multipli rapidi
-        setTimeout(() => {
-          if (onResultCallback && textToShow.trim()) {
-            onResultCallback(textToShow.trim());
-            accumulatedTranscript = '';
-          }
-        }, 100);
+        // Invia immediatamente (la prevenzione duplicati è gestita nel componente)
+        onResultCallback(textToShow.trim());
+        accumulatedTranscript = '';
       }
       
       // Log per debug - rilevamento lingua (solo per modello multilingue)

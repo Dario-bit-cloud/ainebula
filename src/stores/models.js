@@ -38,6 +38,14 @@ export const availableModels = writable([
     group: 'Nebula AI Premium',
     premium: true,
     requiredPlan: 'max' // Piano minimo richiesto
+  },
+  { 
+    id: 'nebula-dreamer', 
+    name: 'Nebula Dreamer', 
+    description: 'Modello dedicato alla generazione di immagini da testo',
+    group: 'Nebula AI',
+    premium: false,
+    imageGeneration: true // Flag per indicare che è un modello per generazione immagini
   }
 ]);
 

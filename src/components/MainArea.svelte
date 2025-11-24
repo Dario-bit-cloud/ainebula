@@ -5,6 +5,8 @@
   import { selectedModel } from '../stores/models.js';
   import { hasActiveSubscription } from '../stores/user.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
+  import { generateImage } from '../services/imageGenerationService.js';
+  import { availableModels } from '../stores/models.js';
   import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable, requestMicrophonePermission, checkMicrophonePermission } from '../services/voiceService.js';
   import { isPremiumModalOpen, isVoiceSelectionModalOpen, selectedPrompt, isMobile } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
@@ -381,51 +383,73 @@
       await tick();
       scrollToBottom();
       
+      // Verifica se il modello selezionato è Nebula Dreamer (generazione immagini)
+      const models = get(availableModels);
+      const selectedModelData = models.find(m => m.id === $selectedModel);
+      const isImageGenerationModel = selectedModelData?.imageGeneration === true;
+      
       isGenerating.set(true);
       
       // Crea AbortController per poter fermare la generazione
       const abortController = new AbortController();
       setAbortController(abortController);
       
-      // Crea messaggio AI vuoto per lo streaming
+      // Crea messaggio AI vuoto
       const aiMessageId = Date.now().toString();
       currentStreamingMessageId = aiMessageId;
       const aiMessage = { 
         id: aiMessageId,
         type: 'ai', 
-        content: '', 
+        content: isImageGenerationModel ? '🎨 Generazione immagine in corso...' : '', 
         timestamp: new Date().toISOString() 
       };
       addMessage(chatId, aiMessage);
       
       try {
-        let fullResponse = '';
-        
-        // Usa streaming per aggiornare in tempo reale
         const currentChatData = get(currentChat);
         if (!currentChatData) {
           throw new Error('Chat corrente non disponibile');
         }
         
-        const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
         const messageIndex = currentChatData.messages.length - 1;
         
-        for await (const chunk of generateResponseStream(
-          messageText, 
-          $selectedModel, 
-          chatHistory,
-          [],
-          abortController
-        )) {
-          fullResponse += chunk;
-          // Aggiorna il messaggio in tempo reale
+        if (isImageGenerationModel) {
+          // Generazione immagine con Nebula Dreamer
+          const imageResult = await generateImage(messageText, {}, abortController);
+          
+          // Aggiorna il messaggio con l'immagine generata
+          updateMessage(chatId, messageIndex, {
+            content: `**Prompt utilizzato:** ${imageResult.prompt}\n\n*Immagine generata con Nebula Dreamer*`,
+            images: [{
+              url: imageResult.imageUrl,
+              name: 'Immagine generata',
+              type: 'image/png'
+            }]
+          });
+          
+        } else {
+          // Generazione testo normale
+          let fullResponse = '';
+          const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
+          
+          for await (const chunk of generateResponseStream(
+            messageText, 
+            $selectedModel, 
+            chatHistory,
+            [],
+            abortController
+          )) {
+            fullResponse += chunk;
+            // Aggiorna il messaggio in tempo reale
+            updateMessage(chatId, messageIndex, { content: fullResponse });
+            await tick();
+            scrollToBottom(false); // Scroll continuo ma non smooth per performance
+          }
+          
+          // Salva la risposta finale
           updateMessage(chatId, messageIndex, { content: fullResponse });
-          await tick();
-          scrollToBottom(false); // Scroll continuo ma non smooth per performance
         }
         
-        // Salva la risposta finale
-        updateMessage(chatId, messageIndex, { content: fullResponse });
         currentStreamingMessageId = null;
         
       } catch (error) {

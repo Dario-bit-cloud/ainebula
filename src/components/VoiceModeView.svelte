@@ -104,7 +104,7 @@
         (transcript) => {
           // Risultato finale - invia il messaggio automaticamente
           // AssemblyAI invia automaticamente quando end_of_turn è true
-          if (transcript.trim() && !isProcessing && listeningState === 'listening') {
+          if (transcript.trim() && !isProcessing) {
             // Cancella il timer di silenzio se presente
             if (silenceTimer) {
               clearTimeout(silenceTimer);
@@ -114,7 +114,7 @@
             accumulatedText = '';
             clearAssemblyAITranscript();
             // Ferma l'ascolto prima di inviare per evitare loop
-            if (recognition) {
+            if (recognition && listeningState === 'listening') {
               recognition.stop();
             }
             handleVoiceMessage(transcript.trim());
@@ -154,9 +154,10 @@
         },
         (interim) => {
           // Risultato intermedio - mostra feedback visivo
+          console.log('AssemblyAI interim result:', interim);
           interimTranscript = interim;
           // Aggiorna il testo accumulato
-          accumulatedText = getAssemblyAITranscript() || interim;
+          accumulatedText = getAssemblyAITranscript() || interim || accumulatedText;
           
           // Reset timer silenzio quando c'è attività vocale
           if (silenceTimer) {
@@ -166,9 +167,12 @@
           // Timer per invio automatico dopo 3 secondi di silenzio
           silenceTimer = setTimeout(() => {
             const finalText = getAssemblyAITranscript() || accumulatedText || interim;
-            if (finalText.trim() && !isProcessing && listeningState === 'listening') {
+            if (finalText.trim() && !isProcessing) {
               accumulatedText = '';
               clearAssemblyAITranscript();
+              if (recognition && listeningState === 'listening') {
+                recognition.stop();
+              }
               handleVoiceMessage(finalText.trim());
             }
             silenceTimer = null;
@@ -209,9 +213,12 @@
           
           silenceTimer = setTimeout(() => {
             const finalText = getWebSpeechTranscript() || accumulatedText || interim;
-            if (finalText.trim() && !isProcessing && listeningState === 'listening') {
+            if (finalText.trim() && !isProcessing) {
               accumulatedText = '';
               clearWebSpeechTranscript();
+              if (listeningState === 'listening') {
+                stopWebSpeechListening();
+              }
               handleVoiceMessage(finalText.trim());
             }
             silenceTimer = null;
@@ -336,12 +343,13 @@
   }
   
   async function handleVoiceMessage(messageText) {
-    // Prevenire invii duplicati o troppo rapidi
+    // Prevenire invii duplicati (ma non troppo aggressivo)
     const now = Date.now();
     const timeSinceLastSend = now - lastSentTime;
     const isDuplicate = messageText.trim() === lastSentMessage.trim();
     
-    if (isProcessing || !messageText.trim() || isDuplicate || timeSinceLastSend < 2000) {
+    // Debounce ridotto a 500ms solo per duplicati esatti
+    if (isProcessing || !messageText.trim() || (isDuplicate && timeSinceLastSend < 500)) {
       console.log('Message ignored:', { isProcessing, isEmpty: !messageText.trim(), isDuplicate, timeSinceLastSend });
       return;
     }
@@ -514,11 +522,14 @@
     if (listeningState === 'listening' && !updateInterval) {
       updateInterval = setInterval(() => {
         if (listeningState === 'listening') {
-          accumulatedText = useAssemblyAI 
+          const newText = useAssemblyAI 
             ? (getAssemblyAITranscript() || interimTranscript)
             : (getWebSpeechTranscript() || interimTranscript);
+          if (newText) {
+            accumulatedText = newText;
+          }
         }
-      }, 500); // Aggiorna ogni 500ms
+      }, 100); // Aggiorna ogni 100ms per feedback più reattivo
     } else if (listeningState !== 'listening' && updateInterval) {
       clearInterval(updateInterval);
       updateInterval = null;
@@ -595,8 +606,8 @@
       {#if listeningState === 'listening'}
         <div class="status-message listening">
           <p class="status-text">In ascolto...</p>
-          {#if interimTranscript}
-            <p class="transcript-preview">{interimTranscript}</p>
+          {#if accumulatedText.trim() || interimTranscript.trim()}
+            <p class="transcript-preview">{accumulatedText.trim() || interimTranscript.trim()}</p>
           {/if}
         </div>
       {:else if listeningState === 'processing'}

@@ -28,6 +28,17 @@ export const MODEL_MAPPING = {
   'nebula-pro': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Pro con LLM7.io
   'nebula-coder': { model: 'gpt-4', provider: 'llm7' }, // Nebula Coder con LLM7.io (specializzato in coding)
   'nebula-premium-pro': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Premium Pro - Richiede abbonamento Pro
-  'nebula-premium-max': { model: 'gpt-4', provider: 'llm7' } // Nebula AI Premium Max - Richiede abbonamento Massimo
+  'nebula-premium-max': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Premium Max - Richiede abbonamento Massimo
+  'nebula-dreamer': { model: 'dall-e-3', provider: 'electronhub', imageGeneration: true } // Nebula Dreamer - Generazione immagini
+};
+
+// Configurazione per generazione immagini
+export const IMAGE_GENERATION_CONFIG = {
+  baseURL: 'https://api.electronhub.ai/v1',
+  apiKey: 'ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ',
+  timeout: 60000, // 60 secondi per la generazione immagini
+  defaultSize: '1024x1024', // Dimensioni predefinite
+  defaultQuality: 'standard', // 'standard' o 'hd'
+  defaultStyle: 'vivid' // 'vivid' o 'natural'
 };
 
