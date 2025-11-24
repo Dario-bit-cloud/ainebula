@@ -27,7 +27,7 @@ export function createNewChat(projectId = null) {
   
   chats.update(allChats => [newChat, ...allChats]);
   currentChatId.set(newChat.id);
-  saveChatsToStorage();
+  // Non salvare subito - verrà salvata solo quando avrà almeno un messaggio
   return newChat.id;
 }
 
@@ -86,10 +86,10 @@ export function addMessage(chatId, message) {
     });
   });
   
-  // Salva solo se non è una chat temporanea
+  // Salva solo se non è una chat temporanea e ha almeno un messaggio visibile
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
-  if (chat && !chat.isTemporary) {
+  if (chat && !chat.isTemporary && chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
     saveChatsToStorage();
   }
 }
@@ -164,8 +164,13 @@ export function saveChatsToStorage() {
   if (typeof window !== 'undefined') {
     let currentChats = [];
     const unsubscribe = chats.subscribe(value => {
-      // Filtra le chat temporanee - non salviamo quelle
-      currentChats = value.filter(chat => !chat.isTemporary);
+      // Filtra le chat temporanee e quelle senza messaggi - non salviamo quelle
+      currentChats = value.filter(chat => 
+        !chat.isTemporary && 
+        chat.messages && 
+        chat.messages.length > 0 &&
+        chat.messages.some(msg => !msg.hidden) // Almeno un messaggio visibile
+      );
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentChats));
     unsubscribe();

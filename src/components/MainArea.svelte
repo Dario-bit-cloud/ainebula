@@ -566,12 +566,15 @@
             hidden: true,
             timestamp: new Date().toISOString()
           }, userMessage];
+        } else {
+          // Se non c'è modificatore, usa la cronologia normale
+          modifiedHistory = chatHistory;
         }
         
         for await (const chunk of generateResponseStream(
           userMessage.content,
           $selectedModel,
-          modifiedHistory.slice(0, -1),
+          styleModifier ? modifiedHistory.slice(0, -1) : chatHistory.slice(0, -1),
           [],
           abortController
         )) {
@@ -1094,9 +1097,57 @@
           messageType={message.type}
           on:copy={() => handleCopyMessage(index)}
           on:edit={() => handleEditMessage(index)}
-          on:regenerate={() => handleRegenerateMessage(index)}
-          on:moreDetailed={() => handleRegenerateMessage(index, 'moreDetailed')}
-          on:moreSimple={() => handleRegenerateMessage(index, 'moreSimple')}
+          on:regenerate={() => {
+            // Trova il messaggio utente precedente nell'array messages completo
+            const currentMessage = visibleMessages[index];
+            const messageId = currentMessage?.id;
+            if (messageId) {
+              const messageIndexInFull = messages.findIndex(m => m.id === messageId);
+              if (messageIndexInFull >= 0) {
+                // Cerca indietro per trovare il messaggio utente
+                for (let i = messageIndexInFull - 1; i >= 0; i--) {
+                  if (messages[i].type === 'user' && !messages[i].hidden) {
+                    handleRegenerateMessage(i);
+                    return;
+                  }
+                }
+              }
+            }
+          }}
+          on:moreDetailed={() => {
+            // Trova il messaggio utente precedente nell'array messages completo
+            const currentMessage = visibleMessages[index];
+            const messageId = currentMessage?.id;
+            if (messageId) {
+              const messageIndexInFull = messages.findIndex(m => m.id === messageId);
+              if (messageIndexInFull >= 0) {
+                // Cerca indietro per trovare il messaggio utente
+                for (let i = messageIndexInFull - 1; i >= 0; i--) {
+                  if (messages[i].type === 'user' && !messages[i].hidden) {
+                    handleRegenerateMessage(i, 'moreDetailed');
+                    return;
+                  }
+                }
+              }
+            }
+          }}
+          on:moreSimple={() => {
+            // Trova il messaggio utente precedente nell'array messages completo
+            const currentMessage = visibleMessages[index];
+            const messageId = currentMessage?.id;
+            if (messageId) {
+              const messageIndexInFull = messages.findIndex(m => m.id === messageId);
+              if (messageIndexInFull >= 0) {
+                // Cerca indietro per trovare il messaggio utente
+                for (let i = messageIndexInFull - 1; i >= 0; i--) {
+                  if (messages[i].type === 'user' && !messages[i].hidden) {
+                    handleRegenerateMessage(i, 'moreSimple');
+                    return;
+                  }
+                }
+              }
+            }
+          }}
           on:delete={() => handleDeleteMessage(index)}
           on:feedback={(e) => handleMessageFeedback(index, e.detail.type)}
           on:readAloud={() => handleReadAloud(index)}
