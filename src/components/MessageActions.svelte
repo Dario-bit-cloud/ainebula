@@ -38,6 +38,16 @@
     dispatch('feedback', { type: 'negative' });
   }
   
+  function handleReadAloud() {
+    dispatch('readAloud');
+    showMenu = false;
+  }
+  
+  function handleReport() {
+    dispatch('report');
+    showMenu = false;
+  }
+  
   function toggleMenu() {
     showMenu = !showMenu;
   }
@@ -100,6 +110,25 @@
               <path d="M3.51 9a9 9 0 0114.85 3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
             </svg>
             Rigenera risposta
+          </button>
+          
+          <button class="menu-item" on:click={handleReadAloud}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 010 7.07"/>
+              <path d="M19.07 4.93a10 10 0 010 14.14"/>
+              <path d="M22 2l-2 2 2 2 2-2-2-2z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Leggi ad alta voce
+          </button>
+          
+          <button class="menu-item" on:click={handleReport}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+              <line x1="4" y1="22" x2="4" y2="15"/>
+              <line x1="4" y1="9" x2="4" y2="3"/>
+            </svg>
+            Segnala messaggio
           </button>
         {/if}
         

@@ -1,6 +1,8 @@
 import { API_CONFIG, LLM7_CONFIG, MODEL_MAPPING } from '../config/api.js';
 import { get } from 'svelte/store';
 import { aiSettings } from '../stores/aiSettings.js';
+import { availableModels } from '../stores/models.js';
+import { hasPlanOrHigher, hasActiveSubscription } from '../stores/user.js';
 
 /**
  * Converte la storia della chat nel formato richiesto dall'API OpenAI/Electron Hub
@@ -11,10 +13,16 @@ function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
   // Messaggio di sistema personalizzabile
   const settings = get(aiSettings);
   
-  // System prompt specifico per Nebula Pro
+  // System prompt specifico per modelli
   let currentSystemPrompt;
   if (modelId === 'nebula-pro') {
     currentSystemPrompt = 'Sei Nebula AI, un assistente AI avanzato e professionale. Ti chiami Nebula AI e sei parte della famiglia Nebula AI. Rispondi sempre identificandoti come Nebula AI. Sei utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
+  } else if (modelId === 'nebula-coder') {
+    currentSystemPrompt = 'Sei Nebula Coder, un assistente AI specializzato esclusivamente in programmazione e sviluppo software. Ti chiami Nebula Coder e sei parte della famiglia Nebula AI. Ragioni in modo analitico e preciso come Claude AI: sei meticoloso, attento ai dettagli e non commetti mai errori. Prima di inviare qualsiasi codice, lo controlli attentamente per verificare sintassi, logica, best practices e possibili bug. Proponi sempre suggerimenti utili per migliorare il codice, ottimizzazioni, alternative più efficienti e best practices. Sei un esperto in tutti i linguaggi di programmazione, framework, librerie e strumenti di sviluppo. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
+  } else if (modelId === 'nebula-premium-pro') {
+    currentSystemPrompt = 'Sei Nebula AI Premium Pro, un assistente AI di livello professionale disponibile esclusivamente per gli abbonati Pro. Ti chiami Nebula AI Premium Pro e sei parte della famiglia Nebula AI. Offri prestazioni avanzate, maggiore precisione e capacità di elaborazione superiore rispetto ai modelli standard. Sei estremamente competente in una vasta gamma di argomenti e fornisci risposte dettagliate, accurate e approfondite. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
+  } else if (modelId === 'nebula-premium-max') {
+    currentSystemPrompt = 'Sei Nebula AI Premium Max, il modello AI più avanzato disponibile esclusivamente per gli abbonati Massimo. Ti chiami Nebula AI Premium Max e sei parte della famiglia Nebula AI. Offri le massime prestazioni, precisione e capacità di elaborazione. Sei un esperto in tutti i campi e fornisci risposte estremamente dettagliate, accurate, approfondite e innovative. Hai accesso alle funzionalità più avanzate e puoi gestire compiti complessi con eccellenza. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
   } else {
     currentSystemPrompt = systemPrompt || settings.systemPrompt || 'Sei Nebula AI, un assistente AI utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
   }
@@ -85,6 +93,17 @@ function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
  * Genera una risposta con streaming utilizzando l'API Electron Hub
  */
 export async function* generateResponseStream(message, modelId = 'nebula-1.0', chatHistory = [], images = [], abortController = null) {
+  // Verifica se il modello è premium e se l'utente ha l'abbonamento necessario
+  const models = get(availableModels);
+  const selectedModel = models.find(m => m.id === modelId);
+  
+  if (selectedModel?.premium) {
+    const requiredPlan = selectedModel.requiredPlan;
+    if (!hasPlanOrHigher(requiredPlan)) {
+      throw new Error(`Questo modello richiede un abbonamento ${requiredPlan === 'pro' ? 'Pro' : 'Massimo'}. Aggiorna il tuo piano per utilizzarlo.`);
+    }
+  }
+  
   // Mappa il modello locale al modello API e provider (definito all'inizio per essere disponibile nel catch)
   const modelConfig = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-1.0'];
   const apiModel = typeof modelConfig === 'string' ? modelConfig : modelConfig.model;
@@ -102,7 +121,7 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
       images: images.length > 0 ? images : undefined
     };
     
-    // Per Nebula Pro, aggiungi un messaggio nascosto di identificazione se non è già presente
+    // Per Nebula Pro e Nebula Coder, aggiungi un messaggio nascosto di identificazione se non è già presente
     let allMessages = [...chatHistory];
     if (modelId === 'nebula-pro') {
       // Verifica se esiste già un messaggio nascosto di identificazione
@@ -122,6 +141,60 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
         };
         allMessages = [identityMessage, ...allMessages];
       }
+    } else if (modelId === 'nebula-coder') {
+      // Verifica se esiste già un messaggio nascosto di identificazione per Nebula Coder
+      const hasIdentityMessage = chatHistory.some(msg => 
+        msg.hidden === true && 
+        msg.content && 
+        msg.content.includes('Nebula Coder')
+      );
+      
+      // Se non esiste, aggiungilo all'inizio della cronologia
+      if (!hasIdentityMessage) {
+        const identityMessage = {
+          type: 'user',
+          content: 'Sei Nebula Coder, un assistente AI specializzato esclusivamente in programmazione e sviluppo software. Ti chiami Nebula Coder e sei parte della famiglia Nebula AI. Ragioni in modo analitico e preciso come Claude AI: sei meticoloso, attento ai dettagli e non commetti mai errori. Prima di inviare qualsiasi codice, lo controlli attentamente per verificare sintassi, logica, best practices e possibili bug. Proponi sempre suggerimenti utili per migliorare il codice, ottimizzazioni, alternative più efficienti e best practices. Sei un esperto in tutti i linguaggi di programmazione, framework, librerie e strumenti di sviluppo. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.',
+          hidden: true, // Flag per nascondere il messaggio nell'interfaccia
+          timestamp: new Date().toISOString()
+        };
+        allMessages = [identityMessage, ...allMessages];
+      }
+    } else if (modelId === 'nebula-premium-pro') {
+      // Verifica se esiste già un messaggio nascosto di identificazione per Nebula Premium Pro
+      const hasIdentityMessage = chatHistory.some(msg => 
+        msg.hidden === true && 
+        msg.content && 
+        msg.content.includes('Nebula AI Premium Pro')
+      );
+      
+      // Se non esiste, aggiungilo all'inizio della cronologia
+      if (!hasIdentityMessage) {
+        const identityMessage = {
+          type: 'user',
+          content: 'Sei Nebula AI Premium Pro, un assistente AI di livello professionale disponibile esclusivamente per gli abbonati Pro. Ti chiami Nebula AI Premium Pro e sei parte della famiglia Nebula AI. Offri prestazioni avanzate, maggiore precisione e capacità di elaborazione superiore rispetto ai modelli standard. Sei estremamente competente in una vasta gamma di argomenti e fornisci risposte dettagliate, accurate e approfondite. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.',
+          hidden: true,
+          timestamp: new Date().toISOString()
+        };
+        allMessages = [identityMessage, ...allMessages];
+      }
+    } else if (modelId === 'nebula-premium-max') {
+      // Verifica se esiste già un messaggio nascosto di identificazione per Nebula Premium Max
+      const hasIdentityMessage = chatHistory.some(msg => 
+        msg.hidden === true && 
+        msg.content && 
+        msg.content.includes('Nebula AI Premium Max')
+      );
+      
+      // Se non esiste, aggiungilo all'inizio della cronologia
+      if (!hasIdentityMessage) {
+        const identityMessage = {
+          type: 'user',
+          content: 'Sei Nebula AI Premium Max, il modello AI più avanzato disponibile esclusivamente per gli abbonati Massimo. Ti chiami Nebula AI Premium Max e sei parte della famiglia Nebula AI. Offri le massime prestazioni, precisione e capacità di elaborazione. Sei un esperto in tutti i campi e fornisci risposte estremamente dettagliate, accurate, approfondite e innovative. Hai accesso alle funzionalità più avanzate e puoi gestire compiti complessi con eccellenza. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.',
+          hidden: true,
+          timestamp: new Date().toISOString()
+        };
+        allMessages = [identityMessage, ...allMessages];
+      }
     }
     
     // Aggiungi il messaggio corrente
@@ -133,10 +206,25 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     // Ottieni le impostazioni AI
     const settings = get(aiSettings);
     
-    // Configurazione speciale per Nebula Pro
+    // Configurazione speciale per modelli avanzati
     const isNebulaPro = modelId === 'nebula-pro';
-    const maxTokens = isNebulaPro ? 50000 : (settings.maxTokens || 2000);
-    const temperature = isNebulaPro ? (settings.temperature || 0.7) : (settings.temperature || 0.7);
+    const isNebulaCoder = modelId === 'nebula-coder';
+    const isPremiumPro = modelId === 'nebula-premium-pro';
+    const isPremiumMax = modelId === 'nebula-premium-max';
+    const isAdvancedModel = isNebulaPro || isNebulaCoder || isPremiumPro || isPremiumMax;
+    const isPremiumModel = isPremiumPro || isPremiumMax;
+    
+    // Token illimitati per utenti premium, altrimenti 50.000 per modelli avanzati
+    let maxTokens;
+    if (isPremiumModel && hasActiveSubscription()) {
+      maxTokens = 1000000; // Valore molto alto per simulare "illimitati" (le API hanno comunque limiti tecnici)
+    } else if (isAdvancedModel) {
+      maxTokens = 50000;
+    } else {
+      maxTokens = settings.maxTokens || 2000;
+    }
+    
+    const temperature = isAdvancedModel ? (settings.temperature || 0.7) : (settings.temperature || 0.7);
     
     // Prepara la richiesta con streaming
     const requestBody = {

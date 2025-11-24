@@ -1,12 +1,15 @@
 <script>
   import { isPremiumModalOpen } from '../stores/app.js';
   import { isMobile } from '../stores/app.js';
+  import { user } from '../stores/user.js';
   
   let selectedPlan = 'monthly'; // 'monthly' o 'yearly'
   let showPaymentForm = false;
   let couponCode = '';
   let couponApplied = false;
   let couponDiscount = 0;
+  let isProcessing = false;
+  let isActivating = false;
   
   // Dati del form di pagamento
   let paymentData = {
@@ -27,16 +30,15 @@
       price: 30,
       period: 'mese',
       badge: 'Popolare',
-      description: 'Migliora la produttività e l\'apprendimento con accessi aggiuntivi.',
+      description: 'Accesso completo a Nebula AI Premium Pro e tutte le funzionalità avanzate.',
       features: [
-        'Accesso a Nebula AI 5.1 (Auto, Instant, Thinking, Pro)',
-        '10 volte più token disponibili per chat',
+        'Accesso a Nebula AI Premium Pro (modello premium avanzato)',
+        'Accesso a tutti i modelli standard (Nebula AI 1.0, Pro, Coder)',
+        'Token illimitati per chat',
         'Caricamenti illimitati di file e immagini',
-        'Accesso esteso a modelli legacy (Nebula AI 5, Nebula AI 4o)',
         'Esportazione chat avanzata (Markdown, PDF, JSON)',
-        'Accesso prioritario ai nuovi modelli Nebula AI',
         'Supporto prioritario',
-        'Un abbonamento per tutti gli ultimi modelli AI Nebula'
+        'Aggiornamenti e nuove funzionalità in anteprima'
       ]
     },
     yearly: {
@@ -44,18 +46,18 @@
       price: 300,
       period: 'mese',
       badge: null,
-      description: 'Sblocca tutte le funzionalità di Nebula AI con accesso anticipato a nuovi prodotti.',
+      description: 'Il piano completo con accesso a tutti i modelli premium e funzionalità esclusive.',
       features: [
-        'Tutto incluso in Pro',
-        'Accesso anticipato ai nostri nuovi modelli AI',
-        'Accesso illimitato a tutti i modelli Nebula AI',
-        'Accesso illimitato a modelli avanzati come Nebula AI 5.1 Pro e Thinking',
-        'Priorità massima nelle richieste API',
-        'Generazione avanzata di contenuti',
+        'Accesso a Nebula AI Premium Max (il modello più avanzato)',
+        'Accesso a Nebula AI Premium Pro incluso',
+        'Accesso a tutti i modelli standard (Nebula AI 1.0, Pro, Coder)',
+        'Token illimitati per chat',
+        'Caricamenti illimitati di file e immagini',
+        'Esportazione chat avanzata (Markdown, PDF, JSON)',
         'Supporto prioritario dedicato',
+        'Accesso anticipato a nuovi modelli e funzionalità',
         'Analisi avanzata di immagini e documenti',
-        'API access illimitato incluso',
-        'Dashboard analytics personalizzata'
+        'API access incluso'
       ]
     }
   };
@@ -67,6 +69,8 @@
     couponCode = '';
     couponApplied = false;
     couponDiscount = 0;
+    isProcessing = false;
+    isActivating = false;
     resetPaymentForm();
   }
   
@@ -84,6 +88,7 @@
   function applyCoupon() {
     // Simula validazione coupon (in produzione collegheresti a un'API)
     const validCoupons = {
+      'DEVTEST': 100, // Sconto 100% per sviluppo/test
       'WELCOME10': 10,
       'PREMIUM20': 20,
       'SAVE50': 50
@@ -98,6 +103,9 @@
       couponCode = '';
     }
   }
+  
+  $: isDevTestCoupon = couponApplied && couponCode.toUpperCase() === 'DEVTEST';
+  $: requiresPaymentData = !isDevTestCoupon;
   
   function removeCoupon() {
     couponCode = '';
@@ -164,44 +172,81 @@
     if (couponApplied && couponDiscount > 0) {
       total = total - (total * couponDiscount / 100);
     }
-    return total.toFixed(2);
+    return Math.max(0, total).toFixed(2); // Non può essere negativo
   }
   
-  function handlePayment(event) {
+  $: finalPrice = parseFloat(calculateTotal());
+  $: isFree = finalPrice === 0;
+  
+  async function handlePayment(event) {
     event.preventDefault();
     
-    // Validazione form
-    if (!paymentData.cardNumber || paymentData.cardNumber.replace(/\s/g, '').length < 16) {
-      alert('Inserisci un numero di carta valido');
-      return;
-    }
-    if (!paymentData.cardHolder || paymentData.cardHolder.trim().length < 3) {
-      alert('Inserisci il nome del titolare della carta');
-      return;
-    }
-    if (!paymentData.expiryMonth || !paymentData.expiryYear) {
-      alert('Inserisci la data di scadenza');
-      return;
-    }
-    if (!paymentData.cvv || paymentData.cvv.length < 3) {
-      alert('Inserisci il CVV');
-      return;
-    }
-    
-    // Qui implementeresti la chiamata API per processare il pagamento
-    console.log('Processing payment:', {
-      plan: selectedPlan,
-      amount: calculateTotal(),
-      coupon: couponCode || null,
-      paymentData: {
-        ...paymentData,
-        cvv: '***' // Non inviare il CVV reale nei log
+    // Validazione form solo se non è gratuito
+    if (!isFree) {
+      if (!paymentData.cardNumber || paymentData.cardNumber.replace(/\s/g, '').length < 16) {
+        alert('Inserisci un numero di carta valido');
+        return;
       }
-    });
+      if (!paymentData.cardHolder || paymentData.cardHolder.trim().length < 3) {
+        alert('Inserisci il nome del titolare della carta');
+        return;
+      }
+      if (!paymentData.expiryMonth || !paymentData.expiryYear) {
+        alert('Inserisci la data di scadenza');
+        return;
+      }
+      if (!paymentData.cvv || paymentData.cvv.length < 3) {
+        alert('Inserisci il CVV');
+        return;
+      }
+    }
     
-    // Simula pagamento
-    alert(`Pagamento di €${calculateTotal()} processato con successo! Benvenuto in Premium!`);
-    closeModal();
+    isProcessing = true;
+    
+    // Simula processamento pagamento (solo se non è gratuito)
+    if (!isFree) {
+      console.log('Processing payment:', {
+        plan: selectedPlan,
+        amount: calculateTotal(),
+        coupon: couponCode || null,
+        paymentData: {
+          ...paymentData,
+          cvv: '***' // Non inviare il CVV reale nei log
+        }
+      });
+      
+      // Simula delay pagamento
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    
+    isProcessing = false;
+    isActivating = true;
+    
+    // Simula attivazione abbonamento
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Attiva abbonamento premium
+    const planType = selectedPlan === 'monthly' ? 'pro' : 'max';
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + (selectedPlan === 'monthly' ? 1 : 1)); // 1 mese per entrambi
+    
+    user.update(u => ({
+      ...u,
+      isLoggedIn: true,
+      subscription: {
+        active: true,
+        plan: planType,
+        expiresAt: expiresAt.toISOString()
+      }
+    }));
+    
+    isActivating = false;
+    
+    // Chiudi modal dopo conferma
+    setTimeout(() => {
+      closeModal();
+      alert(`Abbonamento ${plans[selectedPlan].name} attivato con successo! Benvenuto in Premium!`);
+    }, 500);
   }
   
   function goBack() {
@@ -341,117 +386,143 @@
               </div>
             </div>
             
-            <div class="form-section">
-              <h3>Dati di Pagamento</h3>
-              
-              <div class="form-group">
-                <label for="cardNumber">Numero Carta</label>
-                <input
-                  id="cardNumber"
-                  type="text"
-                  class="form-input"
-                  placeholder="1234 5678 9012 3456"
-                  maxlength="19"
-                  on:input={handleCardNumberInput}
-                  required
-                />
-              </div>
-              
-              <div class="form-group">
-                <label for="cardHolder">Nome Titolare</label>
-                <input
-                  id="cardHolder"
-                  type="text"
-                  class="form-input"
-                  placeholder="Mario Rossi"
-                  bind:value={paymentData.cardHolder}
-                  required
-                />
-              </div>
-              
-              <div class="form-row">
+            {#if requiresPaymentData}
+              <div class="form-section">
+                <h3>Dati di Pagamento</h3>
+                
                 <div class="form-group">
-                  <label for="expiry">Scadenza (MM/AA)</label>
+                  <label for="cardNumber">Numero Carta</label>
                   <input
-                    id="expiry"
+                    id="cardNumber"
                     type="text"
                     class="form-input"
-                    placeholder="MM/AA"
-                    maxlength="5"
-                    on:input={handleExpiryInput}
+                    placeholder="1234 5678 9012 3456"
+                    maxlength="19"
+                    on:input={handleCardNumberInput}
                     required
                   />
                 </div>
                 
                 <div class="form-group">
-                  <label for="cvv">CVV</label>
+                  <label for="cardHolder">Nome Titolare</label>
                   <input
-                    id="cvv"
+                    id="cardHolder"
                     type="text"
                     class="form-input"
-                    placeholder="123"
-                    maxlength="4"
-                    on:input={handleCvvInput}
+                    placeholder="Mario Rossi"
+                    bind:value={paymentData.cardHolder}
                     required
                   />
                 </div>
-              </div>
-              
-              <div class="form-group">
-                <label for="billingAddress">Indirizzo di Fatturazione</label>
-                <input
-                  id="billingAddress"
-                  type="text"
-                  class="form-input"
-                  placeholder="Via Roma 123"
-                  bind:value={paymentData.billingAddress}
-                />
-              </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="city">Città</label>
-                  <input
-                    id="city"
-                    type="text"
-                    class="form-input"
-                    placeholder="Roma"
-                    bind:value={paymentData.city}
-                  />
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="expiry">Scadenza (MM/AA)</label>
+                    <input
+                      id="expiry"
+                      type="text"
+                      class="form-input"
+                      placeholder="MM/AA"
+                      maxlength="5"
+                      on:input={handleExpiryInput}
+                      required
+                    />
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="cvv">CVV</label>
+                    <input
+                      id="cvv"
+                      type="text"
+                      class="form-input"
+                      placeholder="123"
+                      maxlength="4"
+                      on:input={handleCvvInput}
+                      required
+                    />
+                  </div>
                 </div>
                 
                 <div class="form-group">
-                  <label for="postalCode">CAP</label>
+                  <label for="billingAddress">Indirizzo di Fatturazione</label>
                   <input
-                    id="postalCode"
+                    id="billingAddress"
                     type="text"
                     class="form-input"
-                    placeholder="00100"
-                    bind:value={paymentData.postalCode}
-                    maxlength="10"
+                    placeholder="Via Roma 123"
+                    bind:value={paymentData.billingAddress}
                   />
                 </div>
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="city">Città</label>
+                    <input
+                      id="city"
+                      type="text"
+                      class="form-input"
+                      placeholder="Roma"
+                      bind:value={paymentData.city}
+                    />
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="postalCode">CAP</label>
+                    <input
+                      id="postalCode"
+                      type="text"
+                      class="form-input"
+                      placeholder="00100"
+                      bind:value={paymentData.postalCode}
+                      maxlength="10"
+                    />
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="country">Paese</label>
+                  <select id="country" class="form-input" bind:value={paymentData.country}>
+                    <option value="IT">Italia</option>
+                    <option value="US">Stati Uniti</option>
+                    <option value="GB">Regno Unito</option>
+                    <option value="DE">Germania</option>
+                    <option value="FR">Francia</option>
+                    <option value="ES">Spagna</option>
+                  </select>
+                </div>
               </div>
-              
-              <div class="form-group">
-                <label for="country">Paese</label>
-                <select id="country" class="form-input" bind:value={paymentData.country}>
-                  <option value="IT">Italia</option>
-                  <option value="US">Stati Uniti</option>
-                  <option value="GB">Regno Unito</option>
-                  <option value="DE">Germania</option>
-                  <option value="FR">Francia</option>
-                  <option value="ES">Spagna</option>
-                </select>
+            {:else}
+              <div class="form-section free-payment-notice">
+                <div class="free-notice">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  <p>Pagamento gratuito con coupon applicato. Nessun dato di pagamento richiesto.</p>
+                </div>
               </div>
-            </div>
+            {/if}
             
             <div class="form-footer">
-              <button type="button" class="back-button" on:click={goBack}>
+              <button type="button" class="back-button" on:click={goBack} disabled={isProcessing || isActivating}>
                 Indietro
               </button>
-              <button type="submit" class="pay-button">
-                Paga €{calculateTotal()}
+              <button type="submit" class="pay-button" disabled={isProcessing || isActivating}>
+                {#if isProcessing}
+                  <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                  </svg>
+                  Processamento...
+                {:else if isActivating}
+                  <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                  </svg>
+                  Attivazione...
+                {:else if isFree}
+                  Attiva Gratis
+                {:else}
+                  Paga €{calculateTotal()}
+                {/if}
               </button>
             </div>
           </form>
@@ -632,6 +703,13 @@
   .price-period {
     font-size: 16px;
     color: var(--text-secondary);
+  }
+
+  .price-savings {
+    font-size: 12px;
+    color: #10b981;
+    font-weight: 500;
+    margin-top: 4px;
   }
 
   .plan-description {
@@ -863,9 +941,57 @@
     transition: all 0.2s;
   }
 
-  .pay-button:hover {
+  .pay-button:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+  }
+
+  .pay-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .pay-button .spinner {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 8px;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .free-payment-notice {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%);
+    border-color: #10b981;
+  }
+
+  .free-notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #10b981;
+    padding: 8px 0;
+  }
+
+  .free-notice svg {
+    flex-shrink: 0;
+  }
+
+  .free-notice p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .back-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   @media (max-width: 768px) {

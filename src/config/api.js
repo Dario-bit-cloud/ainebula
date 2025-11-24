@@ -15,6 +15,9 @@ export const LLM7_CONFIG = {
 // Mappatura modelli locali ai modelli API e provider
 export const MODEL_MAPPING = {
   'nebula-1.0': { model: 'gpt-4o', provider: 'electronhub' }, // Nebula AI 1.0 con Electron Hub
-  'nebula-pro': { model: 'gpt-4', provider: 'llm7' } // Nebula AI Pro con LLM7.io
+  'nebula-pro': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Pro con LLM7.io
+  'nebula-coder': { model: 'gpt-4', provider: 'llm7' }, // Nebula Coder con LLM7.io (specializzato in coding)
+  'nebula-premium-pro': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Premium Pro - Richiede abbonamento Pro
+  'nebula-premium-max': { model: 'gpt-4', provider: 'llm7' } // Nebula AI Premium Max - Richiede abbonamento Massimo
 };
 

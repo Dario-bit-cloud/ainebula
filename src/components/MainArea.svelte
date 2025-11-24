@@ -1,13 +1,14 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, afterUpdate } from 'svelte';
   import { get } from 'svelte/store';
   import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, createTemporaryChat, saveChatsToStorage } from '../stores/chat.js';
   import { selectedModel } from '../stores/models.js';
+  import { hasActiveSubscription } from '../stores/user.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
   import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable } from '../services/voiceService.js';
-  import { isPremiumModalOpen, isVoiceSelectionModalOpen, selectedPrompt } from '../stores/app.js';
+  import { isPremiumModalOpen, isVoiceSelectionModalOpen, selectedPrompt, isMobile } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
-  import { renderMarkdown } from '../utils/markdown.js';
+  import { renderMarkdown, initCodeCopyButtons } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
   import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
   
@@ -100,14 +101,39 @@
       // Filtra i messaggi nascosti dal conteggio token
       const visibleMessagesForTokens = messages.filter(msg => !msg.hidden);
       currentChatTokens = visibleMessagesForTokens.length > 0 ? estimateChatTokens(visibleMessagesForTokens) : 0;
-      // Limite aumentato a 50.000 per Nebula Pro
-      maxTokens = $selectedModel === 'nebula-pro' ? 50000 : 4000;
-      tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-      tokenWarning = tokenUsagePercentage > 80;
+      
+      // Calcola maxTokens: illimitati per modelli premium con abbonamento attivo
+      const isPremiumModel = $selectedModel === 'nebula-premium-pro' || $selectedModel === 'nebula-premium-max';
+      const hasPremium = isPremiumModel && hasActiveSubscription();
+      const isAdvancedModel = $selectedModel === 'nebula-pro' || $selectedModel === 'nebula-coder' || isPremiumModel;
+      
+      if (hasPremium) {
+        maxTokens = Infinity; // Token illimitati
+        tokenUsagePercentage = 0; // Non mostrare percentuale per token illimitati
+        tokenWarning = false;
+      } else if (isAdvancedModel) {
+        maxTokens = 50000;
+        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
+        tokenWarning = tokenUsagePercentage > 80;
+      } else {
+        maxTokens = 4000;
+        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
+        tokenWarning = tokenUsagePercentage > 80;
+      }
     } catch (error) {
       console.error('Error calculating tokens:', error);
       currentChatTokens = 0;
-      maxTokens = $selectedModel === 'nebula-pro' ? 50000 : 4000;
+      const isPremiumModel = $selectedModel === 'nebula-premium-pro' || $selectedModel === 'nebula-premium-max';
+      const hasPremium = isPremiumModel && hasActiveSubscription();
+      const isAdvancedModel = $selectedModel === 'nebula-pro' || $selectedModel === 'nebula-coder' || isPremiumModel;
+      
+      if (hasPremium) {
+        maxTokens = Infinity;
+      } else if (isAdvancedModel) {
+        maxTokens = 50000;
+      } else {
+        maxTokens = 4000;
+      }
       tokenUsagePercentage = 0;
       tokenWarning = false;
     }
@@ -219,6 +245,13 @@
       }
     });
     
+    // Inizializza i pulsanti di copia dopo ogni aggiornamento (event delegation, quindi basta una volta)
+    afterUpdate(() => {
+      if (messagesContainer) {
+        initCodeCopyButtons(messagesContainer);
+      }
+    });
+    
     // Monitor scroll per mostrare/nascondere pulsante scroll to top
     // Usa afterUpdate per assicurarsi che messagesContainer sia disponibile
     const setupScrollListener = () => {
@@ -239,11 +272,23 @@
     // Aggiungi listener per chiudere il menu quando si clicca fuori
     document.addEventListener('click', handleClickOutside);
     
+    // Inizializza i pulsanti di copia codice
+    tick().then(() => {
+      if (messagesContainer) {
+        initCodeCopyButtons(messagesContainer);
+      }
+    });
+    
     // Cleanup
     return () => {
       window.removeEventListener('paste', handlePaste);
       if (messagesContainer) {
         messagesContainer.removeEventListener('scroll', handleScroll);
+        // Rimuovi listener per copia codice
+        if (messagesContainer._copyButtonHandler) {
+          messagesContainer.removeEventListener('click', messagesContainer._copyButtonHandler);
+          delete messagesContainer._copyButtonHandler;
+        }
       }
       document.removeEventListener('click', handleClickOutside);
       if (unsubscribe) unsubscribe();
@@ -563,6 +608,54 @@
     const chatId = $currentChatId;
     if (chatId) {
       deleteMessage(chatId, messageIndex);
+    }
+  }
+  
+  function handleReadAloud(messageIndex) {
+    const message = messages[messageIndex];
+    if (message && message.content && message.type === 'ai') {
+      // Rimuovi markdown e HTML per ottenere testo puro
+      const textContent = message.content
+        .replace(/```[\s\S]*?```/g, '') // Rimuovi blocchi di codice
+        .replace(/`[^`]+`/g, '') // Rimuovi codice inline
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Rimuovi link markdown
+        .replace(/#{1,6}\s+/g, '') // Rimuovi header markdown
+        .replace(/\*\*([^\*]+)\*\*/g, '$1') // Rimuovi bold
+        .replace(/\*([^\*]+)\*/g, '$1') // Rimuovi italic
+        .replace(/<[^>]+>/g, '') // Rimuovi HTML tags
+        .trim();
+      
+      if (textContent && 'speechSynthesis' in window) {
+        // Ferma qualsiasi sintesi vocale in corso
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(textContent);
+        utterance.lang = 'it-IT';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        window.speechSynthesis.speak(utterance);
+      } else {
+        alert('La sintesi vocale non è disponibile nel tuo browser.');
+      }
+    }
+  }
+  
+  function handleReportMessage(messageIndex) {
+    const message = messages[messageIndex];
+    if (message && message.type === 'ai') {
+      const reason = prompt('Perché vuoi segnalare questo messaggio?\n\n1. Contenuto inappropriato\n2. Informazioni errate\n3. Altro\n\nInserisci il motivo:');
+      if (reason) {
+        // Qui potresti inviare la segnalazione a un server
+        console.log('Messaggio segnalato:', {
+          messageIndex,
+          messageId: message.id,
+          content: message.content,
+          reason: reason
+        });
+        alert('Grazie per la segnalazione. Il messaggio è stato segnalato.');
+      }
     }
   }
   
@@ -897,10 +990,14 @@
   {#if showTokenCounter && visibleMessages.length > 0}
     <div class="token-counter" class:token-warning={tokenWarning}>
       <div class="token-info">
-        <span class="token-label">Token: {currentChatTokens.toLocaleString()} / {maxTokens.toLocaleString()}</span>
-        <div class="token-bar">
-          <div class="token-bar-fill" style="width: {Math.min(tokenUsagePercentage, 100)}%"></div>
-        </div>
+        <span class="token-label">
+          Token: {currentChatTokens.toLocaleString()} / {maxTokens === Infinity ? 'Illimitati' : maxTokens.toLocaleString()}
+        </span>
+        {#if maxTokens !== Infinity}
+          <div class="token-bar">
+            <div class="token-bar-fill" style="width: {Math.min(tokenUsagePercentage, 100)}%"></div>
+          </div>
+        {/if}
       </div>
       <button class="token-counter-toggle" on:click={() => showTokenCounter = false} title="Nascondi">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -982,6 +1079,8 @@
           on:regenerate={() => handleRegenerateMessage(index)}
           on:delete={() => handleDeleteMessage(index)}
           on:feedback={(e) => handleMessageFeedback(index, e.detail.type)}
+          on:readAloud={() => handleReadAloud(index)}
+          on:report={() => handleReportMessage(index)}
         />
       </div>
     {/each}
@@ -1007,8 +1106,8 @@
     </button>
   {/if}
   
-  <div class="input-container">
-    <div class="input-toolbar">
+  {#if $isMobile}
+    <div class="input-toolbar mobile-toolbar">
       <button 
         class="toolbar-button" 
         on:click={toggleSearchBar}
@@ -1033,6 +1132,35 @@
         </svg>
       </button>
     </div>
+  {/if}
+  <div class="input-container">
+    {#if !$isMobile}
+      <div class="input-toolbar">
+        <button 
+          class="toolbar-button" 
+          on:click={toggleSearchBar}
+          title="Cerca nella chat"
+          class:active={showSearchBar}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+        </button>
+        <button 
+          class="toolbar-button" 
+          on:click={() => exportChat('markdown')}
+          title="Esporta chat"
+          disabled={messages.length === 0}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+      </div>
+    {/if}
       {#if attachedImages.length > 0}
         <div class="attached-images">
           {#each attachedImages as imageItem, index}
@@ -1249,7 +1377,7 @@
       <textarea
         class="message-input"
         class:textarea-input={isTextarea}
-        placeholder={editingMessageIndex !== null ? "Modifica il messaggio..." : "Fai una domanda (Shift+Enter per nuova riga)"}
+        placeholder={editingMessageIndex !== null ? "Modifica il messaggio..." : ($isMobile ? "" : "Fai una domanda (Shift+Enter per nuova riga)")}
         bind:value={inputValue}
         bind:this={textareaRef}
         on:keydown={handleKeyPress}
@@ -1497,6 +1625,18 @@
     padding: 8px 24px;
     background-color: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
+  }
+
+  .mobile-toolbar {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .input-toolbar {
+      padding: 8px 16px;
+    }
   }
   
   .toolbar-button {
@@ -2416,6 +2556,77 @@
     padding: 0;
   }
   
+  /* Stili per i blocchi di codice con pulsante copia */
+  .message-content :global(.code-block-wrapper) {
+    position: relative;
+    margin: 12px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+  
+  .message-content :global(.code-block-wrapper pre) {
+    margin: 0;
+    border-radius: 0;
+  }
+  
+  .message-content :global(.code-copy-button) {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  .message-content :global(.code-block-wrapper:hover .code-copy-button) {
+    opacity: 1;
+    pointer-events: all;
+  }
+  
+  .message-content :global(.code-copy-button:hover) {
+    background-color: rgba(0, 0, 0, 0.8);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 1);
+    transform: translateY(-1px);
+  }
+  
+  .message-content :global(.code-copy-button:active) {
+    transform: translateY(0);
+  }
+  
+  .message-content :global(.code-copy-button.copied) {
+    background-color: rgba(76, 175, 80, 0.3);
+    border-color: rgba(76, 175, 80, 0.6);
+    color: #4caf50;
+    opacity: 1;
+  }
+  
+  .message-content :global(.code-copy-button svg) {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+    flex-shrink: 0;
+  }
+  
+  .message-content :global(.code-copy-button .copy-text) {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  
   .message-content :global(blockquote) {
     border-left: 3px solid var(--accent-blue);
     padding-left: 12px;
@@ -2445,6 +2656,42 @@
   .message-content :global(th) {
     background-color: rgba(0, 0, 0, 0.2);
     font-weight: 600;
+  }
+
+  /* Toast di notifica per copia codice */
+  :global(.copy-toast) {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  :global(.copy-toast.show) {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: all;
+  }
+
+  :global(.copy-toast::before) {
+    content: '✓';
+    font-size: 18px;
+    color: #4caf50;
+    font-weight: bold;
   }
 
   .input-actions {

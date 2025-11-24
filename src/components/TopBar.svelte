@@ -1,7 +1,8 @@
 <script>
   import { selectedModel, availableModels } from '../stores/models.js';
   import { isGenerating } from '../stores/chat.js';
-  import { isSettingsOpen, isSidebarOpen, isMobile, isAISettingsModalOpen, isPromptLibraryModalOpen } from '../stores/app.js';
+  import { isSettingsOpen, isSidebarOpen, isMobile, isAISettingsModalOpen, isPromptLibraryModalOpen, isPremiumModalOpen } from '../stores/app.js';
+  import { user, hasPlanOrHigher } from '../stores/user.js';
   import { onMount } from 'svelte';
   
   let isModelDropdownOpen = false;
@@ -27,9 +28,32 @@
   }
   
   function selectModel(modelId) {
+    // Verifica se il modello è premium e se l'utente ha l'abbonamento necessario
+    const model = $availableModels.find(m => m.id === modelId);
+    if (model?.premium) {
+      const requiredPlan = model.requiredPlan;
+      if (!hasPlanOrHigher(requiredPlan)) {
+        // Apri il modal premium
+        isPremiumModalOpen.set(true);
+        isModelDropdownOpen = false;
+        return;
+      }
+    }
+    
     selectedModel.set(modelId);
     isModelDropdownOpen = false;
   }
+  
+  // Mostra sempre tutti i modelli, ma disabilita quelli premium senza abbonamento
+  // Raggruppa i modelli per gruppo
+  $: groupedModels = $availableModels.reduce((acc, model) => {
+    const group = model.group || 'Altri';
+    if (!acc[group]) {
+      acc[group] = [];
+    }
+    acc[group].push(model);
+    return acc;
+  }, {});
   
   function toggleSettings() {
     isSettingsOpen.update(open => !open);
@@ -108,25 +132,37 @@
       </button>
       {#if isModelDropdownOpen}
         <div class="model-dropdown" bind:this={modelDropdown} style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;">
-          <div class="model-group-header">Nebula AI</div>
-          {#each $availableModels as model}
-            <button 
-              class="model-option" 
-              class:selected={model.id === $selectedModel}
-              on:click={() => selectModel(model.id)}
-            >
-              <div class="model-info">
-                <div class="model-name">{model.name}</div>
-                {#if model.description}
-                  <div class="model-description">{model.description}</div>
+          {#each Object.entries(groupedModels) as [groupName, models]}
+            <div class="model-group-header">{groupName}</div>
+            {#each models as model}
+              <button 
+                class="model-option" 
+                class:selected={model.id === $selectedModel}
+                class:premium={model.premium}
+                class:disabled={model.premium && !hasPlanOrHigher(model.requiredPlan)}
+                on:click={() => selectModel(model.id)}
+                title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? 'Richiede abbonamento ' + (model.requiredPlan === 'pro' ? 'Pro' : 'Massimo') : ''}
+              >
+                <div class="model-info">
+                  <div class="model-name">
+                    {model.name}
+                    {#if model.premium}
+                      <span class="premium-badge" class:pro={model.requiredPlan === 'pro'} class:max={model.requiredPlan === 'max'}>
+                        {model.requiredPlan === 'pro' ? 'PRO' : 'MAX'}
+                      </span>
+                    {/if}
+                  </div>
+                  {#if model.description}
+                    <div class="model-description">{model.description}</div>
+                  {/if}
+                </div>
+                {#if model.id === $selectedModel}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
                 {/if}
-              </div>
-              {#if model.id === $selectedModel}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              {/if}
-            </button>
+              </button>
+            {/each}
           {/each}
         </div>
       {/if}
@@ -316,6 +352,7 @@
   .model-dropdown {
     position: fixed;
     min-width: 280px;
+    max-width: 90vw;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -323,6 +360,16 @@
     overflow: visible;
     z-index: 10000;
     animation: dropdownSlideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (max-width: 768px) {
+    .model-dropdown {
+      min-width: 240px;
+      max-width: calc(100vw - 32px);
+      left: 16px !important;
+      right: 16px;
+      width: auto;
+    }
   }
   
   .model-group-header {
@@ -400,6 +447,19 @@
     background-color: var(--bg-tertiary);
   }
 
+  .model-option.premium {
+    position: relative;
+  }
+
+  .model-option.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .model-option.disabled:hover {
+    background-color: transparent;
+  }
+
   .model-info {
     flex: 1;
   }
@@ -408,6 +468,31 @@
     font-size: 14px;
     font-weight: 500;
     margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .premium-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1;
+  }
+
+  .premium-badge.pro {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+
+  .premium-badge.max {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
   }
 
   .model-description {
