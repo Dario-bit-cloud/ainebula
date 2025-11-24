@@ -14,6 +14,8 @@ export const isAISettingsModalOpen = writable(false);
 export const isPromptLibraryModalOpen = writable(false);
 export const selectedPrompt = writable(null);
 export const isVoiceSelectionModalOpen = writable(false);
+export const isShortcutsModalOpen = writable(false);
+export const isReportBugModalOpen = writable(false);
 
 // Store per rilevare la dimensione dello schermo
 function createMediaQuery(query) {

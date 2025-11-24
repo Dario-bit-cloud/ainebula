@@ -96,8 +96,20 @@
   }
   
   function handleSubmenuClick(submenuItem) {
-    alert(`${submenuItem.label} - Funzionalità in arrivo`);
-    closeMenu();
+    if (submenuItem.id === 'shortcuts') {
+      import('../stores/app.js').then(module => {
+        module.isShortcutsModalOpen.set(true);
+      });
+      closeMenu();
+    } else if (submenuItem.id === 'report-bug') {
+      import('../stores/app.js').then(module => {
+        module.isReportBugModalOpen.set(true);
+      });
+      closeMenu();
+    } else {
+      alert(`${submenuItem.label} - Funzionalità in arrivo`);
+      closeMenu();
+    }
   }
   
   function handleAddAccount() {
