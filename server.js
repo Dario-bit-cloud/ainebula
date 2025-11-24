@@ -574,6 +574,260 @@ app.patch('/api/chat/:chatId', authenticateToken, async (req, res) => {
 
 // ==================== FINE ENDPOINT CHAT ====================
 
+// ==================== ENDPOINT IMPOSTAZIONI UTENTE ====================
+
+// Ottieni le impostazioni dell'utente
+app.get('/api/user/settings', authenticateToken, async (req, res) => {
+  try {
+    const settings = await sql`
+      SELECT * FROM user_settings WHERE user_id = ${req.user.id}
+    `;
+    
+    if (settings.length === 0) {
+      // Crea impostazioni di default se non esistono
+      const defaultSettingsId = randomBytes(16).toString('hex');
+      await sql`
+        INSERT INTO user_settings (id, user_id)
+        VALUES (${defaultSettingsId}, ${req.user.id})
+      `;
+      const newSettings = await sql`
+        SELECT * FROM user_settings WHERE user_id = ${req.user.id}
+      `;
+      return res.json({
+        success: true,
+        settings: newSettings[0]
+      });
+    }
+    
+    res.json({
+      success: true,
+      settings: settings[0]
+    });
+  } catch (error) {
+    console.error('Errore recupero impostazioni:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle impostazioni',
+      error: error.message
+    });
+  }
+});
+
+// Aggiorna le impostazioni dell'utente
+app.patch('/api/user/settings', authenticateToken, async (req, res) => {
+  try {
+    const updates = req.body;
+    
+    // Verifica se le impostazioni esistono
+    const existing = await sql`
+      SELECT id FROM user_settings WHERE user_id = ${req.user.id}
+    `;
+    
+    if (existing.length === 0) {
+      // Crea impostazioni se non esistono
+      const settingsId = randomBytes(16).toString('hex');
+      await sql`
+        INSERT INTO user_settings (id, user_id, ${sql(Object.keys(updates))})
+        VALUES (${settingsId}, ${req.user.id}, ${sql(Object.values(updates))})
+      `;
+    } else {
+      // Aggiorna impostazioni esistenti
+      const updateFields = Object.keys(updates).map(key => `${key} = ${updates[key]}`).join(', ');
+      await sql`
+        UPDATE user_settings 
+        SET ${sql(updates)}, updated_at = NOW()
+        WHERE user_id = ${req.user.id}
+      `;
+    }
+    
+    // Restituisci le impostazioni aggiornate
+    const updated = await sql`
+      SELECT * FROM user_settings WHERE user_id = ${req.user.id}
+    `;
+    
+    res.json({
+      success: true,
+      settings: updated[0]
+    });
+  } catch (error) {
+    console.error('Errore aggiornamento impostazioni:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'aggiornamento delle impostazioni',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT IMPOSTAZIONI UTENTE ====================
+
+// ==================== ENDPOINT ABBONAMENTI ====================
+
+// Ottieni l'abbonamento corrente dell'utente
+app.get('/api/user/subscription', authenticateToken, async (req, res) => {
+  try {
+    const subscription = await sql`
+      SELECT * FROM subscriptions 
+      WHERE user_id = ${req.user.id} 
+        AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    
+    if (subscription.length === 0) {
+      // Crea abbonamento gratuito di default
+      const freeSubscriptionId = randomBytes(16).toString('hex');
+      await sql`
+        INSERT INTO subscriptions (id, user_id, plan, status, started_at)
+        VALUES (${freeSubscriptionId}, ${req.user.id}, 'free', 'active', NOW())
+      `;
+      const newSubscription = await sql`
+        SELECT * FROM subscriptions WHERE id = ${freeSubscriptionId}
+      `;
+      return res.json({
+        success: true,
+        subscription: newSubscription[0]
+      });
+    }
+    
+    res.json({
+      success: true,
+      subscription: subscription[0]
+    });
+  } catch (error) {
+    console.error('Errore recupero abbonamento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero dell\'abbonamento',
+      error: error.message
+    });
+  }
+});
+
+// Crea o aggiorna un abbonamento
+app.post('/api/user/subscription', authenticateToken, async (req, res) => {
+  try {
+    const { plan, billingCycle, amount, currency, paymentMethod, paymentId, expiresAt } = req.body;
+    
+    if (!plan) {
+      return res.status(400).json({
+        success: false,
+        message: 'Piano obbligatorio'
+      });
+    }
+    
+    // Disattiva abbonamenti precedenti
+    await sql`
+      UPDATE subscriptions 
+      SET status = 'cancelled', cancelled_at = NOW()
+      WHERE user_id = ${req.user.id} AND status = 'active'
+    `;
+    
+    // Crea nuovo abbonamento
+    const subscriptionId = randomBytes(16).toString('hex');
+    const expiresDate = expiresAt ? new Date(expiresAt) : null;
+    
+    await sql`
+      INSERT INTO subscriptions (
+        id, user_id, plan, status, billing_cycle, 
+        amount, currency, payment_method, payment_id, expires_at
+      )
+      VALUES (
+        ${subscriptionId}, ${req.user.id}, ${plan}, 'active',
+        ${billingCycle || 'monthly'}, ${amount || 0}, 
+        ${currency || 'EUR'}, ${paymentMethod || null}, 
+        ${paymentId || null}, ${expiresDate}
+      )
+    `;
+    
+    // Crea record di pagamento se fornito
+    if (amount && amount > 0) {
+      const paymentRecordId = randomBytes(16).toString('hex');
+      await sql`
+        INSERT INTO payments (
+          id, subscription_id, user_id, amount, currency,
+          status, payment_method, payment_provider, transaction_id, paid_at
+        )
+        VALUES (
+          ${paymentRecordId}, ${subscriptionId}, ${req.user.id},
+          ${amount}, ${currency || 'EUR'}, 'completed',
+          ${paymentMethod || null}, 'stripe', ${paymentId || null}, NOW()
+        )
+      `;
+    }
+    
+    const newSubscription = await sql`
+      SELECT * FROM subscriptions WHERE id = ${subscriptionId}
+    `;
+    
+    res.json({
+      success: true,
+      subscription: newSubscription[0]
+    });
+  } catch (error) {
+    console.error('Errore creazione abbonamento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nella creazione dell\'abbonamento',
+      error: error.message
+    });
+  }
+});
+
+// Cancella un abbonamento
+app.delete('/api/user/subscription/:subscriptionId', authenticateToken, async (req, res) => {
+  try {
+    const { subscriptionId } = req.params;
+    
+    await sql`
+      UPDATE subscriptions 
+      SET status = 'cancelled', cancelled_at = NOW(), auto_renew = false
+      WHERE id = ${subscriptionId} AND user_id = ${req.user.id}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Abbonamento cancellato con successo'
+    });
+  } catch (error) {
+    console.error('Errore cancellazione abbonamento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nella cancellazione dell\'abbonamento',
+      error: error.message
+    });
+  }
+});
+
+// Ottieni lo storico pagamenti
+app.get('/api/user/payments', authenticateToken, async (req, res) => {
+  try {
+    const payments = await sql`
+      SELECT p.*, s.plan, s.billing_cycle
+      FROM payments p
+      JOIN subscriptions s ON p.subscription_id = s.id
+      WHERE p.user_id = ${req.user.id}
+      ORDER BY p.created_at DESC
+      LIMIT 50
+    `;
+    
+    res.json({
+      success: true,
+      payments: payments
+    });
+  } catch (error) {
+    console.error('Errore recupero pagamenti:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero dei pagamenti',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT ABBONAMENTI ====================
+
 app.listen(PORT, () => {
   console.log(`🚀 Server API avviato su http://localhost:${PORT}`);
   console.log(`📊 Endpoint disponibili:`);
@@ -588,5 +842,11 @@ app.listen(PORT, () => {
   console.log(`   POST /api/chat - Salva chat`);
   console.log(`   DELETE /api/chat/:id - Elimina chat`);
   console.log(`   PATCH /api/chat/:id - Aggiorna chat`);
+  console.log(`   GET  /api/user/settings - Ottieni impostazioni utente`);
+  console.log(`   PATCH /api/user/settings - Aggiorna impostazioni utente`);
+  console.log(`   GET  /api/user/subscription - Ottieni abbonamento utente`);
+  console.log(`   POST /api/user/subscription - Crea/aggiorna abbonamento`);
+  console.log(`   DELETE /api/user/subscription/:id - Cancella abbonamento`);
+  console.log(`   GET  /api/user/payments - Ottieni storico pagamenti`);
 });
 
