@@ -1,0 +1,592 @@
+import express from 'express';
+import cors from 'cors';
+import { neon } from '@neondatabase/serverless';
+import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
+
+dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
+
+const app = express();
+const PORT = 3001;
+
+// Middleware
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));
+app.use(express.json());
+
+// Middleware per verificare l'autenticazione
+async function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Token non fornito' });
+  }
+
+  try {
+    // Verifica il token JWT
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Verifica che la sessione esista nel database
+    const session = await sql`
+      SELECT s.*, u.id as user_id, u.email, u.username, u.is_active
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.token = ${token}
+        AND s.expires_at > NOW()
+        AND u.is_active = true
+    `;
+    
+    if (session.length === 0) {
+      return res.status(401).json({ success: false, message: 'Sessione non valida' });
+    }
+    
+    req.user = {
+      id: session[0].user_id,
+      email: session[0].email,
+      username: session[0].username
+    };
+    req.session = session[0];
+    
+    next();
+  } catch (error) {
+    return res.status(403).json({ success: false, message: 'Token non valido' });
+  }
+}
+
+// Connessione al database Neon
+// Usa la variabile d'ambiente o il valore di default per sviluppo
+const connectionString = process.env.DATABASE_URL || 
+  'postgresql://neondb_owner:npg_Xpw3ovIOqnz0@ep-spring-leaf-ads75xz2-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require';
+
+if (!connectionString) {
+  console.error('❌ DATABASE_URL non trovata nelle variabili d\'ambiente');
+  process.exit(1);
+}
+
+console.log('✅ Database URL configurato');
+
+const sql = neon(connectionString);
+
+// Endpoint per testare la connessione
+app.get('/api/db/test', async (req, res) => {
+  try {
+    const response = await sql`SELECT version()`;
+    const { version } = response[0];
+    
+    res.json({
+      success: true,
+      message: 'Connessione al database riuscita!',
+      version: version,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Errore connessione database:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nella connessione al database',
+      error: error.message
+    });
+  }
+});
+
+// Endpoint per eseguire query personalizzate (solo SELECT per sicurezza)
+app.post('/api/db/query', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: 'Query non fornita'
+      });
+    }
+    
+    // Verifica che sia una query SELECT (per sicurezza)
+    const trimmedQuery = query.trim().toUpperCase();
+    if (!trimmedQuery.startsWith('SELECT')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Solo query SELECT sono permesse per sicurezza'
+      });
+    }
+    
+    const response = await sql.unsafe(query);
+    
+    res.json({
+      success: true,
+      data: response,
+      rowCount: response.length
+    });
+  } catch (error) {
+    console.error('Errore esecuzione query:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'esecuzione della query',
+      error: error.message
+    });
+  }
+});
+
+// Endpoint per ottenere informazioni sul database
+app.get('/api/db/info', async (req, res) => {
+  try {
+    // Ottieni informazioni sulle tabelle
+    const tables = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name;
+    `;
+    
+    res.json({
+      success: true,
+      tables: tables.map(t => t.table_name),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Errore recupero info database:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle informazioni',
+      error: error.message
+    });
+  }
+});
+
+// ==================== ENDPOINT AUTENTICAZIONE ====================
+
+// Registrazione
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    // Validazione
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username e password sono obbligatori'
+      });
+    }
+    
+    if (username.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lo username deve essere di almeno 3 caratteri'
+      });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'La password deve essere di almeno 6 caratteri'
+      });
+    }
+    
+    // Verifica se username esiste già
+    const existing = await sql`
+      SELECT id FROM users 
+      WHERE username = ${username.toLowerCase()}
+    `;
+    
+    if (existing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username già in uso'
+      });
+    }
+    
+    // Hash della password
+    const passwordHash = await bcrypt.hash(password, 10);
+    const userId = randomBytes(16).toString('hex');
+    const email = `${username.toLowerCase()}@nebula.local`; // Email fittizia basata su username
+    
+    // Crea l'utente
+    await sql`
+      INSERT INTO users (id, email, username, password_hash)
+      VALUES (${userId}, ${email}, ${username.toLowerCase()}, ${passwordHash})
+    `;
+    
+    // Crea sessione
+    const sessionToken = jwt.sign({ userId, email, username: username.toLowerCase() }, JWT_SECRET, { expiresIn: '7d' });
+    const sessionId = randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + SESSION_DURATION);
+    
+    await sql`
+      INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
+      VALUES (${sessionId}, ${userId}, ${sessionToken}, ${expiresAt}, ${req.ip}, ${req.get('user-agent')})
+    `;
+    
+    // Aggiorna last_login
+    await sql`
+      UPDATE users SET last_login = NOW() WHERE id = ${userId}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Registrazione completata con successo',
+      user: {
+        id: userId,
+        username: username.toLowerCase()
+      },
+      token: sessionToken
+    });
+  } catch (error) {
+    console.error('Errore registrazione:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la registrazione',
+      error: error.message
+    });
+  }
+});
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username e password sono obbligatori'
+      });
+    }
+    
+    // Trova l'utente
+    const users = await sql`
+      SELECT id, email, username, password_hash, is_active
+      FROM users
+      WHERE username = ${username.toLowerCase()}
+    `;
+    
+    if (users.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Credenziali non valide'
+      });
+    }
+    
+    const user = users[0];
+    
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account disattivato'
+      });
+    }
+    
+    // Verifica password
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Credenziali non valide'
+      });
+    }
+    
+    // Crea sessione
+    const sessionToken = jwt.sign(
+      { userId: user.id, email: user.email, username: user.username },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    const sessionId = randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + SESSION_DURATION);
+    
+    await sql`
+      INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
+      VALUES (${sessionId}, ${user.id}, ${sessionToken}, ${expiresAt}, ${req.ip}, ${req.get('user-agent')})
+    `;
+    
+    // Aggiorna last_login
+    await sql`
+      UPDATE users SET last_login = NOW() WHERE id = ${user.id}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Login completato con successo',
+      user: {
+        id: user.id,
+        username: user.username
+      },
+      token: sessionToken
+    });
+  } catch (error) {
+    console.error('Errore login:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il login',
+      error: error.message
+    });
+  }
+});
+
+// Verifica sessione corrente
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  res.json({
+    success: true,
+    user: req.user
+  });
+});
+
+// Logout
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  try {
+    await sql`
+      DELETE FROM sessions WHERE token = ${req.headers['authorization'].split(' ')[1]}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Logout completato con successo'
+    });
+  } catch (error) {
+    console.error('Errore logout:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il logout',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT AUTENTICAZIONE ====================
+
+// ==================== ENDPOINT CHAT ====================
+
+// Ottieni tutte le chat dell'utente
+app.get('/api/chat', authenticateToken, async (req, res) => {
+  try {
+    const chats = await sql`
+      SELECT 
+        c.id,
+        c.title,
+        c.project_id,
+        c.created_at,
+        c.updated_at,
+        c.is_temporary,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', m.id,
+              'type', m.type,
+              'content', m.content,
+              'hidden', m.hidden,
+              'timestamp', m.timestamp
+            ) ORDER BY m.timestamp
+          ) FILTER (WHERE m.id IS NOT NULL),
+          '[]'::json
+        ) as messages
+      FROM chats c
+      LEFT JOIN messages m ON c.id = m.chat_id
+      WHERE c.user_id = ${req.user.id}
+        AND c.is_temporary = false
+      GROUP BY c.id, c.title, c.project_id, c.created_at, c.updated_at, c.is_temporary
+      ORDER BY c.updated_at DESC
+    `;
+    
+    // Formatta le chat per il client
+    const formattedChats = chats.map(chat => ({
+      id: chat.id,
+      title: chat.title,
+      projectId: chat.project_id,
+      messages: chat.messages || [],
+      createdAt: chat.created_at,
+      updatedAt: chat.updated_at,
+      isTemporary: chat.is_temporary
+    }));
+    
+    res.json({
+      success: true,
+      chats: formattedChats
+    });
+  } catch (error) {
+    console.error('Errore recupero chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle chat',
+      error: error.message
+    });
+  }
+});
+
+// Salva una chat
+app.post('/api/chat', authenticateToken, async (req, res) => {
+  try {
+    const { id, title, messages, projectId, isTemporary } = req.body;
+    
+    if (!id || !title) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID e titolo sono obbligatori'
+      });
+    }
+    
+    // Verifica se la chat esiste già
+    const existingChat = await sql`
+      SELECT id FROM chats WHERE id = ${id} AND user_id = ${req.user.id}
+    `;
+    
+    if (existingChat.length > 0) {
+      // Aggiorna la chat esistente
+      await sql`
+        UPDATE chats 
+        SET title = ${title}, 
+            project_id = ${projectId || null}, 
+            is_temporary = ${isTemporary || false},
+            updated_at = NOW()
+        WHERE id = ${id} AND user_id = ${req.user.id}
+      `;
+    } else {
+      // Crea una nuova chat
+      await sql`
+        INSERT INTO chats (id, user_id, title, project_id, is_temporary, updated_at)
+        VALUES (${id}, ${req.user.id}, ${title}, ${projectId || null}, ${isTemporary || false}, NOW())
+      `;
+    }
+    
+    // Salva i messaggi
+    if (messages && messages.length > 0) {
+      // Elimina i messaggi esistenti per questa chat
+      await sql`DELETE FROM messages WHERE chat_id = ${id}`;
+      
+      // Inserisci i nuovi messaggi
+      for (const message of messages) {
+        if (!message.hidden) { // Salva solo i messaggi non nascosti
+          await sql`
+            INSERT INTO messages (chat_id, type, content, hidden, timestamp)
+            VALUES (${id}, ${message.type}, ${message.content}, ${message.hidden || false}, ${message.timestamp || new Date().toISOString()})
+          `;
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: 'Chat salvata con successo'
+    });
+  } catch (error) {
+    console.error('Errore salvataggio chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel salvataggio della chat',
+      error: error.message
+    });
+  }
+});
+
+// Elimina una chat
+app.delete('/api/chat/:chatId', authenticateToken, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    
+    // Verifica che la chat appartenga all'utente
+    const chat = await sql`
+      SELECT id FROM chats WHERE id = ${chatId} AND user_id = ${req.user.id}
+    `;
+    
+    if (chat.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat non trovata'
+      });
+    }
+    
+    // Elimina la chat (i messaggi verranno eliminati automaticamente per CASCADE)
+    await sql`DELETE FROM chats WHERE id = ${chatId}`;
+    
+    res.json({
+      success: true,
+      message: 'Chat eliminata con successo'
+    });
+  } catch (error) {
+    console.error('Errore eliminazione chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'eliminazione della chat',
+      error: error.message
+    });
+  }
+});
+
+// Aggiorna una chat (titolo, progetto, ecc.)
+app.patch('/api/chat/:chatId', authenticateToken, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { title, projectId } = req.body;
+    
+    // Verifica che la chat appartenga all'utente
+    const chat = await sql`
+      SELECT id FROM chats WHERE id = ${chatId} AND user_id = ${req.user.id}
+    `;
+    
+    if (chat.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat non trovata'
+      });
+    }
+    
+    // Aggiorna la chat
+    if (title !== undefined && projectId !== undefined) {
+      await sql`
+        UPDATE chats 
+        SET title = ${title}, project_id = ${projectId}, updated_at = NOW()
+        WHERE id = ${chatId}
+      `;
+    } else if (title !== undefined) {
+      await sql`
+        UPDATE chats 
+        SET title = ${title}, updated_at = NOW()
+        WHERE id = ${chatId}
+      `;
+    } else if (projectId !== undefined) {
+      await sql`
+        UPDATE chats 
+        SET project_id = ${projectId}, updated_at = NOW()
+        WHERE id = ${chatId}
+      `;
+    }
+    
+    res.json({
+      success: true,
+      message: 'Chat aggiornata con successo'
+    });
+  } catch (error) {
+    console.error('Errore aggiornamento chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'aggiornamento della chat',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT CHAT ====================
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server API avviato su http://localhost:${PORT}`);
+  console.log(`📊 Endpoint disponibili:`);
+  console.log(`   GET  /api/db/test - Test connessione`);
+  console.log(`   GET  /api/db/info - Informazioni database`);
+  console.log(`   POST /api/db/query - Esegui query SELECT`);
+  console.log(`   POST /api/auth/register - Registrazione`);
+  console.log(`   POST /api/auth/login - Login`);
+  console.log(`   GET  /api/auth/me - Verifica sessione`);
+  console.log(`   POST /api/auth/logout - Logout`);
+  console.log(`   GET  /api/chat - Ottieni chat utente`);
+  console.log(`   POST /api/chat - Salva chat`);
+  console.log(`   DELETE /api/chat/:id - Elimina chat`);
+  console.log(`   PATCH /api/chat/:id - Aggiorna chat`);
+});
+
