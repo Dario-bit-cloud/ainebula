@@ -406,13 +406,6 @@
               <button class="danger-button" on:click={handleDeleteAllChats}>Cancella tutto</button>
             </div>
           {/if}
-            </div>
-            
-            <div class="setting-row" class:row-visible={activeSection === 'dati'}>
-              <div class="setting-label">Elimina tutte le chat</div>
-              <button class="danger-button" on:click={handleDeleteAllChats}>Cancella tutto</button>
-            </div>
-          {/if}
           
           <!-- Informazioni -->
           {#if activeSection === 'informazioni'}

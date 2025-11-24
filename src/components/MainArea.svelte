@@ -167,39 +167,10 @@
     }
   }
   
-  onMount(async () => {
+  onMount(() => {
     voiceAvailable = isVoiceAvailable();
     
-    // Controlla il permesso del microfono
-    if (voiceAvailable) {
-      const micCheck = await checkMicrophonePermission();
-      if (!micCheck.available) {
-        voiceAvailable = false;
-        showMicrophoneError = true;
-        microphoneErrorType = micCheck.error;
-        if (micCheck.error === 'no-device') {
-          microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
-        } else if (micCheck.error === 'permission-denied') {
-          microphoneError = 'Autorizzazione rifiutata';
-        } else {
-          microphoneError = 'Errore nell\'accesso al microfono.';
-        }
-      }
-    } else {
-      // Se SpeechRecognition non è disponibile, controlla comunque il microfono
-      try {
-        const micCheck = await checkMicrophonePermission();
-        if (!micCheck.available && micCheck.error === 'no-device') {
-          showMicrophoneError = true;
-          microphoneErrorType = 'no-device';
-          microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
-        }
-      } catch (e) {
-        // Ignora errori se non è disponibile
-      }
-    }
-    
-    // Inizializza riconoscimento vocale per input testo
+    // Inizializza riconoscimento vocale per input testo (solo se disponibile)
     if (voiceAvailable) {
       initVoiceRecognition(
         (transcript) => {
@@ -244,6 +215,17 @@
         createNewChat();
       }
     })();
+    
+    // Listener globale per ESC quando il modal è aperto
+    const handleEscape = (event) => {
+      if (event.key === 'Escape' && showMicrophoneError) {
+        closeMicrophoneError();
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
     
     // Gestione incolla immagini con Ctrl+V
     const handlePaste = async (event) => {
@@ -317,7 +299,9 @@
     });
     
     // Cleanup
+    // Cleanup function
     return () => {
+      window.removeEventListener('keydown', handleEscape);
       window.removeEventListener('paste', handlePaste);
       if (messagesContainer) {
         messagesContainer.removeEventListener('scroll', handleScroll);
@@ -746,12 +730,39 @@
     console.log('Feedback:', { messageIndex, type });
   }
   
-  function handleVoiceClick() {
+  async function handleVoiceClick() {
+    // Se il riconoscimento vocale non è disponibile, controlla il microfono e mostra errore
     if (!voiceAvailable) {
-      if (!showMicrophoneError) {
+      try {
+        const micCheck = await checkMicrophonePermission();
+        showMicrophoneError = true;
+        microphoneErrorType = micCheck.error;
+        if (micCheck.error === 'no-device') {
+          microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
+        } else if (micCheck.error === 'permission-denied') {
+          microphoneError = 'Autorizzazione rifiutata';
+        } else {
+          microphoneError = 'Errore nell\'accesso al microfono.';
+        }
+      } catch (e) {
         showMicrophoneError = true;
         microphoneErrorType = 'no-device';
         microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
+      }
+      return;
+    }
+    
+    // Controlla il permesso del microfono prima di avviare
+    const micCheck = await checkMicrophonePermission();
+    if (!micCheck.available) {
+      showMicrophoneError = true;
+      microphoneErrorType = micCheck.error;
+      if (micCheck.error === 'no-device') {
+        microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
+      } else if (micCheck.error === 'permission-denied') {
+        microphoneError = 'Autorizzazione rifiutata';
+      } else {
+        microphoneError = 'Errore nell\'accesso al microfono.';
       }
       return;
     }
@@ -775,6 +786,67 @@
     // Non per l'input vocale
     const selectedVoice = event.detail;
     console.log('Voce selezionata per modalità vocale:', selectedVoice);
+  }
+  
+  async function handleRequestMicrophone() {
+    try {
+      const result = await requestMicrophonePermission();
+      if (result.success) {
+        // Permesso concesso, chiudi il modal e riprova
+        showMicrophoneError = false;
+        voiceAvailable = true;
+        // Riprova a inizializzare il riconoscimento vocale
+        if (isVoiceAvailable()) {
+          initVoiceRecognition(
+            (transcript) => {
+              if (inputValue.trim()) {
+                inputValue = inputValue + ' ' + transcript;
+              } else {
+                inputValue = transcript;
+              }
+              stopListening();
+              isRecording = false;
+              if (textareaRef) {
+                textareaRef.focus();
+                resizeTextarea();
+              }
+            },
+            (error) => {
+              console.error('Voice recognition error:', error);
+              if (error === 'not-allowed') {
+                showMicrophoneError = true;
+                microphoneErrorType = 'permission-denied';
+                microphoneError = 'Autorizzazione rifiutata';
+              }
+              isRecording = false;
+              stopListening();
+            }
+          );
+        }
+      } else {
+        // Permesso negato, aggiorna il messaggio di errore
+        showMicrophoneError = true;
+        microphoneErrorType = 'permission-denied';
+        microphoneError = 'Autorizzazione rifiutata';
+      }
+    } catch (error) {
+      console.error('Error requesting microphone permission:', error);
+      showMicrophoneError = true;
+      microphoneErrorType = 'permission-denied';
+      microphoneError = 'Autorizzazione rifiutata';
+    }
+  }
+  
+  function closeMicrophoneError() {
+    showMicrophoneError = false;
+  }
+  
+  function handleModalKeyDown(event) {
+    if (event.key === 'Escape' && showMicrophoneError) {
+      closeMicrophoneError();
+      event.preventDefault();
+      event.stopPropagation();
+    }
   }
   
   function handleAttachClick(event) {
@@ -1611,12 +1683,19 @@
 
 <!-- Modal errore microfono -->
 {#if showMicrophoneError}
-  <div class="microphone-error-modal">
-    <div class="modal-backdrop" on:click={() => showMicrophoneError = false}></div>
-    <div class="modal-content">
+  <div 
+    class="microphone-error-modal" 
+    on:keydown={handleModalKeyDown} 
+    role="dialog" 
+    aria-modal="true" 
+    aria-labelledby="microphone-error-title"
+    tabindex="-1"
+  >
+    <div class="modal-backdrop" on:click={closeMicrophoneError}></div>
+    <div class="modal-content" on:click|stopPropagation>
       <div class="modal-header">
-        <h3>Errore Microfono</h3>
-        <button class="modal-close" on:click={() => showMicrophoneError = false}>
+        <h3 id="microphone-error-title">Errore Microfono</h3>
+        <button class="modal-close" on:click={closeMicrophoneError} aria-label="Chiudi" type="button">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -1631,7 +1710,7 @@
         </div>
         <p class="error-message">{microphoneError}</p>
         {#if microphoneErrorType !== 'permission-denied'}
-          <button class="request-permission-btn" on:click={handleRequestMicrophone}>
+          <button class="request-permission-btn" on:click={handleRequestMicrophone} type="button">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -3084,5 +3163,163 @@
   .convert-to-permanent:hover {
     background-color: #2563eb;
     transform: translateY(-1px);
+  }
+
+  /* Modal errore microfono */
+  .microphone-error-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: all;
+    outline: none;
+  }
+  
+  .microphone-error-modal:focus {
+    outline: none;
+  }
+
+  .microphone-error-modal .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 1;
+  }
+
+  .microphone-error-modal .modal-content {
+    position: relative;
+    background-color: #1a1a1a;
+    border-radius: 16px;
+    padding: 0;
+    max-width: 480px;
+    width: 90%;
+    max-height: 90vh;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+    overflow: hidden;
+  }
+
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .microphone-error-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .microphone-error-modal .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .microphone-error-modal .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .microphone-error-modal .modal-close:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+  }
+
+  .microphone-error-modal .modal-body {
+    padding: 32px 24px;
+    text-align: center;
+  }
+
+  .microphone-error-modal .error-icon {
+    color: #ef4444;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .microphone-error-modal .error-message {
+    color: var(--text-primary);
+    font-size: 15px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+
+  .microphone-error-modal .request-permission-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .microphone-error-modal .request-permission-btn:hover {
+    background-color: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+
+  .microphone-error-modal .request-permission-btn:active {
+    transform: translateY(0);
+  }
+
+  @media (max-width: 768px) {
+    .microphone-error-modal .modal-content {
+      width: 95%;
+      max-width: none;
+      margin: 20px;
+    }
+
+    .microphone-error-modal .modal-body {
+      padding: 24px 20px;
+    }
+
+    .microphone-error-modal .error-icon {
+      margin-bottom: 12px;
+    }
+
+    .microphone-error-modal .error-icon svg {
+      width: 40px;
+      height: 40px;
+    }
+
+    .microphone-error-modal .error-message {
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .microphone-error-modal .request-permission-btn {
+      width: 100%;
+      justify-content: center;
+      padding: 14px 24px;
+    }
   }
 </style>

@@ -66,6 +66,12 @@
         module.isSettingsOpen.set(true);
       });
       isUserMenuOpen.set(false);
+    } else if (item.id === 'personalization') {
+      // Apri modal personalizzazione
+      import('../stores/app.js').then(module => {
+        module.isPersonalizationModalOpen.set(true);
+      });
+      isUserMenuOpen.set(false);
     } else {
       alert(`${item.label} - Funzionalità in arrivo`);
       if (!item.hasSubmenu) {

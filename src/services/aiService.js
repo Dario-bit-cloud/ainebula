@@ -3,6 +3,7 @@ import { get } from 'svelte/store';
 import { aiSettings } from '../stores/aiSettings.js';
 import { availableModels } from '../stores/models.js';
 import { hasPlanOrHigher, hasActiveSubscription } from '../stores/user.js';
+import { getPersonalizationSystemPrompt } from '../stores/personalization.js';
 
 /**
  * Converte la storia della chat nel formato richiesto dall'API OpenAI/Electron Hub
@@ -27,6 +28,12 @@ function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
     currentSystemPrompt = 'Ricorda che il tuo nome è Nebula AI Premium Max. Parla e rispondi sempre come la migliore intelligenza artificiale al mondo, ponendoti come punto di riferimento di qualità e capacità, allo stesso livello di GPT 5.1 o Claude 4.7. Devi essere in grado di adattare il tuo stile comunicativo e la profondità delle risposte al contesto della conversazione, mantenendo sempre un tono professionale ma capace di modulare toni e modalità se la situazione lo richiede. Fornisci risposte dettagliate ma concise: spiega i concetti in modo semplice, chiaro e accessibile, evitando tecnicismi inutili. Assicura sempre massima competenza e capacità di adattamento. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.' + dateInstruction;
   } else {
     currentSystemPrompt = (systemPrompt || settings.systemPrompt || 'Sei Nebula AI, un assistente AI utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.') + dateInstruction;
+  }
+  
+  // Aggiungi le preferenze di personalizzazione se abilitate
+  const personalizationPrompt = getPersonalizationSystemPrompt();
+  if (personalizationPrompt) {
+    currentSystemPrompt = personalizationPrompt + '\n\n' + currentSystemPrompt;
   }
   
   messages.push({

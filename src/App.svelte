@@ -14,6 +14,7 @@
   import VoiceModeView from './components/VoiceModeView.svelte';
   import ShortcutsModal from './components/ShortcutsModal.svelte';
   import ReportBugModal from './components/ReportBugModal.svelte';
+  import PersonalizationModal from './components/PersonalizationModal.svelte';
   import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile } from './stores/app.js';
   import { createNewChat, deleteChat } from './stores/chat.js';
   import { get } from 'svelte/store';
@@ -201,6 +202,7 @@
   <VoiceModeView />
   <ShortcutsModal />
   <ReportBugModal />
+  <PersonalizationModal />
 </div>
 
 <style>
@@ -237,15 +239,7 @@
 
   /* Previeni scroll orizzontale su mobile */
   @media (max-width: 768px) {
-    body {
-      overflow-x: hidden;
-      position: fixed;
-      width: 100%;
-    }
-
-    #app {
-      width: 100vw;
-      max-width: 100vw;
+    .app-container {
       overflow-x: hidden;
     }
   }
