@@ -1346,6 +1346,8 @@
       <!-- Pulsanti integrati nell'input (solo quando vuoto) -->
       {#if !inputValue.trim() && !editingMessageIndex && visibleMessages.length === 0}
         <div class="input-quick-actions">
+          <!-- Pulsante Prompt temporaneamente nascosto -->
+          <!--
           <button 
             class="quick-action-btn" 
             on:click={() => isPromptLibraryModalOpen.set(true)}
@@ -1358,6 +1360,7 @@
             </svg>
             <span>Prompt</span>
           </button>
+          -->
         </div>
       {/if}
       
