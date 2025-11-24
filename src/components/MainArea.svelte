@@ -155,7 +155,7 @@
         tick().then(() => {
           if (textareaRef) {
             textareaRef.focus();
-            handleInputResize();
+            resizeTextarea();
           }
         });
         // Reset del prompt selezionato
@@ -182,7 +182,7 @@
           // Focus sul textarea e resize
           if (textareaRef) {
             textareaRef.focus();
-            handleInputResize();
+            resizeTextarea();
           }
         },
         (error) => {
@@ -438,24 +438,45 @@
     isGenerating.set(false);
   }
   
+  function resizeTextarea() {
+    if (textareaRef) {
+      // Reset height per calcolare correttamente scrollHeight
+      textareaRef.style.height = 'auto';
+      // Calcola l'altezza necessaria basata sul contenuto
+      const scrollHeight = textareaRef.scrollHeight;
+      // Altezza minima quando vuoto, massima quando pieno
+      const minHeight = inputValue.trim() === '' ? 24 : 24;
+      const maxHeight = 200; // Altezza massima prima dello scroll
+      const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+      textareaRef.style.height = newHeight + 'px';
+      
+      // Aggiorna anche il wrapper per adattarsi
+      if (textareaRef.parentElement) {
+        const wrapper = textareaRef.closest('.input-wrapper');
+        if (wrapper) {
+          wrapper.style.minHeight = newHeight + 'px';
+        }
+      }
+    }
+  }
+  
   function handleKeyPress(event) {
     // Shift+Enter per nuova riga, Enter per inviare
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       handleSubmit();
     }
-    // Auto-resize textarea
-    if (textareaRef) {
-      textareaRef.style.height = 'auto';
-      textareaRef.style.height = Math.min(textareaRef.scrollHeight, 200) + 'px';
-    }
+    // Auto-resize textarea dopo il keypress
+    setTimeout(() => resizeTextarea(), 0);
   }
   
   function handleInputResize() {
-    if (textareaRef) {
-      textareaRef.style.height = 'auto';
-      textareaRef.style.height = Math.min(textareaRef.scrollHeight, 200) + 'px';
-    }
+    resizeTextarea();
+  }
+  
+  // Resize automatico quando cambia inputValue
+  $: if (inputValue !== undefined && textareaRef) {
+    tick().then(() => resizeTextarea());
   }
   
   // Funzioni per gestione messaggi
@@ -1453,6 +1474,10 @@
         bind:this={textareaRef}
         on:keydown={handleKeyPress}
         on:input={handleInputResize}
+        on:paste={(e) => {
+          // Resize dopo il paste
+          setTimeout(() => resizeTextarea(), 0);
+        }}
         disabled={$isGenerating && editingMessageIndex === null}
         rows="1"
       ></textarea>
@@ -2461,6 +2486,9 @@
     overflow-y: auto;
     font-family: inherit;
     line-height: 1.5;
+    transition: height 0.1s ease-out;
+    box-sizing: border-box;
+    width: 100%;
   }
   
   .message-input.textarea-input {
@@ -2470,16 +2498,19 @@
   .input-wrapper.input-empty .message-input {
     min-height: 20px;
     font-size: 14px;
+    height: 20px;
   }
 
   @media (max-width: 768px) {
     .message-input {
       font-size: 14px;
+      min-height: 22px;
     }
 
     .input-wrapper.input-empty .message-input {
       min-height: 18px;
       font-size: 13px;
+      height: 18px;
     }
   }
 
