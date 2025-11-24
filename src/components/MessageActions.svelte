@@ -48,6 +48,16 @@
     showMenu = false;
   }
   
+  function handleMoreDetailed() {
+    dispatch('moreDetailed');
+    showMenu = false;
+  }
+  
+  function handleMoreSimple() {
+    dispatch('moreSimple');
+    showMenu = false;
+  }
+  
   function toggleMenu() {
     showMenu = !showMenu;
   }
@@ -129,6 +139,22 @@
               <line x1="4" y1="9" x2="4" y2="3"/>
             </svg>
             Segnala messaggio
+          </button>
+          
+          <div class="menu-divider"></div>
+          
+          <button class="menu-item" on:click={handleMoreDetailed}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M2 12h20"/>
+            </svg>
+            Più dettagliato
+          </button>
+          
+          <button class="menu-item" on:click={handleMoreSimple}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Più semplice
           </button>
         {/if}
         
@@ -231,6 +257,12 @@
   
   .menu-item.delete:hover {
     background-color: rgba(239, 68, 68, 0.1);
+  }
+  
+  .menu-divider {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 4px 0;
   }
 </style>
 

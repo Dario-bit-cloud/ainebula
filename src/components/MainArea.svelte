@@ -517,7 +517,7 @@
     }
   }
   
-  async function handleRegenerateMessage(messageIndex) {
+  async function handleRegenerateMessage(messageIndex, styleModifier = null) {
     const chatId = $currentChatId;
     if (!chatId) return;
     
@@ -550,10 +550,28 @@
         let fullResponse = '';
         const chatHistory = messages.slice(0, messageIndex + 1);
         
+        // Aggiungi un messaggio utente nascosto con la richiesta di modifica dello stile
+        let modifiedHistory = chatHistory.slice(0, -1);
+        if (styleModifier === 'moreDetailed') {
+          modifiedHistory = [...modifiedHistory, {
+            type: 'user',
+            content: 'Per favore, rispondi in modo più dettagliato e approfondito, fornendo maggiori informazioni e spiegazioni.',
+            hidden: true,
+            timestamp: new Date().toISOString()
+          }, userMessage];
+        } else if (styleModifier === 'moreSimple') {
+          modifiedHistory = [...modifiedHistory, {
+            type: 'user',
+            content: 'Per favore, rispondi in modo più semplice e conciso, evitando tecnicismi e usando un linguaggio più accessibile.',
+            hidden: true,
+            timestamp: new Date().toISOString()
+          }, userMessage];
+        }
+        
         for await (const chunk of generateResponseStream(
           userMessage.content,
           $selectedModel,
-          chatHistory.slice(0, -1),
+          modifiedHistory.slice(0, -1),
           [],
           abortController
         )) {
@@ -1077,6 +1095,8 @@
           on:copy={() => handleCopyMessage(index)}
           on:edit={() => handleEditMessage(index)}
           on:regenerate={() => handleRegenerateMessage(index)}
+          on:moreDetailed={() => handleRegenerateMessage(index, 'moreDetailed')}
+          on:moreSimple={() => handleRegenerateMessage(index, 'moreSimple')}
           on:delete={() => handleDeleteMessage(index)}
           on:feedback={(e) => handleMessageFeedback(index, e.detail.type)}
           on:readAloud={() => handleReadAloud(index)}
