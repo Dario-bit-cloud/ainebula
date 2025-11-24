@@ -335,6 +335,14 @@
     }
     
     if (hasText && !$isGenerating) {
+      // Se c'è una chat temporanea e stiamo inviando un messaggio, rimuovila
+      const tempChat = $chats.find(chat => chat.isTemporary);
+      if (tempChat && $currentChatId === tempChat.id) {
+        // La chat temporanea diventerà permanente quando viene salvata
+      } else if (tempChat && $currentChatId !== tempChat.id) {
+        // Se stiamo inviando in una chat normale, rimuovi quella temporanea
+        chats.update(allChats => allChats.filter(chat => !chat.isTemporary));
+      }
       const chatId = $currentChatId || createNewChat();
       
       const userMessage = { 

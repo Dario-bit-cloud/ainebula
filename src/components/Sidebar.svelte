@@ -1,6 +1,6 @@
 <script>
   import { user as userStore } from '../stores/user.js';
-  import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject } from '../stores/chat.js';
+  import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, createTemporaryChat } from '../stores/chat.js';
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { projects, updateProject, deleteProject } from '../stores/projects.js';
@@ -95,6 +95,16 @@
   function handleMenuClick(itemId) {
     switch(itemId) {
       case 'new-chat':
+        // Rimuovi chat temporanea se esiste
+        const tempChat = $chats.find(chat => chat.isTemporary);
+        if (tempChat) {
+          temporaryButtonFading = true;
+          setTimeout(() => {
+            chats.update(allChats => allChats.filter(chat => !chat.isTemporary));
+            showTemporaryButton = false;
+            temporaryButtonFading = false;
+          }, 300);
+        }
         createNewChat();
         sidebarView.set('chat');
         activeItem = null; // Nessun item attivo quando si è in una chat
@@ -318,74 +328,96 @@
       </button>
     </div>
     
-    <!-- Cerca chat con animazione -->
-    <div class="search-container" class:active={showSearchInput}>
-      {#if !showSearchInput}
-        <button 
-          class="nav-item search-button" 
-          class:active={activeItem === 'search'}
-          on:click={() => handleMenuClick('search')}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span>Cerca chat</span>
-        </button>
-      {:else}
-        <div class="search-group-animated">
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
-            <g>
-              <path
-                d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"
-              ></path>
-            </g>
-          </svg>
-          <input
-            bind:this={searchInputRef}
-            id="query"
-            class="search-input"
-            type="search"
-            placeholder="Cerca nelle chat..."
-            name="searchbar"
-            bind:value={searchInput}
-            on:input={(e) => searchQuery.set(e.target.value)}
-            on:blur={handleSearchBlur}
-            on:keydown={handleSearchKeydown}
-          />
-          <button 
-            class="search-close-button"
-            on:click={() => handleMenuClick('search')}
-            title="Chiudi ricerca"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-      {/if}
-    </div>
-    
     {#each [
+      { id: 'search', label: 'Cerca chat', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
       { id: 'library', label: 'Libreria', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
       { id: 'projects', label: 'Progetti', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
     ] as item}
-      <button 
-        class="nav-item" 
-        class:active={activeItem === item.id}
-        on:click={() => handleMenuClick(item.id)}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d={item.icon} />
-        </svg>
-        <span>{item.label}</span>
-        {#if item.id === 'projects'}
-          <svg class="plus-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
+      <div class="nav-item-wrapper" class:with-temporary={item.id === 'search' && showTemporaryButton}>
+        {#if item.id === 'search'}
+          {#if !showSearchInput}
+            <button 
+              class="nav-item search-button" 
+              class:active={activeItem === 'search'}
+              on:click={() => handleMenuClick('search')}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d={item.icon} />
+              </svg>
+              <span>{item.label}</span>
+            </button>
+          {:else}
+            <div class="search-group-animated">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
+                <g>
+                  <path
+                    d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"
+                  ></path>
+                </g>
+              </svg>
+              <input
+                bind:this={searchInputRef}
+                id="query"
+                class="search-input"
+                type="search"
+                placeholder="Cerca nelle chat..."
+                name="searchbar"
+                bind:value={searchInput}
+                on:input={(e) => searchQuery.set(e.target.value)}
+                on:blur={handleSearchBlur}
+                on:keydown={handleSearchKeydown}
+              />
+              <button 
+                class="search-close-button"
+                on:click={() => handleMenuClick('search')}
+                title="Chiudi ricerca"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          {/if}
+          
+          {#if showTemporaryButton}
+            <button 
+              class="temporary-chat-nav-button"
+              class:fading={temporaryButtonFading}
+              on:click={() => {
+                createTemporaryChat();
+                sidebarView.set('chat');
+                activeItem = null;
+                if ($isMobile) {
+                  isSidebarOpen.set(false);
+                }
+              }}
+              title="Chat temporanea"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </button>
+          {/if}
+        {:else}
+          <button 
+            class="nav-item" 
+            class:active={activeItem === item.id}
+            on:click={() => handleMenuClick(item.id)}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d={item.icon} />
+            </svg>
+            <span>{item.label}</span>
+            {#if item.id === 'projects'}
+              <svg class="plus-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            {/if}
+          </button>
         {/if}
-      </button>
+      </div>
     {/each}
     
     <!-- Cronologia sempre visibile -->
@@ -1026,14 +1058,81 @@
     gap: 4px;
   }
 
-  .search-container {
+  .nav-item-wrapper {
     position: relative;
-    margin-bottom: 8px;
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .nav-item-wrapper.with-temporary {
+    gap: 6px;
   }
 
   .search-button {
-    width: 100%;
+    flex: 1;
+  }
+  
+  .temporary-chat-nav-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 8px;
+    color: #6366f1;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+    transform: scale(1);
+    animation: temporaryButtonSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .temporary-chat-nav-button:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.5);
+    transform: scale(1.05);
+  }
+
+  .temporary-chat-nav-button:active {
+    transform: scale(0.95);
+  }
+
+  .temporary-chat-nav-button.fading {
+    animation: temporaryButtonFadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  @keyframes temporaryButtonSlideIn {
+    from {
+      opacity: 0;
+      transform: scale(0.8) translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateX(0);
+    }
+  }
+
+  @keyframes temporaryButtonFadeOut {
+    from {
+      opacity: 1;
+      transform: scale(1) translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.8) translateX(-10px);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .temporary-chat-nav-button {
+      width: 32px;
+      height: 32px;
+    }
   }
 
   .search-group-animated {
