@@ -1,118 +1,19 @@
 <script>
   import { isSettingsOpen } from '../stores/app.js';
-  import { selectedModel, availableModels } from '../stores/models.js';
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   
   let activeSection = 'generale';
-  let appearanceValue = 'system';
-  let accentColor = 'default';
-  let language = 'auto';
-  let spokenLanguage = 'auto';
-  let voiceModel = 'Juniper';
-  let showOtherModels = false;
-  
-  // Notifiche
-  let notificationResponses = 'push';
-  let notificationActivity = 'push-email';
-  let notificationProjects = 'email';
-  let notificationSuggestions = 'push-email';
-  
-  // Personalizzazione
-  let personalizationEnabled = false;
-  let styleAndTone = 'default';
-  let customInstructions = '';
-  let alternativeName = '';
-  let occupation = '';
-  
-  // Connettori
-  const connectors = [
-    { id: 'aha', name: 'Aha!', icon: '🔵' },
-    { id: 'asana', name: 'Asana', icon: '🔺' },
-    { id: 'azure', name: 'Azure Boards', icon: '⬡' },
-    { id: 'basecamp', name: 'Basecamp', icon: '✅' },
-    { id: 'box', name: 'Box', icon: '📦' },
-    { id: 'outlook-cal', name: 'Calendario Outlook', icon: '📅' },
-    { id: 'clickup', name: 'ClickUp', icon: '👆' },
-    { id: 'google-contacts', name: 'Contatti Google', icon: '👤' },
-    { id: 'dropbox', name: 'Dropbox', icon: '📦' },
-    { id: 'outlook-email', name: 'E-mail Outlook', icon: '✉️' },
-    { id: 'github', name: 'GitHub', icon: '🐙' },
-    { id: 'gitlab', name: 'GitLab Issues', icon: '🦊' },
-    { id: 'gmail', name: 'Gmail', icon: '📧' },
-    { id: 'google-calendar', name: 'Google Calendar', icon: '📆' },
-    { id: 'google-drive', name: 'Google Drive', icon: '🔺' }
-  ];
-  
-  // Controlli dati
-  let remoteBrowserData = true;
-  
-  // Sicurezza
-  let mfaAuthenticator = false;
-  let mfaPush = false;
-  
-  // Lingue disponibili
-  const languages = [
-    { value: 'auto', label: 'Rilevamento automatico' },
-    { value: 'it', label: 'italiano' },
-    { value: 'am', label: 'አማርኛ' },
-    { value: 'ar', label: 'العربية' },
-    { value: 'sq', label: 'shqip' },
-    { value: 'hy', label: 'հայերեն' },
-    { value: 'bg', label: 'български' },
-    { value: 'bn', label: 'বাংলা' },
-    { value: 'bs', label: 'bosanski' },
-    { value: 'ca', label: 'català' },
-    { value: 'zh-CN', label: '简体中文' },
-    { value: 'zh-HK', label: '繁體中文 (香港)' },
-    { value: 'zh-TW', label: '繁體中文 (台灣)' },
-    { value: 'hr', label: 'hrvatski' },
-    { value: 'cs', label: 'čeština' },
-    { value: 'da', label: 'dansk' },
-    { value: 'nl', label: 'Nederlands' },
-    { value: 'en', label: 'English (US)' },
-    { value: 'et', label: 'eesti' },
-    { value: 'fi', label: 'suomi' },
-    { value: 'fr-CA', label: 'français (Canada)' },
-    { value: 'fr', label: 'français (France)' },
-    { value: 'de', label: 'Deutsch' },
-    { value: 'el', label: 'Ελληνικά' },
-    { value: 'gu', label: 'ગુજરાતી' },
-    { value: 'hi', label: 'हिन्दी' },
-    { value: 'hu', label: 'magyar' },
-    { value: 'pa', label: 'ਪੰਜਾਬੀ' },
-    { value: 'pl', label: 'polski' },
-    { value: 'pt-BR', label: 'português (Brasil)' },
-    { value: 'pt-PT', label: 'português (Portugal)' },
-    { value: 'ro', label: 'română' },
-    { value: 'ru', label: 'русский' },
-    { value: 'sr', label: 'српски' },
-    { value: 'sk', label: 'slovenčina' },
-    { value: 'sl', label: 'slovenščina' },
-    { value: 'so', label: 'Soomaali' },
-    { value: 'es-419', label: 'español (Latinoamérica)' },
-    { value: 'es', label: 'español (España)' },
-    { value: 'sw', label: 'Kiswahili' },
-    { value: 'sv', label: 'svenska' },
-    { value: 'ta', label: 'தமிழ்' },
-    { value: 'te', label: 'తెలుగు' },
-    { value: 'th', label: 'ไทย' },
-    { value: 'tl', label: 'Tagalog' },
-    { value: 'tr', label: 'Türkçe' },
-    { value: 'uk', label: 'українська' },
-    { value: 'ur', label: 'اردو' },
-    { value: 'vi', label: 'Tiếng Việt' }
-  ];
+  let theme = 'system';
+  let language = 'system';
+  let improveModel = true;
+  let phoneNumber = '';
   
   const sections = [
-    { id: 'generale', label: 'Generale', icon: '⚙️' },
-    { id: 'notifiche', label: 'Notifiche', icon: '🔔' },
-    { id: 'personalizzazione', label: 'Personalizzazione', icon: '🕒' },
-    { id: 'connettori', label: 'App e connettori', icon: '🔗' },
-    { id: 'pianificazioni', label: 'Pianificazioni', icon: '📅' },
-    { id: 'controlli-dati', label: 'Controlli dati', icon: '💾' },
-    { id: 'sicurezza', label: 'Sicurezza', icon: '🔒' },
-    { id: 'account', label: 'Account', icon: '👤' }
+    { id: 'generale', label: 'Generale', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
+    { id: 'profilo', label: 'Profilo', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+    { id: 'dati', label: 'Dati', icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4' },
+    { id: 'informazioni', label: 'Informazioni', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }
   ];
   
   function closeModal() {
@@ -129,13 +30,23 @@
     activeSection = sectionId;
   }
   
-  function handleArchiveAll() {
-    if (confirm('Sei sicuro di voler archiviare tutte le chat?')) {
-      alert('Tutte le chat sono state archiviate.');
+  function handleDisconnect() {
+    if (confirm('Sei sicuro di voler disconnetterti da tutti i dispositivi?')) {
+      alert('Disconnessione avviata.');
     }
   }
   
-  function handleDeleteAll() {
+  function handleDeleteAccount() {
+    if (confirm('Sei sicuro di voler eliminare il tuo account? Questa azione è irreversibile.')) {
+      alert('Eliminazione account avviata.');
+    }
+  }
+  
+  function handleExportData() {
+    alert('L\'esportazione dei dati è stata avviata. Riceverai un\'email con il link per il download.');
+  }
+  
+  function handleDeleteAllChats() {
     if (confirm('Sei sicuro di voler eliminare tutte le chat? Questa azione è irreversibile.')) {
       chats.set([]);
       localStorage.removeItem('nebula-ai-chats');
@@ -143,18 +54,20 @@
     }
   }
   
-  function handleLogout() {
-    if (confirm('Sei sicuro di voler uscire da questo dispositivo?')) {
-      alert('Logout effettuato.');
-      closeModal();
-    }
+  function maskEmail(email) {
+    if (!email) return '-';
+    const [localPart, domain] = email.split('@');
+    if (localPart.length <= 2) return email;
+    const masked = localPart.substring(0, 2) + '*'.repeat(localPart.length - 2) + localPart.slice(-2);
+    return `${masked}@${domain}`;
   }
   
-  function handleLogoutAll() {
-    if (confirm('Sei sicuro di voler uscire da tutti i dispositivi? Potrebbero essere necessari fino a 30 minuti per completare l\'operazione.')) {
-      alert('Logout da tutti i dispositivi avviato.');
-      closeModal();
-    }
+  function handleViewTerms() {
+    window.open('/terms', '_blank');
+  }
+  
+  function handleViewPrivacy() {
+    window.open('/privacy', '_blank');
   }
 </script>
 
@@ -163,6 +76,7 @@
     <div class="modal-content">
       <!-- Header -->
       <div class="modal-header">
+        <h2 class="modal-title">Impostazioni</h2>
         <button class="close-button" on:click={closeModal}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -180,7 +94,9 @@
               class:active={activeSection === section.id}
               on:click={() => selectSection(section.id)}
             >
-              <span class="sidebar-icon">{section.icon}</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d={section.icon} />
+              </svg>
               <span>{section.label}</span>
             </button>
           {/each}
@@ -190,427 +106,130 @@
         <div class="settings-content">
           <!-- Generale -->
           {#if activeSection === 'generale'}
-            <h2 class="section-title">Generali</h2>
-            
-            <div class="setting-group">
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Aspetto</div>
-                </div>
-                <select class="setting-select" bind:value={appearanceValue}>
-                  <option value="system">Sistema</option>
-                  <option value="dark">Scuro</option>
-                  <option value="light">Chiaro</option>
-                </select>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Colore complementare</div>
-                </div>
-                <select class="setting-select" bind:value={accentColor}>
-                  <option value="default">Predefinito</option>
-                  <option value="blue">Blu</option>
-                  <option value="green">Verde</option>
-                  <option value="purple">Viola</option>
-                </select>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Lingua</div>
-                </div>
-                <select class="setting-select" bind:value={language}>
-                  {#each languages as lang}
-                    <option value={lang.value}>{lang.label}</option>
-                  {/each}
-                </select>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Lingua parlata</div>
-                  <div class="setting-description">Per ottenere risultati migliori, seleziona la tua lingua principale; se non è elencata, potrebbe essere comunque supportata tramite il rilevamento automatico.</div>
-                </div>
-                <select class="setting-select" bind:value={spokenLanguage}>
-                  {#each languages as lang}
-                    <option value={lang.value}>{lang.label}</option>
-                  {/each}
-                </select>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Vocali</div>
-                </div>
-                <div class="setting-controls">
-                  <button class="play-button">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                  </button>
-                  <select class="setting-select" bind:value={voiceModel}>
-                    <option value="Juniper">Juniper</option>
-                    <option value="Alloy">Alloy</option>
-                    <option value="Echo">Echo</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Mostra altri modelli</div>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" bind:checked={showOtherModels} />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-          {/if}
-          
-          <!-- Notifiche -->
-          {#if activeSection === 'notifiche'}
-            <h2 class="section-title">Notifiche</h2>
-            
-            <div class="setting-group">
-              <div class="notification-item">
-                <div class="notification-info">
-                  <div class="notification-label">Risposte</div>
-                  <div class="notification-description">Ricevi una notifica quando Nebula AI risponde a richieste che richiedono tempo, come la ricerca o la generazione di immagini.</div>
-                </div>
-                <select class="setting-select" bind:value={notificationResponses}>
-                  <option value="push">Notifiche push</option>
-                  <option value="email">E-mail</option>
-                  <option value="none">Nessuna</option>
-                </select>
-              </div>
-              
-              <div class="notification-item">
-                <div class="notification-info">
-                  <div class="notification-label">Attività</div>
-                  <div class="notification-description">Ricevi una notifica quando le attività che hai creato vengono aggiornate.</div>
-                  <a href="#" class="link-text">Gestisci attività</a>
-                </div>
-                <select class="setting-select" bind:value={notificationActivity}>
-                  <option value="push-email">Notifiche push, via e-mail</option>
-                  <option value="push">Notifiche push</option>
-                  <option value="email">E-mail</option>
-                  <option value="none">Nessuna</option>
-                </select>
-              </div>
-              
-              <div class="notification-item">
-                <div class="notification-info">
-                  <div class="notification-label">Projects</div>
-                  <div class="notification-description">Ricevi una notifica quando hai un invito via e-mail a un progetto condiviso.</div>
-                </div>
-                <select class="setting-select" bind:value={notificationProjects}>
-                  <option value="email">E-mail</option>
-                  <option value="push">Notifiche push</option>
-                  <option value="none">Nessuna</option>
-                </select>
-              </div>
-              
-              <div class="notification-item">
-                <div class="notification-info">
-                  <div class="notification-label">Suggerimenti</div>
-                  <div class="notification-description">Rimani aggiornato su nuovi strumenti, suggerimenti e funzionalità di Nebula AI.</div>
-                </div>
-                <select class="setting-select" bind:value={notificationSuggestions}>
-                  <option value="push-email">Notifiche push, via e-mail</option>
-                  <option value="push">Notifiche push</option>
-                  <option value="email">E-mail</option>
-                  <option value="none">Nessuna</option>
-                </select>
-              </div>
-            </div>
-          {/if}
-          
-          <!-- Personalizzazione -->
-          {#if activeSection === 'personalizzazione'}
-            <h2 class="section-title">Personalizzazione</h2>
-            
-            <div class="setting-group">
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Abilita personalizzazione</div>
-                  <div class="setting-description">Personalizza le modalità di risposta di Nebula AI. <a href="#" class="link-text">Scopri di più</a></div>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" bind:checked={personalizationEnabled} />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Stile e tono di base</div>
-                  <div class="setting-description">Imposta lo stile e il tono che Nebula AI usa quando risponde.</div>
-                </div>
-                <select class="setting-select" bind:value={styleAndTone}>
-                  <option value="default">Predefinita</option>
-                  <option value="casual">Casuale</option>
-                  <option value="professional">Professionale</option>
-                  <option value="friendly">Amichevole</option>
-                </select>
-              </div>
-              
-              <div class="setting-item-full">
-                <div class="setting-info">
-                  <div class="setting-label">Istruzioni personalizzate</div>
-                  <div class="setting-description">Preferenze aggiuntive relative a comportamento, stile e tono</div>
-                </div>
-                <textarea 
-                  class="setting-textarea" 
-                  bind:value={customInstructions}
-                  placeholder="Preferenze aggiuntive relative a comportamento, stile e tono"
-                ></textarea>
-                <div class="style-pills">
-                  <button class="style-pill">Discorsiva</button>
-                  <button class="style-pill">Arguta</button>
-                  <button class="style-pill">Schietta</button>
-                  <button class="style-pill">Incoraggiante</button>
-                  <button class="style-pill">Gen Z</button>
-                </div>
-              </div>
-              
-              <div class="setting-item-full">
-                <div class="setting-info">
-                  <div class="setting-label">Informazioni su di te</div>
-                </div>
-                
-                <div class="setting-subsection">
-                  <div class="setting-info">
-                    <div class="setting-label">Nome alternativo</div>
-                    <div class="setting-description">Come deve chiamarti Nebula AI?</div>
-                  </div>
-                  <input 
-                    type="text" 
-                    class="setting-input" 
-                    bind:value={alternativeName}
-                    placeholder="Come deve chiamarti Nebula AI?"
-                  />
-                </div>
-                
-                <div class="setting-subsection">
-                  <div class="setting-info">
-                    <div class="setting-label">Occupazione</div>
-                  </div>
-                  <input 
-                    type="text" 
-                    class="setting-input" 
-                    bind:value={occupation}
-                    placeholder="Es: Studente di ingegneria"
-                  />
-                </div>
-              </div>
-            </div>
-          {/if}
-          
-          <!-- Connettori -->
-          {#if activeSection === 'connettori'}
-            <h2 class="section-title">Connettori</h2>
-            <p class="section-description">
-              Nebula AI può accedere alle informazioni provenienti dai tuoi strumenti collegati per fornirti risposte più utili. 
-              Le tue autorizzazioni vengono sempre rispettate. <a href="#" class="link-text">Scopri di più</a>
-            </p>
-            
-            <div class="connectors-grid">
-              {#each connectors as connector}
-                <div class="connector-card">
-                  <div class="connector-icon">{connector.icon}</div>
-                  <div class="connector-name">{connector.name}</div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-          
-          <!-- Pianificazioni -->
-          {#if activeSection === 'pianificazioni'}
-            <h2 class="section-title">Pianificazioni</h2>
-            <p class="section-description">
-              È possibile pianificare Nebula AI in modo che venga eseguito nuovamente dopo aver completato un'attività. 
-              Scegli 📅 Pianifica dal menu ••• in una conversazione per impostare le esecuzioni future.
-            </p>
-            <button class="manage-button">Gestisci</button>
-          {/if}
-          
-          <!-- Controlli dati -->
-          {#if activeSection === 'controlli-dati'}
-            <h2 class="section-title">Controlli dati</h2>
-            
-            <div class="setting-group">
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Dati del browser remoto</div>
-                </div>
-                <div class="setting-status">
-                  <span>{remoteBrowserData ? 'Attiva' : 'Disattiva'}</span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="9 18 15 12 9 6"/>
+            <div class="setting-section">
+              <h3 class="setting-title">Tema</h3>
+              <div class="theme-buttons">
+                <button 
+                  class="theme-button" 
+                  class:active={theme === 'light'}
+                  on:click={() => theme = 'light'}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/>
+                    <line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                   </svg>
-                </div>
+                  <span>Chiaro</span>
+                </button>
+                <button 
+                  class="theme-button" 
+                  class:active={theme === 'dark'}
+                  on:click={() => theme = 'dark'}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                  </svg>
+                  <span>Scuro</span>
+                </button>
+                <button 
+                  class="theme-button" 
+                  class:active={theme === 'system'}
+                  on:click={() => theme = 'system'}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                  <span>Sistema</span>
+                </button>
               </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Link condivisi</div>
-                </div>
-                <button class="manage-button">Gestisci</button>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Chat archiviate</div>
-                </div>
-                <button class="manage-button">Gestisci</button>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Archivia tutte le chat</div>
-                </div>
-                <button class="manage-button" on:click={handleArchiveAll}>Archivia tutto</button>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Elimina tutte le chat</div>
-                </div>
-                <button class="delete-button" on:click={handleDeleteAll}>Elimina tutto</button>
-              </div>
+            </div>
+            
+            <div class="setting-section">
+              <h3 class="setting-title">Lingua</h3>
+              <select class="setting-select" bind:value={language}>
+                <option value="system">Sistema</option>
+                <option value="it">Italiano</option>
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+              </select>
             </div>
           {/if}
           
-          <!-- Sicurezza -->
-          {#if activeSection === 'sicurezza'}
-            <h2 class="section-title">Sicurezza</h2>
+          <!-- Profilo -->
+          {#if activeSection === 'profilo'}
+            <div class="setting-row">
+              <div class="setting-label">Indirizzo email</div>
+              <div class="setting-value">{maskEmail($userStore.email)}</div>
+            </div>
             
-            <div class="setting-group">
-              <div class="setting-section-header">Autenticazione a più fattori (MFA)</div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">App di autenticazione</div>
-                  <div class="setting-description">Utilizza i codici monouso generati da un'app di autenticazione.</div>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" bind:checked={mfaAuthenticator} />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Notifiche push</div>
-                  <div class="setting-description">Approva gli accessi con una notifica push inviata al tuo dispositivo affidabile</div>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" bind:checked={mfaPush} />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Esci da questo dispositivo</div>
-                </div>
-                <button class="manage-button" on:click={handleLogout}>Esci</button>
-              </div>
-              
-              <div class="setting-item-full">
-                <div class="setting-info">
-                  <div class="setting-label">Esci da tutti i dispositivi</div>
-                  <div class="setting-description">
-                    Esci da tutte le sessioni attive su tutti i dispositivi, inclusa la sessione corrente. 
-                    Potrebbero essere necessari fino a 30 minuti perché venga effettuata la disconnessione sugli altri dispositivi.
-                  </div>
-                </div>
-                <button class="delete-button" on:click={handleLogoutAll}>Esci da tutto</button>
-              </div>
-              
-              <div class="setting-item-full">
-                <div class="setting-info">
-                  <div class="setting-label">Accesso protetto con Nebula AI</div>
-                  <div class="setting-description">
-                    Accedi a siti web e app su internet con la sicurezza affidabile di Nebula AI. 
-                    <a href="#" class="link-text">Scopri di più</a>
-                  </div>
-                </div>
-                <div class="info-box">
-                  Non hai ancora usato Nebula AI per accedere a siti web o app. Quando lo farai, appariranno qui.
-                </div>
-              </div>
+            <div class="setting-row">
+              <div class="setting-label">Numero di telefono</div>
+              <div class="setting-value">{phoneNumber || '-'}</div>
+            </div>
+            
+            <div class="setting-row">
+              <div class="setting-label">Disconnetti da tutti i dispositivi</div>
+              <button class="danger-button" on:click={handleDisconnect}>Disconnetti</button>
+            </div>
+            
+            <div class="setting-row">
+              <div class="setting-label">Elimina account</div>
+              <button class="danger-button" on:click={handleDeleteAccount}>Elimina</button>
             </div>
           {/if}
           
-          <!-- Account -->
-          {#if activeSection === 'account'}
-            <h2 class="section-title">Profilo generatore GPT</h2>
-            <p class="section-description">
-              Personalizza il tuo profilo generatore per collegarti con gli utenti dei tuoi GPT. 
-              Queste impostazioni vengono usate per i GPT condivisi con il pubblico.
-            </p>
+          <!-- Dati -->
+          {#if activeSection === 'dati'}
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-label">Migliora il modello per tutti</div>
+                <div class="setting-description">Consenti l'utilizzo dei tuoi contenuti per addestrare i nostri modelli e migliorare i nostri servizi. Proteggiamo la tua privacy dei dati.</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" bind:checked={improveModel} />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
             
-            <div class="setting-group">
-              <div class="preview-box">
-                <div class="preview-icon">⬜</div>
-                <div class="preview-name">PlaceholderGPT</div>
-                <div class="preview-author">Di {$userStore.name || 'utente'}</div>
+            <div class="setting-row">
+              <div class="setting-label">Link condivisi</div>
+              <button class="manage-button">Gestisci</button>
+            </div>
+            
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-label">Esporta dati</div>
+                <div class="setting-description">Questi dati includono le informazioni del tuo account e tutta la cronologia delle chat. L'esportazione potrebbe richiedere del tempo. Il link per il download sarà valido per 7 giorni.</div>
               </div>
-              <div class="preview-label">Anteprima</div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Nome</div>
-                </div>
-                <div class="setting-controls">
-                  <input type="text" class="setting-input" value={$userStore.name || 'utente'} />
-                  <label class="toggle-switch">
-                    <input type="checkbox" checked />
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
-              </div>
-              
-              <div class="setting-item-full">
-                <div class="setting-info">
-                  <div class="setting-label">Link</div>
-                </div>
-                <select class="setting-select">
-                  <option>Seleziona un dominio</option>
-                </select>
-                <div class="link-items">
-                  <div class="link-item">
-                    <span>🌐 in LinkedIn</span>
-                    <button class="add-button">Aggiungi</button>
-                  </div>
-                  <div class="link-item">
-                    <span>💻 GitHub</span>
-                    <button class="add-button">Aggiungi</button>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">E-mail</div>
-                </div>
-                <div class="setting-controls">
-                  <span>{$userStore.email || 'utente@esempio.com'}</span>
-                </div>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-info">
-                  <div class="setting-label">Ricevi e-mail di feedback</div>
-                </div>
-                <label class="checkbox-label">
-                  <input type="checkbox" />
-                  <span></span>
-                </label>
-              </div>
+              <button class="manage-button" on:click={handleExportData}>Esporta</button>
+            </div>
+            
+            <div class="setting-row">
+              <div class="setting-label">Elimina tutte le chat</div>
+              <button class="danger-button" on:click={handleDeleteAllChats}>Cancella tutto</button>
+            </div>
+          {/if}
+          
+          <!-- Informazioni -->
+          {#if activeSection === 'informazioni'}
+            <div class="setting-row">
+              <div class="setting-label">Termini di utilizzo</div>
+              <button class="view-button" on:click={handleViewTerms}>Visualizza</button>
+            </div>
+            
+            <div class="setting-row">
+              <div class="setting-label">Informativa sulla privacy</div>
+              <button class="view-button" on:click={handleViewPrivacy}>Visualizza</button>
             </div>
           {/if}
         </div>
@@ -626,59 +245,36 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
-    animation: backdropFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: backdropFadeIn 0.3s ease;
   }
 
   @keyframes backdropFadeIn {
+    from {
+      opacity: 0;
+    }
     to {
-      background-color: rgba(0, 0, 0, 0.7);
+      opacity: 1;
     }
   }
 
   .modal-content {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: #2d2d2d;
     border-radius: 12px;
-    max-width: 900px;
+    max-width: 800px;
     width: 100%;
     max-height: 85vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    transform-origin: center;
-  }
-
-  @media (max-width: 768px) {
-    .modal-backdrop {
-      padding: 0;
-    }
-
-    .modal-content {
-      max-width: 100%;
-      max-height: 100vh;
-      border-radius: 0;
-      height: 100vh;
-    }
-
-    .settings-sidebar {
-      width: 180px;
-    }
-
-    .settings-content {
-      padding: 20px 16px;
-    }
-
-    .section-title {
-      font-size: 20px;
-    }
+    animation: modalSlideIn 0.3s ease;
   }
 
   @keyframes modalSlideIn {
@@ -695,25 +291,32 @@
   .modal-header {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border-color);
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #3a3a3a;
+  }
+
+  .modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
   }
 
   .close-button {
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: #ffffff;
     cursor: pointer;
     padding: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: opacity 0.2s;
   }
 
   .close-button:hover {
-    color: var(--text-primary);
+    opacity: 0.7;
   }
 
   .modal-body-container {
@@ -723,11 +326,13 @@
   }
 
   .settings-sidebar {
-    width: 220px;
-    background-color: var(--bg-primary);
-    border-right: 1px solid var(--border-color);
-    padding: 12px 0;
-    overflow-y: auto;
+    width: 200px;
+    background-color: #2d2d2d;
+    border-right: 1px solid #3a3a3a;
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .sidebar-item {
@@ -735,10 +340,10 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 16px;
+    padding: 12px 20px;
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: #ffffff;
     font-size: 14px;
     text-align: left;
     cursor: pointer;
@@ -746,19 +351,15 @@
   }
 
   .sidebar-item:hover {
-    background-color: var(--hover-bg);
-    color: var(--text-primary);
+    background-color: #3a3a3a;
   }
 
   .sidebar-item.active {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
+    background-color: #3a3a3a;
   }
 
-  .sidebar-icon {
-    font-size: 16px;
-    width: 20px;
-    text-align: center;
+  .sidebar-item svg {
+    flex-shrink: 0;
   }
 
   .settings-content {
@@ -767,47 +368,99 @@
     overflow-y: auto;
   }
 
-  .section-title {
-    font-size: 24px;
+  .setting-section {
+    margin-bottom: 32px;
+  }
+
+  .setting-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .setting-title {
+    font-size: 16px;
     font-weight: 600;
-    color: var(--text-primary);
-    margin: 0 0 24px 0;
+    color: #ffffff;
+    margin: 0 0 16px 0;
   }
 
-  .section-description {
+  .theme-buttons {
+    display: flex;
+    gap: 12px;
+  }
+
+  .theme-button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    background-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    color: #ffffff;
     font-size: 14px;
-    color: var(--text-secondary);
-    margin-bottom: 24px;
-    line-height: 1.6;
+    cursor: pointer;
+    transition: all 0.2s;
   }
 
-  .setting-group {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
+  .theme-button:hover {
+    background-color: #454545;
   }
 
-  .setting-item,
-  .setting-item-full,
-  .notification-item {
+  .theme-button.active {
+    background-color: #3a3a3a;
+    border-color: #ffffff;
+  }
+
+  .theme-button svg {
+    flex-shrink: 0;
+  }
+
+  .setting-select {
+    width: 100%;
+    max-width: 300px;
+    padding: 10px 12px;
+    background-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .setting-select:hover {
+    border-color: #4a4a4a;
+  }
+
+  .setting-select:focus {
+    border-color: #3b82f6;
+  }
+
+  .setting-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 24px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--border-color);
+    padding: 16px 0;
+    border-bottom: 1px solid #3a3a3a;
   }
 
-  .setting-item-full {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .setting-item:last-child,
-  .setting-item-full:last-child,
-  .notification-item:last-child {
+  .setting-row:last-child {
     border-bottom: none;
-    padding-bottom: 0;
+  }
+
+  .setting-label {
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: 500;
+  }
+
+  .setting-value {
+    font-size: 14px;
+    color: #a0a0a0;
   }
 
   .setting-info {
@@ -815,68 +468,47 @@
     min-width: 0;
   }
 
-  .setting-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-  }
-
   .setting-description {
     font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.5;
+    color: #a0a0a0;
     margin-top: 4px;
+    line-height: 1.5;
   }
 
-  .setting-select,
-  .setting-input,
-  .setting-textarea {
-    min-width: 200px;
-    padding: 8px 12px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-primary);
-    font-size: 14px;
-    font-family: inherit;
-    outline: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .setting-select:focus,
-  .setting-input:focus,
-  .setting-textarea:focus {
-    border-color: var(--accent-blue);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    transform: scale(1.01);
-  }
-
-  .setting-textarea {
-    width: 100%;
-    min-height: 100px;
-    resize: vertical;
-    margin-top: 8px;
-  }
-
-  .setting-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .play-button {
-    background: none;
+  .manage-button,
+  .view-button {
+    padding: 8px 16px;
+    background-color: #3a3a3a;
     border: none;
-    color: var(--text-primary);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    padding: 6px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
+    white-space: nowrap;
   }
 
-  .play-button:hover {
-    background-color: var(--hover-bg);
+  .manage-button:hover,
+  .view-button:hover {
+    background-color: #454545;
+  }
+
+  .danger-button {
+    padding: 8px 16px;
+    background-color: transparent;
+    border: 1px solid #ef4444;
+    border-radius: 6px;
+    color: #ef4444;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .danger-button:hover {
+    background-color: rgba(239, 68, 68, 0.1);
   }
 
   .toggle-switch {
@@ -900,8 +532,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: var(--bg-tertiary);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: #3a3a3a;
+    transition: all 0.3s;
     border-radius: 24px;
   }
 
@@ -913,226 +545,40 @@
     left: 3px;
     bottom: 3px;
     background-color: white;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s;
     border-radius: 50%;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 
   .toggle-switch input:checked + .toggle-slider {
-    background-color: var(--accent-blue);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    background-color: #3b82f6;
   }
 
   .toggle-switch input:checked + .toggle-slider:before {
     transform: translateX(20px);
   }
 
-  .toggle-switch:hover .toggle-slider {
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
+  @media (max-width: 768px) {
+    .modal-backdrop {
+      padding: 0;
+    }
 
-  .style-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 12px;
-  }
+    .modal-content {
+      max-width: 100%;
+      max-height: 100vh;
+      border-radius: 0;
+      height: 100vh;
+    }
 
-  .style-pill {
-    padding: 6px 12px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    color: var(--text-primary);
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
+    .settings-sidebar {
+      width: 160px;
+    }
 
-  .style-pill:hover {
-    background-color: var(--hover-bg);
-    border-color: var(--accent-blue);
-  }
+    .settings-content {
+      padding: 20px 16px;
+    }
 
-  .setting-subsection {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-color);
-  }
-
-  .notification-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-  }
-
-  .notification-description {
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin-top: 4px;
-  }
-
-  .link-text {
-    color: var(--accent-blue);
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
-  .connectors-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 12px;
-    margin-top: 24px;
-  }
-
-  .connector-card {
-    padding: 16px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .connector-card:hover {
-    background-color: var(--hover-bg);
-    border-color: var(--accent-blue);
-  }
-
-  .connector-icon {
-    font-size: 32px;
-    margin-bottom: 8px;
-  }
-
-  .connector-name {
-    font-size: 13px;
-    color: var(--text-primary);
-  }
-
-  .manage-button,
-  .delete-button {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    white-space: nowrap;
-  }
-
-  .manage-button {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
-  }
-
-  .manage-button:hover {
-    background-color: var(--hover-bg);
-  }
-
-  .delete-button {
-    background-color: #ef4444;
-    color: white;
-  }
-
-  .delete-button:hover {
-    background-color: #dc2626;
-  }
-
-  .setting-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-secondary);
-    font-size: 14px;
-  }
-
-  .setting-section-header {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 16px;
-  }
-
-  .info-box {
-    padding: 16px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 13px;
-    margin-top: 12px;
-  }
-
-  .preview-box {
-    padding: 24px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    text-align: center;
-    margin-bottom: 8px;
-  }
-
-  .preview-icon {
-    font-size: 48px;
-    margin-bottom: 12px;
-  }
-
-  .preview-name {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-  }
-
-  .preview-author {
-    font-size: 13px;
-    color: var(--text-secondary);
-  }
-
-  .preview-label {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 24px;
-  }
-
-  .link-items {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 12px;
-  }
-
-  .link-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-  }
-
-  .add-button {
-    padding: 4px 12px;
-    background-color: var(--accent-blue);
-    border: none;
-    border-radius: 4px;
-    color: white;
-    font-size: 13px;
-    cursor: pointer;
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-  }
-
-  .checkbox-label input {
-    margin-right: 8px;
+    .theme-buttons {
+      flex-direction: column;
+    }
   }
 </style>
