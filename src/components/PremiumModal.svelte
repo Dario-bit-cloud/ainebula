@@ -243,7 +243,8 @@
       subscription: {
         active: true,
         plan: planType,
-        expiresAt: expiresAt.toISOString()
+        expiresAt: expiresAt.toISOString(),
+        key: subscriptionKey
       }
     }));
     
