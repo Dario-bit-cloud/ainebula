@@ -8,22 +8,14 @@
     stopSpeaking,
     isSpeaking,
     requestMicrophonePermission, 
-    checkMicrophonePermission
-  } from '../services/voiceService.js';
-  import {
-    initAssemblyAIRecognition,
-    isAssemblyAIAvailable,
-    getCurrentTranscript as getAssemblyAITranscript,
-    clearCurrentTranscript as clearAssemblyAITranscript
-  } from '../services/assemblyAIService.js';
-  import {
-    initVoiceRecognition as initWebSpeechRecognition,
-    isVoiceAvailable as isWebSpeechAvailable,
-    startListening as startWebSpeechListening,
-    stopListening as stopWebSpeechListening,
-    isListeningActive as isWebSpeechListeningActive,
-    getCurrentTranscript as getWebSpeechTranscript,
-    clearCurrentTranscript as clearWebSpeechTranscript
+    checkMicrophonePermission,
+    initVoiceRecognition,
+    isVoiceAvailable,
+    startListening,
+    stopListening,
+    isListeningActive,
+    getCurrentTranscript,
+    clearCurrentTranscript
   } from '../services/voiceService.js';
   import { 
     chats, 
@@ -53,21 +45,13 @@
   
   $: currentVoice = availableVoices.find(v => v.id === $selectedVoice) || availableVoices[0];
   
-  let useAssemblyAI = true; // Prova prima AssemblyAI, poi fallback a Web Speech
-  
   onMount(async () => {
-    // Verifica disponibilità - prova prima AssemblyAI, poi Web Speech API
-    const assemblyAIAvailable = isAssemblyAIAvailable();
-    const webSpeechAvailable = isWebSpeechAvailable();
-    
-    if (!assemblyAIAvailable && !webSpeechAvailable) {
+    // Verifica disponibilità Web Speech API
+    if (!isVoiceAvailable()) {
       showError = true;
       errorMessage = 'Il riconoscimento vocale non è supportato nel tuo browser';
       return;
     }
-    
-    // Usa AssemblyAI se disponibile, altrimenti Web Speech API
-    useAssemblyAI = assemblyAIAvailable;
     
     // Controlla permessi microfono
     const permissionCheck = await checkMicrophonePermission();
@@ -98,134 +82,50 @@
   let silenceTimer = null;
   
   function initializeVoiceRecognition() {
-    if (useAssemblyAI) {
-      // Prova AssemblyAI
-      recognition = initAssemblyAIRecognition(
-        (transcript) => {
-          // Risultato finale - invia il messaggio automaticamente
-          // AssemblyAI invia automaticamente quando end_of_turn è true
-          if (transcript.trim() && !isProcessing) {
-            // Cancella il timer di silenzio se presente
-            if (silenceTimer) {
-              clearTimeout(silenceTimer);
-              silenceTimer = null;
-            }
-            // Reset del testo accumulato
-            accumulatedText = '';
-            clearAssemblyAITranscript();
-            // Ferma l'ascolto prima di inviare per evitare loop
-            if (recognition && listeningState === 'listening') {
-              recognition.stop();
-            }
-            handleVoiceMessage(transcript.trim());
-          }
-        },
-        (error) => {
-          console.error('AssemblyAI recognition error:', error);
+    recognition = initVoiceRecognition(
+      (transcript) => {
+        if (transcript.trim() && !isProcessing) {
           if (silenceTimer) {
             clearTimeout(silenceTimer);
             silenceTimer = null;
           }
-          
-          // Se AssemblyAI fallisce, prova fallback a Web Speech API
-          if (isWebSpeechAvailable() && useAssemblyAI) {
-            console.log('Falling back to Web Speech API');
-            useAssemblyAI = false;
-            initializeVoiceRecognition(); // Reinizializza con Web Speech
-            return;
-          }
-          
-          listeningState = 'idle';
-          showError = true;
-          if (error === 'permission-denied') {
-            errorMessage = 'Permesso microfono negato. Abilitalo nelle impostazioni del browser.';
-          } else if (error === 'no-device') {
-            errorMessage = 'Nessun microfono rilevato.';
-          } else if (error === 'websocket-error' || error === 'connection-closed') {
-            errorMessage = 'Errore di connessione con AssemblyAI. Uso riconoscimento vocale del browser.';
-            // Fallback automatico
-            if (isWebSpeechAvailable()) {
-              useAssemblyAI = false;
-              initializeVoiceRecognition();
-            }
-          } else {
-            errorMessage = 'Errore nel riconoscimento vocale. Riprova.';
-          }
-        },
-        (interim) => {
-          // Risultato intermedio - mostra feedback visivo
-          console.log('AssemblyAI interim result:', interim);
-          interimTranscript = interim;
-          // Aggiorna il testo accumulato
-          accumulatedText = getAssemblyAITranscript() || interim || accumulatedText;
-          
-          // Reset timer silenzio quando c'è attività vocale
-          if (silenceTimer) {
-            clearTimeout(silenceTimer);
-          }
-          
-          // Timer per invio automatico dopo 3 secondi di silenzio
-          silenceTimer = setTimeout(() => {
-            const finalText = getAssemblyAITranscript() || accumulatedText || interim;
-            if (finalText.trim() && !isProcessing) {
-              accumulatedText = '';
-              clearAssemblyAITranscript();
-              if (recognition && listeningState === 'listening') {
-                recognition.stop();
-              }
-              handleVoiceMessage(finalText.trim());
-            }
-            silenceTimer = null;
-          }, 3000);
+          accumulatedText = '';
+          clearCurrentTranscript();
+          handleVoiceMessage(transcript.trim());
         }
-      );
-    } else {
-      // Fallback a Web Speech API
-      recognition = initWebSpeechRecognition(
-        (transcript) => {
-          if (transcript.trim() && !isProcessing) {
-            if (silenceTimer) {
-              clearTimeout(silenceTimer);
-              silenceTimer = null;
-            }
-            accumulatedText = '';
-            clearWebSpeechTranscript();
-            handleVoiceMessage(transcript.trim());
-          }
-        },
-        (error) => {
-          console.error('Web Speech recognition error:', error);
-          if (silenceTimer) {
-            clearTimeout(silenceTimer);
-            silenceTimer = null;
-          }
-          listeningState = 'idle';
-          showError = true;
-          errorMessage = 'Errore nel riconoscimento vocale. Riprova.';
-        },
-        (interim) => {
-          interimTranscript = interim;
-          accumulatedText = getWebSpeechTranscript() || interim;
-          
-          if (silenceTimer) {
-            clearTimeout(silenceTimer);
-          }
-          
-          silenceTimer = setTimeout(() => {
-            const finalText = getWebSpeechTranscript() || accumulatedText || interim;
-            if (finalText.trim() && !isProcessing) {
-              accumulatedText = '';
-              clearWebSpeechTranscript();
-              if (listeningState === 'listening') {
-                stopWebSpeechListening();
-              }
-              handleVoiceMessage(finalText.trim());
-            }
-            silenceTimer = null;
-          }, 3000);
+      },
+      (error) => {
+        console.error('Web Speech recognition error:', error);
+        if (silenceTimer) {
+          clearTimeout(silenceTimer);
+          silenceTimer = null;
         }
-      );
-    }
+        listeningState = 'idle';
+        showError = true;
+        errorMessage = 'Errore nel riconoscimento vocale. Riprova.';
+      },
+      (interim) => {
+        interimTranscript = interim;
+        accumulatedText = getCurrentTranscript() || interim;
+        
+        if (silenceTimer) {
+          clearTimeout(silenceTimer);
+        }
+        
+        silenceTimer = setTimeout(() => {
+          const finalText = getCurrentTranscript() || accumulatedText || interim;
+          if (finalText.trim() && !isProcessing) {
+            accumulatedText = '';
+            clearCurrentTranscript();
+            if (listeningState === 'listening') {
+              stopListening();
+            }
+            handleVoiceMessage(finalText.trim());
+          }
+          silenceTimer = null;
+        }, 3000);
+      }
+    );
   }
   
   async function handleMicrophoneClick() {
@@ -260,26 +160,14 @@
       initializeVoiceRecognition();
     }
     
-    if (useAssemblyAI) {
-      if (recognition && !recognition.isActive()) {
-        currentTranscript = '';
-        interimTranscript = '';
-        accumulatedText = '';
-        clearAssemblyAITranscript();
-        listeningState = 'listening';
-        stopSpeaking();
-        recognition.start();
-      }
-    } else {
-      if (recognition && !isWebSpeechListeningActive()) {
-        currentTranscript = '';
-        interimTranscript = '';
-        accumulatedText = '';
-        clearWebSpeechTranscript();
-        listeningState = 'listening';
-        stopSpeaking();
-        startWebSpeechListening();
-      }
+    if (recognition && !isListeningActive()) {
+      currentTranscript = '';
+      interimTranscript = '';
+      accumulatedText = '';
+      clearCurrentTranscript();
+      listeningState = 'listening';
+      stopSpeaking();
+      startListening();
     }
   }
   
@@ -289,27 +177,17 @@
       silenceTimer = null;
     }
     if (recognition) {
-      if (useAssemblyAI) {
-        recognition.stop();
-      } else {
-        stopWebSpeechListening();
-      }
+      stopListening();
     }
     listeningState = 'idle';
     currentTranscript = '';
     interimTranscript = '';
     accumulatedText = '';
-    if (useAssemblyAI) {
-      clearAssemblyAITranscript();
-    } else {
-      clearWebSpeechTranscript();
-    }
+    clearCurrentTranscript();
   }
   
   function handleManualSend() {
-    const textToSend = useAssemblyAI 
-      ? (getAssemblyAITranscript() || accumulatedText || interimTranscript)
-      : (getWebSpeechTranscript() || accumulatedText || interimTranscript);
+    const textToSend = getCurrentTranscript() || accumulatedText || interimTranscript;
       
     if (textToSend.trim() && !isProcessing && listeningState === 'listening') {
       // Cancella il timer automatico
@@ -321,11 +199,7 @@
       const finalText = textToSend.trim();
       accumulatedText = '';
       interimTranscript = '';
-      if (useAssemblyAI) {
-        clearAssemblyAITranscript();
-      } else {
-        clearWebSpeechTranscript();
-      }
+      clearCurrentTranscript();
       handleVoiceMessage(finalText);
     }
   }
@@ -362,13 +236,7 @@
     lastSentTime = now;
     
     // Ferma l'ascolto per evitare loop
-    if (useAssemblyAI) {
-      if (recognition) {
-        recognition.stop();
-      }
-    } else {
-      stopWebSpeechListening();
-    }
+    stopListening();
     
     try {
       // Crea o usa chat corrente
@@ -456,11 +324,7 @@
       // Reset del testo accumulato dopo l'invio
       accumulatedText = '';
       lastSentMessage = ''; // Reset per permettere nuovi messaggi
-      if (useAssemblyAI) {
-        clearAssemblyAITranscript();
-      } else {
-        clearWebSpeechTranscript();
-      }
+      clearCurrentTranscript();
       
     } catch (error) {
       console.error('Error in voice mode:', error);
@@ -522,9 +386,7 @@
     if (listeningState === 'listening' && !updateInterval) {
       updateInterval = setInterval(() => {
         if (listeningState === 'listening') {
-          const newText = useAssemblyAI 
-            ? (getAssemblyAITranscript() || interimTranscript)
-            : (getWebSpeechTranscript() || interimTranscript);
+          const newText = getCurrentTranscript() || interimTranscript;
           if (newText) {
             accumulatedText = newText;
           }
@@ -540,9 +402,7 @@
     if (updateInterval) {
       clearInterval(updateInterval);
     }
-    if (recognition) {
-      recognition.stop();
-    }
+    stopListening();
   });
 </script>
 
