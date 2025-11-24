@@ -1224,7 +1224,7 @@
     </div>
   {/if}
   <div class="input-container">
-    {#if !$isMobile}
+    {#if !$isMobile && (inputValue.trim() || editingMessageIndex !== null || visibleMessages.length > 0)}
       <div class="input-toolbar">
         <button 
           class="toolbar-button" 
