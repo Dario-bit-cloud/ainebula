@@ -373,32 +373,37 @@
               </div>
               <button class="manage-button" on:click={handleExportData}>Esporta</button>
             </div>
-          </div>
-          
-          {#if $userStore.subscription?.active && $userStore.subscription?.key}
-            <div class="setting-item">
-              <div class="setting-info">
-                <div class="setting-label">Chiave abbonamento</div>
-                <div class="setting-description">Scarica la chiave del tuo abbonamento per ripristinarlo su altri dispositivi. Conserva questa chiave in un luogo sicuro.</div>
+            
+            {#if $userStore.subscription?.active && $userStore.subscription?.key}
+              <div class="setting-row" class:row-visible={activeSection === 'dati'}>
+                <div class="setting-info">
+                  <div class="setting-label">Chiave abbonamento</div>
+                  <div class="setting-description">Scarica la chiave del tuo abbonamento per ripristinarlo su altri dispositivi. Conserva questa chiave in un luogo sicuro.</div>
+                </div>
+                <div class="setting-actions">
+                  <button class="manage-button" on:click={handleDownloadSubscriptionKey}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Scarica chiave
+                  </button>
+                  <button class="manage-button secondary" on:click={handleImportSubscriptionKey}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Importa chiave
+                  </button>
+                </div>
               </div>
-              <div class="setting-actions">
-                <button class="manage-button" on:click={handleDownloadSubscriptionKey}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                  Scarica chiave
-                </button>
-                <button class="manage-button secondary" on:click={handleImportSubscriptionKey}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  Importa chiave
-                </button>
-              </div>
+            {/if}
+            
+            <div class="setting-row" class:row-visible={activeSection === 'dati'}>
+              <div class="setting-label">Elimina tutte le chat</div>
+              <button class="danger-button" on:click={handleDeleteAllChats}>Cancella tutto</button>
             </div>
           {/if}
             </div>
