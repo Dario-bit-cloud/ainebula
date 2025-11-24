@@ -169,6 +169,13 @@
     }
   }
   
+  // Inizializza i pulsanti di copia dopo ogni aggiornamento
+  afterUpdate(() => {
+    if (messagesContainer) {
+      initCodeCopyButtons(messagesContainer);
+    }
+  });
+
   onMount(() => {
     voiceAvailable = isVoiceAvailable();
     
@@ -263,13 +270,6 @@
         if (messagesContainer) {
           scrollToBottom();
         }
-      }
-    });
-    
-    // Inizializza i pulsanti di copia dopo ogni aggiornamento (event delegation, quindi basta una volta)
-    afterUpdate(() => {
-      if (messagesContainer) {
-        initCodeCopyButtons(messagesContainer);
       }
     });
     

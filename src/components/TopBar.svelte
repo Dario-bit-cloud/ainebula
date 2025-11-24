@@ -75,7 +75,6 @@
   function handleClickOutside(event) {
     if (!event.target.closest('.model-selector-wrapper') && !event.target.closest('.legacy-submenu')) {
       isModelDropdownOpen = false;
-      showLegacyModels = false;
     }
   }
   
