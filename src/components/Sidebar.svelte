@@ -55,14 +55,28 @@
     });
   }
   
+  // Ricerca migliorata con debounce e ottimizzazioni
+  let searchTimeout;
   $: {
-    if ($searchQuery) {
-      filteredChats = $chats.filter(chat => 
-        chat.title.toLowerCase().includes($searchQuery.toLowerCase()) ||
-        chat.messages.some(msg => msg.content.toLowerCase().includes($searchQuery.toLowerCase()))
-      );
+    if ($searchQuery && $searchQuery.trim()) {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const query = $searchQuery.toLowerCase().trim();
+        filteredChats = $chats.filter(chat => {
+          if (chat.isTemporary) return false;
+          // Cerca nel titolo
+          if (chat.title.toLowerCase().includes(query)) return true;
+          // Cerca nei messaggi (solo nei primi messaggi per performance)
+          const messagesToSearch = chat.messages.slice(0, 10); // Limita la ricerca ai primi 10 messaggi
+          return messagesToSearch.some(msg => 
+            msg.content && !msg.hidden && msg.content.toLowerCase().includes(query)
+          );
+        });
+      }, 150); // Debounce di 150ms
     } else {
-      filteredChats = $chats.slice(0, 10); // Mostra le ultime 10 chat
+      filteredChats = $chats
+        .filter(chat => !chat.isTemporary)
+        .slice(0, 10); // Mostra le ultime 10 chat
     }
   }
   
@@ -89,21 +103,65 @@
         }
         break;
       case 'search':
-        isSearchOpen.set(true);
-        sidebarView.set('search');
-        activeItem = 'search';
+        if (showSearchInput) {
+          // Se già aperto, chiudi
+          showSearchInput = false;
+          searchInput = '';
+          searchQuery.set('');
+          sidebarView.set('chat');
+          activeItem = null;
+        } else {
+          // Apri con animazione
+          showSearchInput = true;
+          isSearchOpen.set(true);
+          sidebarView.set('search');
+          activeItem = 'search';
+          // Focus sull'input dopo l'animazione
+          setTimeout(() => {
+            if (searchInputRef) {
+              searchInputRef.focus();
+            }
+          }, 300);
+        }
         break;
       case 'library':
+        showSearchInput = false;
         sidebarView.set('library');
         activeItem = 'library';
         showChatList = true;
         break;
       case 'projects':
+        showSearchInput = false;
         isProjectModalOpen.set(true);
         if ($isMobile) {
           isSidebarOpen.set(false);
         }
         break;
+    }
+  }
+  
+  function handleSearchBlur() {
+    // Non chiudere se l'utente sta ancora digitando o se ci sono risultati
+    if (!searchInput.trim() && filteredChats.length === 0) {
+      // Chiudi solo se non c'è input e non ci sono risultati
+      setTimeout(() => {
+        if (document.activeElement !== searchInputRef) {
+          showSearchInput = false;
+          sidebarView.set('chat');
+          activeItem = null;
+        }
+      }, 200);
+    }
+  }
+  
+  function handleSearchKeydown(event) {
+    if (event.key === 'Escape') {
+      showSearchInput = false;
+      searchInput = '';
+      searchQuery.set('');
+      sidebarView.set('chat');
+      activeItem = null;
+      searchInputRef?.blur();
     }
   }
   
@@ -113,6 +171,8 @@
     activeItem = null; // Nessun item attivo quando si è in una chat
     isSearchOpen.set(false);
     searchQuery.set('');
+    showSearchInput = false;
+    searchInput = '';
     if ($isMobile) {
       isSidebarOpen.set(false);
     }
@@ -258,8 +318,55 @@
       </button>
     </div>
     
+    <!-- Cerca chat con animazione -->
+    <div class="search-container" class:active={showSearchInput}>
+      {#if !showSearchInput}
+        <button 
+          class="nav-item search-button" 
+          class:active={activeItem === 'search'}
+          on:click={() => handleMenuClick('search')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span>Cerca chat</span>
+        </button>
+      {:else}
+        <div class="search-group-animated">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
+            <g>
+              <path
+                d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"
+              ></path>
+            </g>
+          </svg>
+          <input
+            bind:this={searchInputRef}
+            id="query"
+            class="search-input"
+            type="search"
+            placeholder="Cerca nelle chat..."
+            name="searchbar"
+            bind:value={searchInput}
+            on:input={(e) => searchQuery.set(e.target.value)}
+            on:blur={handleSearchBlur}
+            on:keydown={handleSearchKeydown}
+          />
+          <button 
+            class="search-close-button"
+            on:click={() => handleMenuClick('search')}
+            title="Chiudi ricerca"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      {/if}
+    </div>
+    
     {#each [
-      { id: 'search', label: 'Cerca chat', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
       { id: 'library', label: 'Libreria', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
       { id: 'projects', label: 'Progetti', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
     ] as item}
@@ -283,25 +390,32 @@
     
     <!-- Cronologia sempre visibile -->
     <div class="chat-list">
-        {#if $sidebarView === 'search'}
-          <div class="search-group">
-            <svg viewBox="0 0 24 24" aria-hidden="true" class="search-icon">
-              <g>
-                <path
-                  d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"
-                ></path>
-              </g>
-            </svg>
-            <input
-              id="query"
-              class="search-input"
-              type="search"
-              placeholder="Cerca nelle chat..."
-              name="searchbar"
-              bind:value={searchInput}
-              on:input={(e) => searchQuery.set(e.target.value)}
-            />
-          </div>
+        
+        {#if $sidebarView === 'search' && showSearchInput}
+          {#if filteredChats.length > 0}
+            {#each filteredChats as chat}
+              <div 
+                class="chat-item"
+                class:active={chat.id === $currentChatId}
+                on:click={() => handleChatClick(chat.id)}
+              >
+                <div class="chat-info">
+                  <div class="chat-title">{chat.title}</div>
+                  <div class="chat-date">
+                    {new Date(chat.updatedAt).toLocaleDateString('it-IT', { 
+                      day: 'numeric', 
+                      month: 'short',
+                      year: new Date(chat.updatedAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                    })}
+                  </div>
+                </div>
+              </div>
+            {/each}
+          {:else if $searchQuery && $searchQuery.trim()}
+            <div class="no-results">
+              <p>Nessun risultato trovato</p>
+            </div>
+          {/if}
         {/if}
         
         {#if $sidebarView === 'library'}
@@ -912,14 +1026,34 @@
     gap: 4px;
   }
 
-  .search-group {
+  .search-container {
+    position: relative;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+
+  .search-button {
+    width: 100%;
+  }
+
+  .search-group-animated {
     display: flex;
     line-height: 28px;
     align-items: center;
     position: relative;
-    max-width: 100%;
-    margin: 12px;
-    margin-bottom: 16px;
+    width: 100%;
+    animation: searchSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes searchSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .search-input {
@@ -927,6 +1061,7 @@
     width: 100%;
     height: 45px;
     padding-left: 2.5rem;
+    padding-right: 2.5rem;
     box-shadow: 0 0 0 1.5px #2b2c37, 0 0 25px -17px #000;
     border: 0;
     border-radius: 12px;
@@ -948,7 +1083,7 @@
   }
 
   .search-input:active {
-    transform: scale(0.95);
+    transform: scale(0.98);
   }
 
   .search-input:focus {
@@ -963,6 +1098,57 @@
     height: 1rem;
     pointer-events: none;
     z-index: 1;
+  }
+
+  .search-close-button {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #bdbecb;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    z-index: 2;
+    border-radius: 4px;
+  }
+
+  .search-close-button:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .no-results {
+    padding: 24px 12px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  @media (max-width: 768px) {
+    .search-input {
+      height: 42px;
+      font-size: 13px;
+      padding-left: 2.25rem;
+      padding-right: 2.25rem;
+    }
+
+    .search-icon {
+      width: 0.9rem;
+      height: 0.9rem;
+      left: 0.875rem;
+    }
+
+    .search-close-button {
+      right: 0.625rem;
+      padding: 3px;
+    }
   }
 
   .chat-item {
