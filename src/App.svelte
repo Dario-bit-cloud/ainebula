@@ -15,7 +15,7 @@
   import ShortcutsModal from './components/ShortcutsModal.svelte';
   import ReportBugModal from './components/ReportBugModal.svelte';
   import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile } from './stores/app.js';
-  import { createNewChat } from './stores/chat.js';
+  import { createNewChat, deleteChat } from './stores/chat.js';
   import { get } from 'svelte/store';
   import { currentChatId } from './stores/chat.js';
   import { isInputElement } from './utils/shortcuts.js';
@@ -86,12 +86,10 @@
     // Ctrl+Shift+Backspace: Elimina chat corrente
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Backspace') {
       event.preventDefault();
-      import('./stores/chat.js').then(module => {
-        const chatId = get(module.currentChatId);
-        if (chatId && confirm('Sei sicuro di voler eliminare questa chat?')) {
-          module.deleteChat(chatId);
-        }
-      });
+      const chatId = get(currentChatId);
+      if (chatId && confirm('Sei sicuro di voler eliminare questa chat?')) {
+        deleteChat(chatId);
+      }
       return;
     }
     
