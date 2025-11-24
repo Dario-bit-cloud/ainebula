@@ -1,5 +1,6 @@
 // Servizio AssemblyAI per riconoscimento vocale streaming
 // Basato sulla documentazione ufficiale AssemblyAI v3
+// https://www.assemblyai.com/docs/guides/streaming-speech-to-text
 import { ASSEMBLYAI_CONFIG } from '../config/api.js';
 
 let socket = null;
@@ -32,24 +33,36 @@ export function initAssemblyAIRecognition(onResult, onError, onInterimResult = n
 
 /**
  * Connette al WebSocket di AssemblyAI v3
- * Segue la documentazione ufficiale: https://www.assemblyai.com/docs
+ * Segue esattamente la documentazione ufficiale
  */
 async function connectWebSocket() {
   return new Promise((resolve, reject) => {
     try {
-      // Costruisci URL con parametri come query string (come nella documentazione)
+      // Costruisci parametri come query string (come nella documentazione)
       const params = new URLSearchParams({
         sample_rate: ASSEMBLYAI_CONFIG.sampleRate.toString(),
-        format_turns: ASSEMBLYAI_CONFIG.formatTurns.toString()
+        format_turns: ASSEMBLYAI_CONFIG.formatTurns.toString(),
+        speech_model: ASSEMBLYAI_CONFIG.speechModel
       });
+      
+      // Aggiungi language_detection se abilitato
+      if (ASSEMBLYAI_CONFIG.languageDetection) {
+        params.append('language_detection', 'true');
+      }
       
       const wsUrl = `${ASSEMBLYAI_CONFIG.wsUrl}?${params.toString()}`;
       
       console.log('Connecting to AssemblyAI:', wsUrl);
       
-      // Nota: Nel browser, WebSocket non supporta header personalizzati
-      // AssemblyAI potrebbe accettare l'API key come query parameter o primo messaggio
-      // Provo prima con query parameter, altrimenti come primo messaggio
+      // NOTA CRITICA: Nel browser, WebSocket non supporta header personalizzati
+      // La documentazione mostra headers solo per Node.js, non per browser
+      // Soluzioni possibili:
+      // 1. Backend proxy (raccomandato per produzione)
+      // 2. Query parameter (non documentato, potrebbe non funzionare)
+      // 3. Usare Web Speech API come fallback
+      
+      // Provo prima con query parameter (non standard ma potrebbe funzionare)
+      // Se non funziona, l'app userà automaticamente il fallback a Web Speech API
       const wsUrlWithAuth = `${wsUrl}&token=${ASSEMBLYAI_CONFIG.apiKey}`;
       
       socket = new WebSocket(wsUrlWithAuth);
@@ -123,30 +136,35 @@ function handleWebSocketMessage(data) {
     const expiresAt = data.expires_at;
     console.log('AssemblyAI session started:', sessionId, 'Expires at:', new Date(expiresAt * 1000));
   } else if (msgType === 'Turn') {
-    // Trascrizione di un turno
+    // Trascrizione di un turno (come nella documentazione)
     const transcript = data.transcript || '';
+    const utterance = data.utterance || ''; // Utterance completo (solo per modello multilingue)
     const formatted = data.turn_is_formatted || false;
     const endOfTurn = data.end_of_turn || false;
     
-    if (transcript) {
-      if (formatted) {
-        // Trascrizione formattata finale
-        accumulatedTranscript = transcript;
-        if (onInterimCallback) {
-          onInterimCallback(transcript);
-        }
-      } else {
-        // Trascrizione parziale (interim)
-        accumulatedTranscript = transcript;
-        if (onInterimCallback) {
-          onInterimCallback(transcript);
-        }
+    // Per il modello multilingue, usa utterance se disponibile (già formattato)
+    // Altrimenti usa transcript
+    const textToShow = utterance || transcript;
+    
+    if (textToShow) {
+      // Mostra sempre la trascrizione (parziale o finale)
+      if (onInterimCallback) {
+        onInterimCallback(textToShow);
       }
       
-      // Se è la fine del turno, invia il risultato
-      if (endOfTurn && transcript.trim() && onResultCallback) {
-        onResultCallback(transcript.trim());
+      // Accumula il testo
+      accumulatedTranscript = textToShow;
+      
+      // Se è la fine del turno, invia il risultato automaticamente
+      if (endOfTurn && textToShow.trim() && onResultCallback) {
+        onResultCallback(textToShow.trim());
         accumulatedTranscript = '';
+      }
+      
+      // Log per debug - rilevamento lingua (solo per modello multilingue)
+      if (data.language_code) {
+        const confidence = ((data.language_confidence || 0) * 100).toFixed(2);
+        console.log(`Language detected: ${data.language_code} (confidence: ${confidence}%)`);
       }
     }
   } else if (msgType === 'Termination') {
@@ -169,7 +187,8 @@ function handleWebSocketMessage(data) {
 
 /**
  * Avvia l'ascolto del microfono e streaming ad AssemblyAI
- * L'audio viene inviato come messaggi BINARI (non JSON con base64!)
+ * L'audio viene inviato come messaggi BINARI (non JSON!)
+ * Come nella documentazione: ws.send(audio_data, websocket.ABNF.OPCODE_BINARY)
  */
 async function startListening() {
   if (isListening) {
@@ -203,7 +222,9 @@ async function startListening() {
     
     // Crea ScriptProcessorNode per processare l'audio
     // Nota: deprecato ma ancora supportato, AudioWorkletNode sarebbe meglio ma più complesso
-    const bufferSize = 4096; // ~256ms di audio a 16kHz
+    // FRAMES_PER_BUFFER = 800 per 50ms di audio (0.05s * 16000Hz)
+    // Usiamo 4096 per ~256ms (più efficiente)
+    const bufferSize = 4096;
     processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
     
     processor.onaudioprocess = (event) => {

@@ -17,7 +17,9 @@ export const ASSEMBLYAI_CONFIG = {
   apiKey: 'f3a18631d42449979ff3066fa8689a8e',
   wsUrl: 'wss://streaming.assemblyai.com/v3/ws', // v3 come nella documentazione
   sampleRate: 16000,
-  formatTurns: true
+  formatTurns: true,
+  speechModel: 'universal-streaming-multilingual', // Modello multilingue per supportare italiano
+  languageDetection: false // Disabilita se vuoi forzare italiano, altrimenti rileva automaticamente
 };
 
 // Mappatura modelli locali ai modelli API e provider
