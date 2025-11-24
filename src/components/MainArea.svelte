@@ -474,11 +474,6 @@
     resizeTextarea();
   }
   
-  // Resize automatico quando cambia inputValue
-  $: if (inputValue !== undefined && textareaRef) {
-    tick().then(() => resizeTextarea());
-  }
-  
   // Funzioni per gestione messaggi
   async function handleCopyMessage(messageIndex) {
     const message = messages[messageIndex];
