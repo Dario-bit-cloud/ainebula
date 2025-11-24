@@ -245,8 +245,8 @@
       </button>
     {/each}
     
-    {#if $sidebarView === 'search' || $sidebarView === 'library'}
-      <div class="chat-list">
+    <!-- Cronologia sempre visibile -->
+    <div class="chat-list">
         {#if $sidebarView === 'search'}
           <div class="search-input-wrapper">
             <input 
@@ -412,9 +412,97 @@
               <p class="empty-hint">Crea una nuova chat per iniziare</p>
             </div>
           {/if}
+        {:else}
+          <!-- Cronologia standard quando non si è in search o library -->
+          {#if organizedChats.unassigned.length > 0 || Object.keys(organizedChats.projects).some(pid => organizedChats.projects[pid]?.length > 0)}
+            <!-- Mostra chat non assegnate -->
+            {#if organizedChats.unassigned.length > 0}
+              {#each organizedChats.unassigned.slice(0, 20) as chat}
+                <div 
+                  class="chat-item" 
+                  class:active={chat.id === $currentChatId}
+                  on:click={() => handleChatClick(chat.id)}
+                >
+                  <div class="chat-info">
+                    <div class="chat-title">{chat.title}</div>
+                    <div class="chat-date">{formatDate(chat.updatedAt)}</div>
+                  </div>
+                  <button 
+                    class="chat-delete" 
+                    on:click={(e) => handleDeleteChat(e, chat.id)}
+                    title="Elimina chat"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
+                  </button>
+                </div>
+              {/each}
+            {/if}
+            
+            <!-- Mostra progetti con chat (solo i primi) -->
+            {#each $projects.slice(0, 3) as project}
+              {#if organizedChats.projects[project.id] && organizedChats.projects[project.id].length > 0}
+                <div class="project-folder">
+                  <div 
+                    class="project-header"
+                    on:click={() => handleProjectClick(project.id)}
+                  >
+                    <div class="project-icon-wrapper" style="background-color: {project.color}20; color: {project.color}">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d={project.icon}/>
+                      </svg>
+                    </div>
+                    <span class="project-name">{project.name}</span>
+                    <span class="project-count">({organizedChats.projects[project.id].length})</span>
+                    <svg 
+                      class="expand-icon" 
+                      class:expanded={expandedProjects.has(project.id)}
+                      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    >
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </div>
+                  {#if expandedProjects.has(project.id)}
+                    <div class="project-chats">
+                      {#each organizedChats.projects[project.id].slice(0, 5) as chat}
+                        <div 
+                          class="chat-item nested" 
+                          class:active={chat.id === $currentChatId}
+                          on:click={() => handleChatClick(chat.id)}
+                        >
+                          <div class="chat-info">
+                            <div class="chat-title">{chat.title}</div>
+                            <div class="chat-date">{formatDate(chat.updatedAt)}</div>
+                          </div>
+                          <div class="chat-actions">
+                            <button 
+                              class="chat-delete" 
+                              on:click={(e) => handleDeleteChat(e, chat.id)}
+                              title="Elimina chat"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            {/each}
+          {:else}
+            <div class="empty-state">
+              <p>Nessuna chat ancora</p>
+              <p class="empty-hint">Crea una nuova chat per iniziare</p>
+            </div>
+          {/if}
         {/if}
       </div>
-    {/if}
     
     {#if showMoveMenu}
       <div class="move-menu-backdrop" on:click={closeMoveMenu}></div>
