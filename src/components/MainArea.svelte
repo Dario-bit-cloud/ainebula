@@ -1638,8 +1638,12 @@
         </button>
         <button 
           class="waveform-button" 
-          title="Modalità vocale - Presto in arrivo"
-          on:click={() => alert('Modalità vocale - Funzionalità in arrivo')}
+          title="Modalità vocale"
+          on:click={() => {
+            import('../stores/voiceSettings.js').then(module => {
+              module.toggleVoiceMode();
+            });
+          }}
           disabled={$isGenerating || editingMessageIndex !== null}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
