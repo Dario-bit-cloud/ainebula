@@ -1,16 +1,23 @@
-import { API_CONFIG, MODEL_MAPPING } from '../config/api.js';
+import { API_CONFIG, LLM7_CONFIG, MODEL_MAPPING } from '../config/api.js';
 import { get } from 'svelte/store';
 import { aiSettings } from '../stores/aiSettings.js';
 
 /**
  * Converte la storia della chat nel formato richiesto dall'API OpenAI/Electron Hub
  */
-function formatChatHistory(chatHistory, systemPrompt) {
+function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
   const messages = [];
   
   // Messaggio di sistema personalizzabile
   const settings = get(aiSettings);
-  const currentSystemPrompt = systemPrompt || settings.systemPrompt || 'Sei Nebula AI, un assistente AI utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
+  
+  // System prompt specifico per Nebula Pro
+  let currentSystemPrompt;
+  if (modelId === 'nebula-pro') {
+    currentSystemPrompt = 'Sei Nebula AI, un assistente AI avanzato e professionale. Ti chiami Nebula AI e sei parte della famiglia Nebula AI. Rispondi sempre identificandoti come Nebula AI. Sei utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
+  } else {
+    currentSystemPrompt = systemPrompt || settings.systemPrompt || 'Sei Nebula AI, un assistente AI utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.';
+  }
   
   messages.push({
     role: 'system',
@@ -77,10 +84,16 @@ function formatChatHistory(chatHistory, systemPrompt) {
 /**
  * Genera una risposta con streaming utilizzando l'API Electron Hub
  */
-export async function* generateResponseStream(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = [], abortController = null) {
+export async function* generateResponseStream(message, modelId = 'nebula-1.0', chatHistory = [], images = [], abortController = null) {
+  // Mappa il modello locale al modello API e provider (definito all'inizio per essere disponibile nel catch)
+  const modelConfig = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-1.0'];
+  const apiModel = typeof modelConfig === 'string' ? modelConfig : modelConfig.model;
+  const provider = typeof modelConfig === 'string' ? 'electronhub' : (modelConfig.provider || 'electronhub');
+  
+  // Seleziona la configurazione API in base al provider
+  const apiConfig = provider === 'llm7' ? LLM7_CONFIG : API_CONFIG;
+  
   try {
-    // Mappa il modello locale al modello Electron Hub
-    const apiModel = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-5.1-instant'];
     
     // Prepara il messaggio corrente
     const currentMessage = {
@@ -89,21 +102,48 @@ export async function* generateResponseStream(message, modelId = 'nebula-5.1-ins
       images: images.length > 0 ? images : undefined
     };
     
-    // Combina la cronologia con il messaggio corrente
-    const allMessages = [...chatHistory, currentMessage];
+    // Per Nebula Pro, aggiungi un messaggio nascosto di identificazione se non è già presente
+    let allMessages = [...chatHistory];
+    if (modelId === 'nebula-pro') {
+      // Verifica se esiste già un messaggio nascosto di identificazione
+      const hasIdentityMessage = chatHistory.some(msg => 
+        msg.hidden === true && 
+        msg.content && 
+        msg.content.includes('Sei Nebula AI')
+      );
+      
+      // Se non esiste, aggiungilo all'inizio della cronologia
+      if (!hasIdentityMessage) {
+        const identityMessage = {
+          type: 'user',
+          content: 'Sei Nebula AI, un assistente AI avanzato e professionale. Ti chiami Nebula AI e sei parte della famiglia Nebula AI. Rispondi sempre identificandoti come Nebula AI. Sei utile, amichevole e professionale come ChatGPT 5.1. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.',
+          hidden: true, // Flag per nascondere il messaggio nell'interfaccia
+          timestamp: new Date().toISOString()
+        };
+        allMessages = [identityMessage, ...allMessages];
+      }
+    }
     
-    // Formatta i messaggi per l'API
-    const formattedMessages = formatChatHistory(allMessages);
+    // Aggiungi il messaggio corrente
+    allMessages = [...allMessages, currentMessage];
+    
+    // Formatta i messaggi per l'API (passa anche modelId per system prompt personalizzato)
+    const formattedMessages = formatChatHistory(allMessages, null, modelId);
     
     // Ottieni le impostazioni AI
     const settings = get(aiSettings);
+    
+    // Configurazione speciale per Nebula Pro
+    const isNebulaPro = modelId === 'nebula-pro';
+    const maxTokens = isNebulaPro ? 50000 : (settings.maxTokens || 2000);
+    const temperature = isNebulaPro ? (settings.temperature || 0.7) : (settings.temperature || 0.7);
     
     // Prepara la richiesta con streaming
     const requestBody = {
       model: apiModel,
       messages: formattedMessages,
-      temperature: settings.temperature || 0.7,
-      max_tokens: settings.maxTokens || 2000,
+      temperature: temperature,
+      max_tokens: maxTokens,
       top_p: settings.topP || 1.0,
       frequency_penalty: settings.frequencyPenalty || 0.0,
       presence_penalty: settings.presencePenalty || 0.0,
@@ -112,23 +152,24 @@ export async function* generateResponseStream(message, modelId = 'nebula-5.1-ins
     
     // Crea controller se non fornito
     const controller = abortController || new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), apiConfig.timeout);
     
-    // Headers per Electron Hub (compatibile OpenAI)
+    // Headers per API (compatibile OpenAI)
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_CONFIG.apiKey}`
+      'Authorization': `Bearer ${apiConfig.apiKey}`
     };
     
-    console.log('Calling Electron Hub API (Streaming):', {
-      url: `${API_CONFIG.baseURL}/chat/completions`,
+    console.log(`Calling ${provider.toUpperCase()} API (Streaming):`, {
+      url: `${apiConfig.baseURL}/chat/completions`,
       model: apiModel,
+      provider: provider,
       messageCount: formattedMessages.length,
       temperature: settings.temperature,
       maxTokens: settings.maxTokens
     });
     
-    const response = await fetch(`${API_CONFIG.baseURL}/chat/completions`, {
+    const response = await fetch(`${apiConfig.baseURL}/chat/completions`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(requestBody),
@@ -206,7 +247,7 @@ export async function* generateResponseStream(message, modelId = 'nebula-5.1-ins
     }
     
   } catch (error) {
-    console.error('❌ Error calling Electron Hub API:', error);
+    console.error(`❌ Error calling ${provider.toUpperCase()} API:`, error);
     
     // Se è un errore di timeout o rete, ritorna un messaggio specifico
     if (error.name === 'AbortError') {
@@ -225,7 +266,7 @@ export async function* generateResponseStream(message, modelId = 'nebula-5.1-ins
 /**
  * Genera una risposta senza streaming (compatibilità backward)
  */
-export async function generateResponse(message, modelId = 'nebula-5.1-instant', chatHistory = [], images = [], abortController = null) {
+export async function generateResponse(message, modelId = 'nebula-1.0', chatHistory = [], images = [], abortController = null) {
   let fullResponse = '';
   
   try {

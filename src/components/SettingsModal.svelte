@@ -51,6 +51,59 @@
   let mfaAuthenticator = false;
   let mfaPush = false;
   
+  // Lingue disponibili
+  const languages = [
+    { value: 'auto', label: 'Rilevamento automatico' },
+    { value: 'it', label: 'italiano' },
+    { value: 'am', label: 'አማርኛ' },
+    { value: 'ar', label: 'العربية' },
+    { value: 'sq', label: 'shqip' },
+    { value: 'hy', label: 'հայերեն' },
+    { value: 'bg', label: 'български' },
+    { value: 'bn', label: 'বাংলা' },
+    { value: 'bs', label: 'bosanski' },
+    { value: 'ca', label: 'català' },
+    { value: 'zh-CN', label: '简体中文' },
+    { value: 'zh-HK', label: '繁體中文 (香港)' },
+    { value: 'zh-TW', label: '繁體中文 (台灣)' },
+    { value: 'hr', label: 'hrvatski' },
+    { value: 'cs', label: 'čeština' },
+    { value: 'da', label: 'dansk' },
+    { value: 'nl', label: 'Nederlands' },
+    { value: 'en', label: 'English (US)' },
+    { value: 'et', label: 'eesti' },
+    { value: 'fi', label: 'suomi' },
+    { value: 'fr-CA', label: 'français (Canada)' },
+    { value: 'fr', label: 'français (France)' },
+    { value: 'de', label: 'Deutsch' },
+    { value: 'el', label: 'Ελληνικά' },
+    { value: 'gu', label: 'ગુજરાતી' },
+    { value: 'hi', label: 'हिन्दी' },
+    { value: 'hu', label: 'magyar' },
+    { value: 'pa', label: 'ਪੰਜਾਬੀ' },
+    { value: 'pl', label: 'polski' },
+    { value: 'pt-BR', label: 'português (Brasil)' },
+    { value: 'pt-PT', label: 'português (Portugal)' },
+    { value: 'ro', label: 'română' },
+    { value: 'ru', label: 'русский' },
+    { value: 'sr', label: 'српски' },
+    { value: 'sk', label: 'slovenčina' },
+    { value: 'sl', label: 'slovenščina' },
+    { value: 'so', label: 'Soomaali' },
+    { value: 'es-419', label: 'español (Latinoamérica)' },
+    { value: 'es', label: 'español (España)' },
+    { value: 'sw', label: 'Kiswahili' },
+    { value: 'sv', label: 'svenska' },
+    { value: 'ta', label: 'தமிழ்' },
+    { value: 'te', label: 'తెలుగు' },
+    { value: 'th', label: 'ไทย' },
+    { value: 'tl', label: 'Tagalog' },
+    { value: 'tr', label: 'Türkçe' },
+    { value: 'uk', label: 'українська' },
+    { value: 'ur', label: 'اردو' },
+    { value: 'vi', label: 'Tiếng Việt' }
+  ];
+  
   const sections = [
     { id: 'generale', label: 'Generale', icon: '⚙️' },
     { id: 'notifiche', label: 'Notifiche', icon: '🔔' },
@@ -168,10 +221,9 @@
                   <div class="setting-label">Lingua</div>
                 </div>
                 <select class="setting-select" bind:value={language}>
-                  <option value="auto">Rilevamento automatico</option>
-                  <option value="it">Italiano</option>
-                  <option value="en">English</option>
-                  <option value="es">Español</option>
+                  {#each languages as lang}
+                    <option value={lang.value}>{lang.label}</option>
+                  {/each}
                 </select>
               </div>
               
@@ -181,10 +233,9 @@
                   <div class="setting-description">Per ottenere risultati migliori, seleziona la tua lingua principale; se non è elencata, potrebbe essere comunque supportata tramite il rilevamento automatico.</div>
                 </div>
                 <select class="setting-select" bind:value={spokenLanguage}>
-                  <option value="auto">Rilevamento automatico</option>
-                  <option value="it">Italiano</option>
-                  <option value="en">English</option>
-                  <option value="es">Español</option>
+                  {#each languages as lang}
+                    <option value={lang.value}>{lang.label}</option>
+                  {/each}
                 </select>
               </div>
               

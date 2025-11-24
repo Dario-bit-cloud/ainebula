@@ -91,17 +91,23 @@
     }
   }
   
-  // Calcola token per la chat corrente
+  // Filtra i messaggi nascosti per la visualizzazione
+  $: visibleMessages = messages.filter(msg => !msg.hidden);
+  
+  // Calcola token per la chat corrente (escludendo messaggi nascosti)
   $: {
     try {
-      currentChatTokens = messages.length > 0 ? estimateChatTokens(messages) : 0;
-      maxTokens = 4000; // Limite di default
+      // Filtra i messaggi nascosti dal conteggio token
+      const visibleMessagesForTokens = messages.filter(msg => !msg.hidden);
+      currentChatTokens = visibleMessagesForTokens.length > 0 ? estimateChatTokens(visibleMessagesForTokens) : 0;
+      // Limite aumentato a 50.000 per Nebula Pro
+      maxTokens = $selectedModel === 'nebula-pro' ? 50000 : 4000;
       tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
       tokenWarning = tokenUsagePercentage > 80;
     } catch (error) {
       console.error('Error calculating tokens:', error);
       currentChatTokens = 0;
-      maxTokens = 4000;
+      maxTokens = $selectedModel === 'nebula-pro' ? 50000 : 4000;
       tokenUsagePercentage = 0;
       tokenWarning = false;
     }
@@ -793,9 +799,9 @@
   // Funzione per ricerca nella chat corrente
   function handleSearchInput(value) {
     searchQuery = value;
-    if (searchQuery && messages.length > 0) {
-      // Trova il primo messaggio che corrisponde
-      const index = messages.findIndex(msg => 
+    if (searchQuery && visibleMessages.length > 0) {
+      // Trova il primo messaggio visibile che corrisponde
+      const index = visibleMessages.findIndex(msg => 
         msg.content && msg.content.toLowerCase().includes(searchQuery.toLowerCase())
       );
       if (index !== -1) {
@@ -888,7 +894,7 @@
     </div>
   {/if}
   
-  {#if showTokenCounter && messages.length > 0}
+  {#if showTokenCounter && visibleMessages.length > 0}
     <div class="token-counter" class:token-warning={tokenWarning}>
       <div class="token-info">
         <span class="token-label">Token: {currentChatTokens.toLocaleString()} / {maxTokens.toLocaleString()}</span>
@@ -903,7 +909,7 @@
         </svg>
       </button>
     </div>
-  {:else if messages.length > 0}
+  {:else if visibleMessages.length > 0}
     <button class="token-counter-show" on:click={() => showTokenCounter = true} title="Mostra token counter">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
@@ -914,7 +920,7 @@
   {/if}
   
   <div class="messages-container" bind:this={messagesContainer}>
-    {#if messages.length === 0}
+    {#if visibleMessages.length === 0}
       <div class="welcome-message">
         {#if !$currentChatId}
           <button class="temporary-chat-button" on:click={() => createTemporaryChat()}>
@@ -945,7 +951,7 @@
       </div>
     {/if}
     
-    {#each messages as message, index (message.id || index)}
+    {#each visibleMessages as message, index (message.id || index)}
       <div 
         class="message" 
         class:user-message={message.type === 'user'} 
@@ -1110,7 +1116,7 @@
           {/if}
         </div>
       {/if}
-    <div class="input-wrapper">
+    <div class="input-wrapper" class:input-empty={!inputValue.trim()}>
       <div class="attach-button-wrapper" bind:this={attachMenuRef}>
         <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title="Allega file">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2081,6 +2087,24 @@
     border-radius: 12px;
     padding: 12px 16px;
     transition: all 0.2s;
+    min-height: 56px;
+  }
+
+  .input-wrapper.input-empty {
+    padding: 8px 12px;
+    min-height: 44px;
+  }
+
+  @media (max-width: 768px) {
+    .input-wrapper {
+      padding: 10px 12px;
+      min-height: 48px;
+    }
+
+    .input-wrapper.input-empty {
+      padding: 6px 10px;
+      min-height: 40px;
+    }
   }
 
   .input-wrapper:focus-within {
@@ -2230,6 +2254,22 @@
   
   .message-input.textarea-input {
     padding: 8px 0;
+  }
+
+  .input-wrapper.input-empty .message-input {
+    min-height: 20px;
+    font-size: 14px;
+  }
+
+  @media (max-width: 768px) {
+    .message-input {
+      font-size: 14px;
+    }
+
+    .input-wrapper.input-empty .message-input {
+      min-height: 18px;
+      font-size: 13px;
+    }
   }
 
   .message-input:disabled {

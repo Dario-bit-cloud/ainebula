@@ -1,26 +1,20 @@
-// Configurazione API
+// Configurazione API - Electron Hub (default)
 export const API_CONFIG = {
   baseURL: 'https://api.electronhub.ai/v1',
   apiKey: 'ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ',
   timeout: 30000 // 30 secondi
 };
 
-// API key Electron Hub aggiornata
+// Configurazione API - LLM7.io per Nebula Pro
+export const LLM7_CONFIG = {
+  baseURL: 'https://api.llm7.io/v1',
+  apiKey: '9I0oxFYS9vFJKLYm6Tbpn6YMObVnMdsrNOPs/r6ZZA0T4Ve2Vn8eWcuYSOMy37eZ6TwyC4WUPmPE6/y6ioivxNo3HkPG72k12SoM25DN5i4+21BPY6E/DFoibTaN+zAW/216gIo=',
+  timeout: 30000 // 30 secondi
+};
 
-// Mappatura modelli locali ai modelli API
+// Mappatura modelli locali ai modelli API e provider
 export const MODEL_MAPPING = {
-  'nebula-5.1-instant': 'gpt-4o-mini', // Modello veloce
-  'nebula-5.1-auto': 'gpt-4o', // Modello auto
-  'nebula-5.1-thinking': 'gpt-4o', // Modello thinking (usa ZukiJourney)
-  'nebula-5.1-pro': 'gpt-4o', // Modello pro
-  'nebula-5-instant': 'gpt-4o-mini', // Legacy
-  'nebula-5-thinking': 'gpt-4o', // Legacy thinking (usa ZukiJourney)
-  'nebula-5-pro': 'gpt-4o', // Legacy pro
-  'nebula-4o': 'gpt-4o', // Legacy
-  'nebula-5.1': 'gpt-4o', // Modello standard
-  'nebula-5.0': 'gpt-4-turbo', // Versione precedente
-  'codex': 'gpt-4o', // Specializzato per codice
-  'gpt-4': 'gpt-4o',
-  'gpt-3.5': 'gpt-3.5-turbo'
+  'nebula-1.0': { model: 'gpt-4o', provider: 'electronhub' }, // Nebula AI 1.0 con Electron Hub
+  'nebula-pro': { model: 'gpt-4', provider: 'llm7' } // Nebula AI Pro con LLM7.io
 };
 

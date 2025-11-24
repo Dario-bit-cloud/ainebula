@@ -8,15 +8,11 @@
   let modelSelectorButton;
   let modelDropdown;
   let dropdownPosition = { top: 0, left: 0 };
-  let showLegacyModels = false;
-  let legacySubmenuPosition = { top: 0, left: 0 };
-  let legacyHeaderElement;
   
   function toggleModelDropdown() {
     isModelDropdownOpen = !isModelDropdownOpen;
     if (isModelDropdownOpen && modelSelectorButton) {
       updateDropdownPosition();
-      showLegacyModels = false;
     }
   }
   
@@ -31,24 +27,8 @@
   }
   
   function selectModel(modelId) {
-    if (modelId === 'legacy-header') {
-      return; // Non selezionare l'header
-    }
     selectedModel.set(modelId);
     isModelDropdownOpen = false;
-    showLegacyModels = false;
-  }
-  
-  function toggleLegacyModels(event) {
-    event.stopPropagation();
-    if (legacyHeaderElement) {
-      const rect = legacyHeaderElement.getBoundingClientRect();
-      legacySubmenuPosition = {
-        top: rect.top,
-        left: rect.right + 8
-      };
-    }
-    showLegacyModels = !showLegacyModels;
   }
   
   function toggleSettings() {
@@ -117,13 +97,9 @@
         <span class="model-name">
           {#if $availableModels.find(m => m.id === $selectedModel)}
             {@const selected = $availableModels.find(m => m.id === $selectedModel)}
-            {#if selected.group === 'Legacy'}
-              {selected.name}
-            {:else}
-              Nebula AI 5.1 {selected.name}
-            {/if}
+            {selected.name}
           {:else}
-            Nebula AI 5.1 Instant
+            Nebula AI 1.0
           {/if}
         </span>
         <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -132,8 +108,8 @@
       </button>
       {#if isModelDropdownOpen}
         <div class="model-dropdown" bind:this={modelDropdown} style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;">
-          <div class="model-group-header">Nebula AI 5.1</div>
-          {#each $availableModels.filter(m => m.group === 'Nebula AI 5.1' && !m.isHeader) as model}
+          <div class="model-group-header">Nebula AI</div>
+          {#each $availableModels as model}
             <button 
               class="model-option" 
               class:selected={model.id === $selectedModel}
@@ -152,39 +128,6 @@
               {/if}
             </button>
           {/each}
-          <button 
-            class="model-option model-option-header" 
-            bind:this={legacyHeaderElement}
-            on:click={toggleLegacyModels}
-            on:mouseenter={toggleLegacyModels}
-          >
-            <div class="model-info">
-              <div class="model-name">Modelli legacy</div>
-            </div>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </button>
-          {#if showLegacyModels}
-            <div class="legacy-submenu" style="top: {legacySubmenuPosition.top}px; left: {legacySubmenuPosition.left}px;">
-              {#each $availableModels.filter(m => m.group === 'Legacy') as model}
-                <button 
-                  class="model-option" 
-                  class:selected={model.id === $selectedModel}
-                  on:click={() => selectModel(model.id)}
-                >
-                  <div class="model-info">
-                    <div class="model-name">{model.name}</div>
-                  </div>
-                  {#if model.id === $selectedModel}
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                  {/if}
-                </button>
-              {/each}
-            </div>
-          {/if}
         </div>
       {/if}
     </div>
