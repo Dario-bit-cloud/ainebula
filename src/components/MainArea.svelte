@@ -462,7 +462,7 @@
   
   function handleKeyPress(event) {
     // Shift+Enter per nuova riga, Enter per inviare
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault();
       handleSubmit();
     }
