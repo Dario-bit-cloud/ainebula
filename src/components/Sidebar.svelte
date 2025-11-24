@@ -234,16 +234,29 @@
   
   <nav class="sidebar-nav">
     <!-- Bottone Nuova Chat Prominente -->
-    <button 
-      class="new-chat-button" 
-      on:click={() => handleMenuClick('new-chat')}
-    >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19"/>
-        <line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      <span>Nuova chat</span>
-    </button>
+    <div class="new-chat-wrapper" on:click={() => handleMenuClick('new-chat')}>
+      <div class="new-chat-glow"></div>
+      <button class="new-chat-button" role="button">
+        Nuova chat
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 10 10"
+          height="10"
+          width="10"
+          fill="none"
+          class="new-chat-arrow"
+        >
+          <path
+            d="M0 5h7"
+            class="arrow-line"
+          ></path>
+          <path
+            d="M1 1l4 4-4 4"
+            class="arrow-path"
+          ></path>
+        </svg>
+      </button>
+    </div>
     
     {#each [
       { id: 'search', label: 'Cerca chat', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
