@@ -211,7 +211,10 @@
 <aside class="sidebar" class:sidebar-open={$isSidebarOpen} class:sidebar-mobile={$isMobile}>
   {#if $isMobile}
     <div class="sidebar-header-mobile">
-      <h3>Menu</h3>
+      <div class="sidebar-logo">
+        <img src="/logo.png" alt="Nebula AI" class="logo-img" />
+        <span class="logo-text">Nebula AI</span>
+      </div>
       <button class="close-sidebar-btn" on:click={closeSidebar}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/>
@@ -220,9 +223,29 @@
       </button>
     </div>
   {/if}
+  
+  <!-- Logo in alto -->
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <img src="/logo.png" alt="Nebula AI" class="logo-img" />
+      <span class="logo-text">Nebula AI</span>
+    </div>
+  </div>
+  
   <nav class="sidebar-nav">
+    <!-- Bottone Nuova Chat Prominente -->
+    <button 
+      class="new-chat-button" 
+      on:click={() => handleMenuClick('new-chat')}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      <span>Nuova chat</span>
+    </button>
+    
     {#each [
-      { id: 'new-chat', label: 'Nuova chat', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' },
       { id: 'search', label: 'Cerca chat', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
       { id: 'library', label: 'Libreria', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
       { id: 'projects', label: 'Progetti', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
@@ -575,7 +598,7 @@
   }
 
   .sidebar {
-    width: 240px;
+    width: 260px;
     background-color: var(--bg-secondary);
     display: flex;
     flex-direction: column;
@@ -584,6 +607,33 @@
     animation: sidebarSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     z-index: 999;
+  }
+  
+  .sidebar-header {
+    padding: 20px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .logo-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+  }
+  
+  .logo-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
   }
 
   @keyframes sidebarSlideIn {

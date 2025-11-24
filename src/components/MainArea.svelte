@@ -1058,15 +1058,18 @@
       <div class="welcome-message">
         {#if !$currentChatId}
           <button class="temporary-chat-button" on:click={() => createTemporaryChat()}>
-            <div class="temporary-chat-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4">
-                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-              </svg>
+            <div class="welcome-logo">
+              <img src="/logo.png" alt="Nebula AI" />
             </div>
             <h1 class="welcome-text">Attiva chat temporanea</h1>
           </button>
         {:else}
-          <h1 class="welcome-text">In cosa posso essere utile?</h1>
+          <div class="welcome-content">
+            <div class="welcome-logo">
+              <img src="/logo.png" alt="Nebula AI" />
+            </div>
+            <h1 class="welcome-text">Come posso aiutarti?</h1>
+          </div>
         {/if}
       </div>
     {/if}
@@ -1332,6 +1335,35 @@
         </div>
       {/if}
     <div class="input-wrapper" class:input-empty={!inputValue.trim()}>
+      <!-- Pulsanti integrati nell'input (solo quando vuoto) -->
+      {#if !inputValue.trim() && !editingMessageIndex && visibleMessages.length === 0}
+        <div class="input-quick-actions">
+          <button 
+            class="quick-action-btn" 
+            on:click={() => isPromptLibraryModalOpen.set(true)}
+            title="Libreria prompt"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+            <span>Prompt</span>
+          </button>
+          <button 
+            class="quick-action-btn" 
+            on:click={toggleSearchBar}
+            title="Cerca"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <span>Cerca</span>
+          </button>
+        </div>
+      {/if}
+      
       <div class="attach-button-wrapper" bind:this={attachMenuRef}>
         <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title="Allega file">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1464,7 +1496,7 @@
       <textarea
         class="message-input"
         class:textarea-input={isTextarea}
-        placeholder={editingMessageIndex !== null ? "Modifica il messaggio..." : ($isMobile ? "" : "Fai una domanda (Shift+Enter per nuova riga)")}
+        placeholder={editingMessageIndex !== null ? "Modifica il messaggio..." : ($isMobile ? "" : "Messaggio a Nebula AI")}
         bind:value={inputValue}
         bind:this={textareaRef}
         on:keydown={handleKeyPress}
@@ -1767,14 +1799,39 @@
     min-height: 60vh;
     width: 100%;
   }
+  
+  .welcome-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .welcome-logo {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+  
+  .welcome-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0.9;
+  }
 
   .welcome-text {
     font-size: 32px;
-    font-weight: 400;
+    font-weight: 600;
     color: var(--text-primary);
     text-align: center;
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     margin: 0;
+    letter-spacing: -0.5px;
   }
 
   @media (max-width: 768px) {
@@ -2469,31 +2526,38 @@
 
   .message-input {
     flex: 1;
-    background: none;
-    border: none;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 24px;
     color: var(--text-primary);
     font-size: 15px;
     outline: none;
-    padding: 4px 0;
+    padding: 12px 20px;
     resize: none;
-    min-height: 24px;
+    min-height: 48px;
     max-height: 200px;
     overflow-y: auto;
     font-family: inherit;
     line-height: 1.5;
-    transition: height 0.1s ease-out;
+    transition: all 0.2s ease;
     box-sizing: border-box;
     width: 100%;
   }
   
+  .message-input:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  }
+  
   .message-input.textarea-input {
-    padding: 8px 0;
+    padding: 12px 20px;
   }
 
   .input-wrapper.input-empty .message-input {
-    min-height: 20px;
-    font-size: 14px;
-    height: 20px;
+    min-height: 48px;
+    font-size: 15px;
+    height: 48px;
+    padding: 12px 20px;
   }
 
   @media (max-width: 768px) {
@@ -2805,43 +2869,45 @@
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 4px;
+    padding: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 4px;
+    border-radius: 50%;
     transform: scale(1);
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
   }
-
+  
   .voice-button:disabled,
   .waveform-button:disabled,
   .send-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
-
+  
   .voice-button:hover:not(:disabled),
-  .waveform-button:hover:not(:disabled),
-  .send-button:hover:not(:disabled) {
+  .waveform-button:hover:not(:disabled) {
     color: var(--text-primary);
     background-color: var(--hover-bg);
-    transform: scale(1.1);
   }
-
+  
   .voice-button:active:not(:disabled),
   .waveform-button:active:not(:disabled),
   .send-button:active:not(:disabled) {
     transform: scale(0.95);
   }
-
+  
   .send-button:not(:disabled) {
-    color: var(--accent-blue);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #8b5cf6 100%);
+    color: white;
   }
-
+  
   .send-button:hover:not(:disabled) {
-    background-color: rgba(59, 130, 246, 0.1);
-    color: var(--accent-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   }
 
   .voice-button.recording {
