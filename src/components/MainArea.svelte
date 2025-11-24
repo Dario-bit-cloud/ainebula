@@ -1564,7 +1564,7 @@
   </div>
   
   <div class="disclaimer">
-    Nebula AI può commettere errori. I dati dell'area di lavoro non vengono utilizzati per addestrare i modelli.
+    Contenuto generato da IA. Verificare sempre l'accuratezza delle risposte, che possono contenere inesattezze.
   </div>
 </main>
 
