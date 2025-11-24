@@ -10,12 +10,14 @@
   import PremiumModal from './components/PremiumModal.svelte';
   import AISettingsModal from './components/AISettingsModal.svelte';
   import PromptLibraryModal from './components/PromptLibraryModal.svelte';
-  import VoiceSelectModal from './components/VoiceSelectModal.svelte';
-  import VoiceModeView from './components/VoiceModeView.svelte';
   import ShortcutsModal from './components/ShortcutsModal.svelte';
   import ReportBugModal from './components/ReportBugModal.svelte';
   import PersonalizationModal from './components/PersonalizationModal.svelte';
+  import AuthModal from './components/AuthModal.svelte';
   import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile } from './stores/app.js';
+  import { initAuth, user, isAuthenticatedStore, isLoading } from './stores/auth.js';
+  import { logout } from './services/authService.js';
+  import { clearUser } from './stores/auth.js';
   import { createNewChat, deleteChat } from './stores/chat.js';
   import { get } from 'svelte/store';
   import { currentChatId } from './stores/chat.js';
@@ -56,7 +58,7 @@
     // Ctrl+Shift+O: Nuova chat
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'o') {
       event.preventDefault();
-      createNewChat();
+      createNewChat(); // Non await per non bloccare
       if ($isMobile) {
         isSidebarOpen.set(false);
       }
@@ -89,7 +91,7 @@
       event.preventDefault();
       const chatId = get(currentChatId);
       if (chatId && confirm('Sei sicuro di voler eliminare questa chat?')) {
-        deleteChat(chatId);
+        deleteChat(chatId); // Non await per non bloccare
       }
       return;
     }
@@ -176,9 +178,19 @@
     }
   }
   
+  let showAuthModal = false;
+  let authModalMode = 'login'; // 'login' o 'register'
+  
+  // Inizializza autenticazione
   onMount(() => {
     window.addEventListener('keydown', handleKeyboardShortcuts);
+    initAuth();
   });
+  
+  function handleOpenAuth(event) {
+    authModalMode = event.detail.mode || 'login';
+    showAuthModal = true;
+  }
   
   onDestroy(() => {
     window.removeEventListener('keydown', handleKeyboardShortcuts);
@@ -186,7 +198,7 @@
 </script>
 
 <div class="app-container">
-  <TopBar />
+  <TopBar on:openAuth={handleOpenAuth} />
   <div class="main-layout">
     <Sidebar />
     <MainArea />
@@ -198,11 +210,12 @@
   <PremiumModal />
   <AISettingsModal />
   <PromptLibraryModal on:select={handlePromptSelect} />
-  <VoiceSelectModal on:voiceSelected={(e) => console.log('Voice selected:', e.detail)} />
-  <VoiceModeView />
   <ShortcutsModal />
   <ReportBugModal />
   <PersonalizationModal />
+  {#if showAuthModal}
+    <AuthModal initialMode={authModalMode} on:close={() => showAuthModal = false} />
+  {/if}
 </div>
 
 <style>

@@ -1,6 +1,8 @@
 <script>
-  import { user as userStore } from '../stores/user.js';
+  import { user as authUser } from '../stores/auth.js';
   import { isUserMenuOpen } from '../stores/app.js';
+  import { logout } from '../services/authService.js';
+  import { clearUser } from '../stores/auth.js';
   
   let hoveredItem = null;
   let activeSubmenu = null;
@@ -47,13 +49,17 @@
     }
   ];
   
+  async function handleLogout() {
+    if (confirm('Sei sicuro di voler uscire?')) {
+      await logout();
+      clearUser();
+      isUserMenuOpen.set(false);
+    }
+  }
+  
   function handleItemClick(item) {
     if (item.id === 'logout') {
-      if (confirm('Sei sicuro di voler uscire?')) {
-        // Qui andrà la logica di logout
-        alert('Logout effettuato');
-        isUserMenuOpen.set(false);
-      }
+      handleLogout();
     } else if (item.id === 'add-colleagues') {
       // Apri modal invita membri (già esiste)
       import('../stores/app.js').then(module => {
@@ -132,13 +138,15 @@
         <div class="user-header">
           <div class="user-info">
             <div class="user-avatar-small">
-              {#if $userStore.email}
-                {$userStore.email.charAt(0).toUpperCase()}
+              {#if $authUser?.username}
+                {$authUser.username.charAt(0).toUpperCase()}
               {:else}
                 U
               {/if}
             </div>
-            <div class="user-email">{$userStore.email || 'utente@esempio.com'}</div>
+            <div class="user-email">
+              {$authUser?.username || 'Non autenticato'}
+            </div>
           </div>
           <button class="add-account-btn" on:click={handleAddAccount} title="Aggiungi account">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

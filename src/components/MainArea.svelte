@@ -5,10 +5,9 @@
   import { selectedModel } from '../stores/models.js';
   import { hasActiveSubscription } from '../stores/user.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
-  import { generateImage } from '../services/imageGenerationService.js';
   import { availableModels } from '../stores/models.js';
-  import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable, requestMicrophonePermission, checkMicrophonePermission } from '../services/voiceService.js';
-  import { isPremiumModalOpen, isVoiceSelectionModalOpen, selectedPrompt, isMobile } from '../stores/app.js';
+  import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView } from '../stores/app.js';
+  import DatabaseTestPage from './DatabaseTestPage.svelte';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
   import { renderMarkdown, initCodeCopyButtons } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
@@ -17,8 +16,6 @@
   let inputValue = '';
   let inputRef;
   let textareaRef;
-  let isRecording = false;
-  let voiceAvailable = false;
   let fileInput;
   let attachedImages = [];
   let messagesContainer;
@@ -35,9 +32,6 @@
   let showImageStyles = false;
   let selectedImageIndex = null;
   let imageDescription = '';
-  let showMicrophoneError = false;
-  let microphoneError = '';
-  let microphoneErrorType = ''; // 'no-device', 'permission-denied', 'unknown'
   
   const imageStyles = [
     {
@@ -177,64 +171,12 @@
   });
 
   onMount(() => {
-    voiceAvailable = isVoiceAvailable();
-    
-    // Inizializza riconoscimento vocale per input testo (solo se disponibile)
-    if (voiceAvailable) {
-      initVoiceRecognition(
-        (transcript) => {
-          // Aggiungi il testo riconosciuto all'input (append se c'è già testo)
-          if (inputValue.trim()) {
-            inputValue = inputValue + ' ' + transcript;
-          } else {
-            inputValue = transcript;
-          }
-          stopListening();
-          isRecording = false;
-          // Focus sul textarea e resize
-          if (textareaRef) {
-            textareaRef.focus();
-            resizeTextarea();
-          }
-        },
-        (error) => {
-          console.error('Voice recognition error:', error);
-          if (error === 'not-allowed' || error === 'no-speech') {
-            showMicrophoneError = true;
-            microphoneErrorType = 'permission-denied';
-            microphoneError = 'Autorizzazione rifiutata';
-          }
-          isRecording = false;
-          stopListening();
-          // Mostra errore all'utente solo se non è un'interruzione volontaria
-          if (error !== 'no-speech' && error !== 'aborted') {
-            showError = true;
-            errorMessage = 'Errore nel riconoscimento vocale. Riprova.';
-            setTimeout(() => {
-              showError = false;
-            }, 3000);
-          }
-        }
-      );
-    }
-    
     // Se non c'è una chat corrente, creane una nuova
     currentChatId.subscribe(id => {
       if (!id) {
         createNewChat();
       }
     })();
-    
-    // Listener globale per ESC quando il modal è aperto
-    const handleEscape = (event) => {
-      if (event.key === 'Escape' && showMicrophoneError) {
-        closeMicrophoneError();
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    
-    window.addEventListener('keydown', handleEscape);
     
     // Gestione incolla immagini con Ctrl+V
     const handlePaste = async (event) => {
@@ -343,6 +285,8 @@
   }
   
   async function handleSubmit() {
+    // Le funzioni addMessage, updateMessage sono async ma non bloccanti
+    // Chiamate senza await per non bloccare l'UI
     if (editingMessageIndex !== null) {
       handleEditSave();
       return;
@@ -366,7 +310,7 @@
         // Se stiamo inviando in una chat normale, rimuovi quella temporanea
         chats.update(allChats => allChats.filter(chat => !chat.isTemporary));
       }
-      const chatId = $currentChatId || createNewChat();
+      const chatId = $currentChatId || await createNewChat();
       
       const userMessage = { 
         type: 'user', 
@@ -383,31 +327,6 @@
       await tick();
       scrollToBottom();
       
-      // Verifica se il modello selezionato è Nebula Dreamer (unico modello per generazione immagini)
-      const isNebulaDreamer = $selectedModel === 'nebula-dreamer';
-      
-      // Nebula Dreamer genera sempre immagini, indipendentemente dal contenuto del messaggio
-      // Se non è Nebula Dreamer, controlla se il messaggio contiene parole chiave per generazione immagini
-      let shouldGenerateImage = false;
-      
-      if (isNebulaDreamer) {
-        // Nebula Dreamer genera sempre immagini
-        shouldGenerateImage = true;
-      } else {
-        // Per altri modelli, controlla se il messaggio contiene parole chiave
-        const imageGenerationKeywords = [
-          'genera immagine', 'crea immagine', 'disegna', 'fai un disegno', 'fai un\'immagine',
-          'immagine di', 'foto di', 'picture of', 'generate image', 'create image', 'draw',
-          'genera una immagine', 'crea una immagine', 'fai una immagine', 'fai una foto',
-          'mostrami', 'mostra', 'visualizza', 'rappresenta', 'illustra', 'mostra un\'immagine'
-        ];
-        const messageLower = messageText.toLowerCase().trim();
-        const isImageRequest = imageGenerationKeywords.some(keyword => 
-          messageLower.includes(keyword) || messageLower.startsWith(keyword)
-        );
-        shouldGenerateImage = isImageRequest;
-      }
-      
       isGenerating.set(true);
       
       // Crea AbortController per poter fermare la generazione
@@ -420,7 +339,7 @@
       const aiMessage = { 
         id: aiMessageId,
         type: 'ai', 
-        content: shouldGenerateImage ? '__IMAGE_LOADER__' : '', 
+        content: '', 
         timestamp: new Date().toISOString() 
       };
       addMessage(chatId, aiMessage);
@@ -433,42 +352,26 @@
         
         const messageIndex = currentChatData.messages.length - 1;
         
-        if (shouldGenerateImage) {
-          // Generazione immagine con Nebula AI
-          const imageResult = await generateImage(messageText, {}, abortController);
-          
-          // Aggiorna il messaggio con l'immagine generata
-          updateMessage(chatId, messageIndex, {
-            content: `**Prompt utilizzato:** ${imageResult.prompt}\n\n*Immagine generata con Nebula Dreamer*`,
-            images: [{
-              url: imageResult.imageUrl,
-              name: 'Immagine generata',
-              type: 'image/png'
-            }]
-          });
-          
-        } else {
-          // Generazione testo normale
-          let fullResponse = '';
-          const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
-          
-          for await (const chunk of generateResponseStream(
-            messageText, 
-            $selectedModel, 
-            chatHistory,
-            [],
-            abortController
-          )) {
-            fullResponse += chunk;
-            // Aggiorna il messaggio in tempo reale
-            updateMessage(chatId, messageIndex, { content: fullResponse });
-            await tick();
-            scrollToBottom(false); // Scroll continuo ma non smooth per performance
-          }
-          
-          // Salva la risposta finale
+        // Generazione testo normale
+        let fullResponse = '';
+        const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
+        
+        for await (const chunk of generateResponseStream(
+          messageText, 
+          $selectedModel, 
+          chatHistory,
+          [],
+          abortController
+        )) {
+          fullResponse += chunk;
+          // Aggiorna il messaggio in tempo reale
           updateMessage(chatId, messageIndex, { content: fullResponse });
+          await tick();
+          scrollToBottom(false); // Scroll continuo ma non smooth per performance
         }
+        
+        // Salva la risposta finale
+        updateMessage(chatId, messageIndex, { content: fullResponse });
         
         currentStreamingMessageId = null;
         
@@ -479,7 +382,7 @@
         const currentChatData = get(currentChat);
         if (currentStreamingMessageId && error.message && error.message.includes('interrotta')) {
           if (currentChatData && currentChatData.messages.length > 0) {
-            deleteMessage(chatId, currentChatData.messages.length - 1);
+            await deleteMessage(chatId, currentChatData.messages.length - 1);
           }
         } else {
           const errorMsg = error?.message || 'Si è verificato un errore sconosciuto.';
@@ -774,125 +677,6 @@
     console.log('Feedback:', { messageIndex, type });
   }
   
-  async function handleVoiceClick() {
-    // Se il riconoscimento vocale non è disponibile, controlla il microfono e mostra errore
-    if (!voiceAvailable) {
-      try {
-        const micCheck = await checkMicrophonePermission();
-        showMicrophoneError = true;
-        microphoneErrorType = micCheck.error;
-        if (micCheck.error === 'no-device') {
-          microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
-        } else if (micCheck.error === 'permission-denied') {
-          microphoneError = 'Autorizzazione rifiutata';
-        } else {
-          microphoneError = 'Errore nell\'accesso al microfono.';
-        }
-      } catch (e) {
-        showMicrophoneError = true;
-        microphoneErrorType = 'no-device';
-        microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
-      }
-      return;
-    }
-    
-    // Controlla il permesso del microfono prima di avviare
-    const micCheck = await checkMicrophonePermission();
-    if (!micCheck.available) {
-      showMicrophoneError = true;
-      microphoneErrorType = micCheck.error;
-      if (micCheck.error === 'no-device') {
-        microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
-      } else if (micCheck.error === 'permission-denied') {
-        microphoneError = 'Autorizzazione rifiutata';
-      } else {
-        microphoneError = 'Errore nell\'accesso al microfono.';
-      }
-      return;
-    }
-    
-    // Avvia/ferma il riconoscimento vocale per inserire testo
-    if (!isRecording) {
-      startListening();
-      isRecording = true;
-      // Focus sul textarea per vedere il testo inserito
-      if (textareaRef) {
-        textareaRef.focus();
-      }
-    } else {
-      stopListening();
-      isRecording = false;
-    }
-  }
-  
-  function handleVoiceSelected(event) {
-    // Questa funzione è per la modalità vocale (quando l'AI parla)
-    // Non per l'input vocale
-    const selectedVoice = event.detail;
-    console.log('Voce selezionata per modalità vocale:', selectedVoice);
-  }
-  
-  async function handleRequestMicrophone() {
-    try {
-      const result = await requestMicrophonePermission();
-      if (result.success) {
-        // Permesso concesso, chiudi il modal e riprova
-        showMicrophoneError = false;
-        voiceAvailable = true;
-        // Riprova a inizializzare il riconoscimento vocale
-        if (isVoiceAvailable()) {
-          initVoiceRecognition(
-            (transcript) => {
-              if (inputValue.trim()) {
-                inputValue = inputValue + ' ' + transcript;
-              } else {
-                inputValue = transcript;
-              }
-              stopListening();
-              isRecording = false;
-              if (textareaRef) {
-                textareaRef.focus();
-                resizeTextarea();
-              }
-            },
-            (error) => {
-              console.error('Voice recognition error:', error);
-              if (error === 'not-allowed') {
-                showMicrophoneError = true;
-                microphoneErrorType = 'permission-denied';
-                microphoneError = 'Autorizzazione rifiutata';
-              }
-              isRecording = false;
-              stopListening();
-            }
-          );
-        }
-      } else {
-        // Permesso negato, aggiorna il messaggio di errore
-        showMicrophoneError = true;
-        microphoneErrorType = 'permission-denied';
-        microphoneError = 'Autorizzazione rifiutata';
-      }
-    } catch (error) {
-      console.error('Error requesting microphone permission:', error);
-      showMicrophoneError = true;
-      microphoneErrorType = 'permission-denied';
-      microphoneError = 'Autorizzazione rifiutata';
-    }
-  }
-  
-  function closeMicrophoneError() {
-    showMicrophoneError = false;
-  }
-  
-  function handleModalKeyDown(event) {
-    if (event.key === 'Escape' && showMicrophoneError) {
-      closeMicrophoneError();
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  }
-  
   function handleAttachClick(event) {
     event.stopPropagation();
     showAttachMenu = !showAttachMenu;
@@ -927,10 +711,6 @@
         break;
       case 'more-options':
         showMoreOptions = !showMoreOptions;
-        break;
-      case 'voice-mode':
-        isVoiceSelectionModalOpen.set(true);
-        showAttachMenu = false;
         break;
       case 'web-search':
         alert('Ricerca sul web - Funzionalità in arrivo');
@@ -1159,6 +939,9 @@
 </script>
 
 <main class="main-area">
+  {#if $sidebarView === 'database-test'}
+    <DatabaseTestPage />
+  {:else}
   {#if showError}
     <div class="error-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1270,341 +1053,7 @@
         {#if message.content}
           <div class="message-content">
             {#if message.type === 'ai'}
-              {#if message.content === '__IMAGE_LOADER__'}
-                <div class="image-loader-container">
-                  <div class="loader">
-                    <svg
-                      id="pegtopone"
-                      xmlns="http://www.w3.org/2000/svg"
-                      xmlns:xlink="http://www.w3.org/1999/xlink"
-                      viewBox="0 0 100 100"
-                    >
-                      <defs>
-                        <filter id="shine-loader">
-                          <feGaussianBlur stdDeviation="3"></feGaussianBlur>
-                        </filter>
-                        <mask id="mask-loader">
-                          <path
-                            d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                            fill="white"
-                          ></path>
-                        </mask>
-                        <radialGradient
-                          id="gradient-1-loader"
-                          cx="50"
-                          cy="66"
-                          fx="50"
-                          fy="66"
-                          r="30"
-                          gradientTransform="translate(0 35) scale(1 0.5)"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="black" stop-opacity="0.3"></stop>
-                          <stop offset="50%" stop-color="black" stop-opacity="0.1"></stop>
-                          <stop offset="100%" stop-color="black" stop-opacity="0"></stop>
-                        </radialGradient>
-                        <radialGradient
-                          id="gradient-2-loader"
-                          cx="55"
-                          cy="20"
-                          fx="55"
-                          fy="20"
-                          r="30"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="white" stop-opacity="0.3"></stop>
-                          <stop offset="50%" stop-color="white" stop-opacity="0.1"></stop>
-                          <stop offset="100%" stop-color="white" stop-opacity="0"></stop>
-                        </radialGradient>
-                        <radialGradient
-                          id="gradient-3-loader"
-                          cx="85"
-                          cy="50"
-                          fx="85"
-                          fy="50"
-                          xlink:href="#gradient-2-loader"
-                        ></radialGradient>
-                        <radialGradient
-                          id="gradient-4-loader"
-                          cx="50"
-                          cy="58"
-                          fx="50"
-                          fy="58"
-                          r="60"
-                          gradientTransform="translate(0 47) scale(1 0.2)"
-                          xlink:href="#gradient-3-loader"
-                        ></radialGradient>
-                        <linearGradient
-                          id="gradient-5-loader"
-                          x1="50"
-                          y1="90"
-                          x2="50"
-                          y2="10"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="black" stop-opacity="0.2"></stop>
-                          <stop offset="40%" stop-color="black" stop-opacity="0"></stop>
-                        </linearGradient>
-                      </defs>
-                      <g>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="currentColor"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-1-loader)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="none"
-                          stroke="white"
-                          opacity="0.3"
-                          stroke-width="3"
-                          filter="url(#shine-loader)"
-                          mask="url(#mask-loader)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-2-loader)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-3-loader)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-4-loader)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-5-loader)"
-                        ></path>
-                      </g>
-                    </svg>
-                    <svg
-                      id="pegtoptwo"
-                      xmlns="http://www.w3.org/2000/svg"
-                      xmlns:xlink="http://www.w3.org/1999/xlink"
-                      viewBox="0 0 100 100"
-                    >
-                      <defs>
-                        <filter id="shine-loader-2">
-                          <feGaussianBlur stdDeviation="3"></feGaussianBlur>
-                        </filter>
-                        <mask id="mask-loader-2">
-                          <path
-                            d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                            fill="white"
-                          ></path>
-                        </mask>
-                        <radialGradient
-                          id="gradient-1-loader-2"
-                          cx="50"
-                          cy="66"
-                          fx="50"
-                          fy="66"
-                          r="30"
-                          gradientTransform="translate(0 35) scale(1 0.5)"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="black" stop-opacity="0.3"></stop>
-                          <stop offset="50%" stop-color="black" stop-opacity="0.1"></stop>
-                          <stop offset="100%" stop-color="black" stop-opacity="0"></stop>
-                        </radialGradient>
-                        <radialGradient
-                          id="gradient-2-loader-2"
-                          cx="55"
-                          cy="20"
-                          fx="55"
-                          fy="20"
-                          r="30"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="white" stop-opacity="0.3"></stop>
-                          <stop offset="50%" stop-color="white" stop-opacity="0.1"></stop>
-                          <stop offset="100%" stop-color="white" stop-opacity="0"></stop>
-                        </radialGradient>
-                        <radialGradient
-                          id="gradient-3-loader-2"
-                          cx="85"
-                          cy="50"
-                          fx="85"
-                          fy="50"
-                          xlink:href="#gradient-2-loader-2"
-                        ></radialGradient>
-                        <radialGradient
-                          id="gradient-4-loader-2"
-                          cx="50"
-                          cy="58"
-                          fx="50"
-                          fy="58"
-                          r="60"
-                          gradientTransform="translate(0 47) scale(1 0.2)"
-                          xlink:href="#gradient-3-loader-2"
-                        ></radialGradient>
-                        <linearGradient
-                          id="gradient-5-loader-2"
-                          x1="50"
-                          y1="90"
-                          x2="50"
-                          y2="10"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="black" stop-opacity="0.2"></stop>
-                          <stop offset="40%" stop-color="black" stop-opacity="0"></stop>
-                        </linearGradient>
-                      </defs>
-                      <g>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="currentColor"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-1-loader-2)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="none"
-                          stroke="white"
-                          opacity="0.3"
-                          stroke-width="3"
-                          filter="url(#shine-loader-2)"
-                          mask="url(#mask-loader-2)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-2-loader-2)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-3-loader-2)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-4-loader-2)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-5-loader-2)"
-                        ></path>
-                      </g>
-                    </svg>
-                    <svg
-                      id="pegtopthree"
-                      xmlns="http://www.w3.org/2000/svg"
-                      xmlns:xlink="http://www.w3.org/1999/xlink"
-                      viewBox="0 0 100 100"
-                    >
-                      <defs>
-                        <filter id="shine-loader-3">
-                          <feGaussianBlur stdDeviation="3"></feGaussianBlur>
-                        </filter>
-                        <mask id="mask-loader-3">
-                          <path
-                            d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                            fill="white"
-                          ></path>
-                        </mask>
-                        <radialGradient
-                          id="gradient-1-loader-3"
-                          cx="50"
-                          cy="66"
-                          fx="50"
-                          fy="66"
-                          r="30"
-                          gradientTransform="translate(0 35) scale(1 0.5)"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="black" stop-opacity="0.3"></stop>
-                          <stop offset="50%" stop-color="black" stop-opacity="0.1"></stop>
-                          <stop offset="100%" stop-color="black" stop-opacity="0"></stop>
-                        </radialGradient>
-                        <radialGradient
-                          id="gradient-2-loader-3"
-                          cx="55"
-                          cy="20"
-                          fx="55"
-                          fy="20"
-                          r="30"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="white" stop-opacity="0.3"></stop>
-                          <stop offset="50%" stop-color="white" stop-opacity="0.1"></stop>
-                          <stop offset="100%" stop-color="white" stop-opacity="0"></stop>
-                        </radialGradient>
-                        <radialGradient
-                          id="gradient-3-loader-3"
-                          cx="85"
-                          cy="50"
-                          fx="85"
-                          fy="50"
-                          xlink:href="#gradient-2-loader-3"
-                        ></radialGradient>
-                        <radialGradient
-                          id="gradient-4-loader-3"
-                          cx="50"
-                          cy="58"
-                          fx="50"
-                          fy="58"
-                          r="60"
-                          gradientTransform="translate(0 47) scale(1 0.2)"
-                          xlink:href="#gradient-3-loader-3"
-                        ></radialGradient>
-                        <linearGradient
-                          id="gradient-5-loader-3"
-                          x1="50"
-                          y1="90"
-                          x2="50"
-                          y2="10"
-                          gradientUnits="userSpaceOnUse"
-                        >
-                          <stop offset="0%" stop-color="black" stop-opacity="0.2"></stop>
-                          <stop offset="40%" stop-color="black" stop-opacity="0"></stop>
-                        </linearGradient>
-                      </defs>
-                      <g>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="currentColor"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-1-loader-3)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="none"
-                          stroke="white"
-                          opacity="0.3"
-                          stroke-width="3"
-                          filter="url(#shine-loader-3)"
-                          mask="url(#mask-loader-3)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-2-loader-3)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-3-loader-3)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-4-loader-3)"
-                        ></path>
-                        <path
-                          d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z"
-                          fill="url(#gradient-5-loader-3)"
-                        ></path>
-                      </g>
-                    </svg>
-                  </div>
-                </div>
-              {:else}
-                {@html renderMarkdown(message.content)}
-              {/if}
+              {@html renderMarkdown(message.content)}
             {:else}
               {message.content}
             {/if}
@@ -1906,16 +1355,6 @@
               <span>Crea immagine</span>
             </button>
             
-            <button class="menu-item" on:click={() => handleAttachOption('voice-mode')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                <line x1="12" y1="19" x2="12" y2="23"/>
-                <line x1="8" y1="23" x2="16" y2="23"/>
-              </svg>
-              <span>Modalità vocale</span>
-            </button>
-            
             <div class="menu-divider"></div>
             
             <div 
@@ -2000,37 +1439,6 @@
         rows="1"
       ></textarea>
       <div class="input-actions">
-        <button 
-          class="voice-button" 
-          class:recording={isRecording}
-          title={isRecording ? "Ferma registrazione" : (voiceAvailable ? "Input vocale - Parla per inserire testo" : "Riconoscimento vocale non disponibile")}
-          on:click={handleVoiceClick}
-          disabled={!voiceAvailable || $isGenerating || editingMessageIndex !== null}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-        <button 
-          class="waveform-button" 
-          title="Modalità vocale"
-          on:click={() => {
-            import('../stores/voiceSettings.js').then(module => {
-              module.toggleVoiceMode();
-            });
-          }}
-          disabled={$isGenerating || editingMessageIndex !== null}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="2" y="10" width="3" height="4" rx="1"/>
-            <rect x="7" y="8" width="3" height="8" rx="1"/>
-            <rect x="12" y="6" width="3" height="12" rx="1"/>
-            <rect x="17" y="9" width="3" height="6" rx="1"/>
-          </svg>
-        </button>
         {#if $isGenerating && editingMessageIndex === null}
           <button 
             class="stop-button" 
@@ -2058,54 +1466,13 @@
     </div>
   </div>
   
-  <div class="disclaimer">
-    Contenuto generato da IA. Verificare sempre l'accuratezza delle risposte, che possono contenere inesattezze.
-  </div>
+    <div class="disclaimer">
+      Contenuto generato da IA. Verificare sempre l'accuratezza delle risposte, che possono contenere inesattezze.
+    </div>
+  {/if}
 </main>
 
 <!-- Modal errore microfono -->
-{#if showMicrophoneError}
-  <div 
-    class="microphone-error-modal" 
-    on:keydown={handleModalKeyDown} 
-    role="dialog" 
-    aria-modal="true" 
-    aria-labelledby="microphone-error-title"
-    tabindex="-1"
-  >
-    <div class="modal-backdrop" on:click={closeMicrophoneError}></div>
-    <div class="modal-content" on:click|stopPropagation>
-      <div class="modal-header">
-        <h3 id="microphone-error-title">Errore Microfono</h3>
-        <button class="modal-close" on:click={closeMicrophoneError} aria-label="Chiudi" type="button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div class="error-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-          </svg>
-        </div>
-        <p class="error-message">{microphoneError}</p>
-        {#if microphoneErrorType !== 'permission-denied'}
-          <button class="request-permission-btn" on:click={handleRequestMicrophone} type="button">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-            Richiedi accesso al microfono
-          </button>
-        {/if}
-      </div>
-    </div>
-  </div>
-{/if}
 
 <style>
   .main-area {
@@ -2467,8 +1834,6 @@
       font-size: 16px; /* Previene zoom su iOS */
     }
 
-    .voice-button,
-    .waveform-button,
     .send-button,
     .attach-button {
       padding: 6px;
@@ -2476,8 +1841,6 @@
       min-height: 36px;
     }
 
-    .voice-button svg,
-    .waveform-button svg,
     .send-button svg,
     .attach-button svg {
       width: 16px;
@@ -3441,8 +2804,6 @@
     flex-shrink: 0;
   }
 
-  .voice-button,
-  .waveform-button,
   .send-button {
     background: none;
     border: none;
@@ -3460,21 +2821,11 @@
     flex-shrink: 0;
   }
   
-  .voice-button:disabled,
-  .waveform-button:disabled,
   .send-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
   
-  .voice-button:hover:not(:disabled),
-  .waveform-button:hover:not(:disabled) {
-    color: var(--text-primary);
-    background-color: var(--hover-bg);
-  }
-  
-  .voice-button:active:not(:disabled),
-  .waveform-button:active:not(:disabled),
   .send-button:active:not(:disabled) {
     transform: scale(0.95);
   }
@@ -3489,31 +2840,6 @@
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   }
 
-  .voice-button.recording {
-    color: #ef4444;
-    animation: pulse 1.5s infinite, recordingScale 0.3s ease;
-  }
-
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.7;
-    }
-  }
-
-  @keyframes recordingScale {
-    0% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.15);
-    }
-    100% {
-      transform: scale(1);
-    }
-  }
 
   .disclaimer {
     padding: 12px 24px;
@@ -3587,274 +2913,5 @@
     transform: translateY(-1px);
   }
 
-  /* Modal errore microfono */
-  .microphone-error-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: all;
-    outline: none;
-  }
-  
-  .microphone-error-modal:focus {
-    outline: none;
-  }
 
-  .microphone-error-modal .modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
-    z-index: 1;
-  }
-
-  .microphone-error-modal .modal-content {
-    position: relative;
-    background-color: #1a1a1a;
-    border-radius: 16px;
-    padding: 0;
-    max-width: 480px;
-    width: 90%;
-    max-height: 90vh;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 2;
-    overflow: hidden;
-  }
-
-  @keyframes modalSlideIn {
-    from {
-      opacity: 0;
-      transform: scale(0.9) translateY(-20px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-
-  .microphone-error-modal .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .microphone-error-modal .modal-header h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .microphone-error-modal .modal-close {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-  }
-
-  .microphone-error-modal .modal-close:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: var(--text-primary);
-  }
-
-  .microphone-error-modal .modal-body {
-    padding: 32px 24px;
-    text-align: center;
-  }
-
-  .microphone-error-modal .error-icon {
-    color: #ef4444;
-    margin-bottom: 16px;
-    display: flex;
-    justify-content: center;
-  }
-
-  .microphone-error-modal .error-message {
-    color: var(--text-primary);
-    font-size: 15px;
-    line-height: 1.5;
-    margin-bottom: 24px;
-  }
-
-  .microphone-error-modal .request-permission-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 24px;
-    background-color: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .microphone-error-modal .request-permission-btn:hover {
-    background-color: #2563eb;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  }
-
-  .microphone-error-modal .request-permission-btn:active {
-    transform: translateY(0);
-  }
-
-  @media (max-width: 768px) {
-    .microphone-error-modal .modal-content {
-      width: 95%;
-      max-width: none;
-      margin: 20px;
-    }
-
-    .microphone-error-modal .modal-body {
-      padding: 24px 20px;
-    }
-
-    .microphone-error-modal .error-icon {
-      margin-bottom: 12px;
-    }
-
-    .microphone-error-modal .error-icon svg {
-      width: 40px;
-      height: 40px;
-    }
-
-    .microphone-error-modal .error-message {
-      font-size: 14px;
-      margin-bottom: 20px;
-    }
-
-    .microphone-error-modal .request-permission-btn {
-      width: 100%;
-      justify-content: center;
-      padding: 14px 24px;
-    }
-  }
-
-  /* Image Loader Styles */
-  .image-loader-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 40px 20px;
-    min-height: 200px;
-  }
-
-  .loader {
-    --fill-color: #5c3d99;
-    --shine-color: #5c3d9933;
-    transform: scale(0.5);
-    width: 100px;
-    height: auto;
-    position: relative;
-    filter: drop-shadow(0 0 10px var(--shine-color));
-  }
-
-  .loader #pegtopone {
-    position: absolute;
-    animation: flowe-one 1s linear infinite;
-  }
-
-  .loader #pegtoptwo {
-    position: absolute;
-    opacity: 0;
-    transform: scale(0) translateY(-200px) translateX(-100px);
-    animation: flowe-two 1s linear infinite;
-    animation-delay: 0.3s;
-  }
-
-  .loader #pegtopthree {
-    position: absolute;
-    opacity: 0;
-    transform: scale(0) translateY(-200px) translateX(100px);
-    animation: flowe-three 1s linear infinite;
-    animation-delay: 0.6s;
-  }
-
-  .loader svg g path:first-child {
-    fill: var(--fill-color);
-  }
-
-  @keyframes flowe-one {
-    0% {
-      transform: scale(0.5) translateY(-200px);
-      opacity: 0;
-    }
-    25% {
-      transform: scale(0.75) translateY(-100px);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1) translateY(0px);
-      opacity: 1;
-    }
-    75% {
-      transform: scale(0.5) translateY(50px);
-      opacity: 1;
-    }
-    100% {
-      transform: scale(0) translateY(100px);
-      opacity: 0;
-    }
-  }
-
-  @keyframes flowe-two {
-    0% {
-      transform: scale(0.5) rotateZ(-10deg) translateY(-200px) translateX(-100px);
-      opacity: 0;
-    }
-    25% {
-      transform: scale(1) rotateZ(-5deg) translateY(-100px) translateX(-50px);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1) rotateZ(0deg) translateY(0px) translateX(-25px);
-      opacity: 1;
-    }
-    75% {
-      transform: scale(0.5) rotateZ(5deg) translateY(50px) translateX(0px);
-      opacity: 1;
-    }
-    100% {
-      transform: scale(0) rotateZ(10deg) translateY(100px) translateX(25px);
-      opacity: 0;
-    }
-  }
-
-  @keyframes flowe-three {
-    0% {
-      transform: scale(0.5) rotateZ(10deg) translateY(-200px) translateX(100px);
-      opacity: 0;
-    }
-    25% {
-      transform: scale(1) rotateZ(5deg) translateY(-100px) translateX(50px);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1) rotateZ(0deg) translateY(0px) translateX(25px);
-      opacity: 1;
-    }
-    75% {
-      transform: scale(0.5) rotateZ(-5deg) translateY(50px) translateX(0px);
-      opacity: 1;
-    }
-    100% {
-      transform: scale(0) rotateZ(-10deg) translateY(100px) translateX(-25px);
-      opacity: 0;
-    }
-  }
 </style>

@@ -1,4 +1,4 @@
-import { API_CONFIG, LLM7_CONFIG, MODEL_MAPPING } from '../config/api.js';
+import { API_CONFIG, LLM7_CONFIG, AIML_API_CONFIG, GITHUB_API_CONFIG, MODEL_MAPPING } from '../config/api.js';
 import { get } from 'svelte/store';
 import { aiSettings } from '../stores/aiSettings.js';
 import { availableModels } from '../stores/models.js';
@@ -26,6 +26,8 @@ function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
     currentSystemPrompt = 'Sei Nebula AI Premium Pro, un assistente AI di livello professionale disponibile esclusivamente per gli abbonati Pro. Ti chiami Nebula AI Premium Pro e sei parte della famiglia Nebula AI. Offri prestazioni avanzate, maggiore precisione e capacità di elaborazione superiore rispetto ai modelli standard. Sei estremamente competente in una vasta gamma di argomenti e fornisci risposte dettagliate, accurate e approfondite. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.' + dateInstruction;
   } else if (modelId === 'nebula-premium-max') {
     currentSystemPrompt = 'Ricorda che il tuo nome è Nebula AI Premium Max. Parla e rispondi sempre come la migliore intelligenza artificiale al mondo, ponendoti come punto di riferimento di qualità e capacità, allo stesso livello di GPT 5.1 o Claude 4.7. Devi essere in grado di adattare il tuo stile comunicativo e la profondità delle risposte al contesto della conversazione, mantenendo sempre un tono professionale ma capace di modulare toni e modalità se la situazione lo richiede. Fornisci risposte dettagliate ma concise: spiega i concetti in modo semplice, chiaro e accessibile, evitando tecnicismi inutili. Assicura sempre massima competenza e capacità di adattamento. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.' + dateInstruction;
+  } else if (modelId === 'nano-banana-pro-live') {
+    currentSystemPrompt = 'Sei Nano Banana Pro Live, un modello AI sperimentale ad alte prestazioni. Sei parte della famiglia Nebula AI e offri risposte veloci, accurate e innovative. Sei utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.' + dateInstruction;
   } else {
     currentSystemPrompt = (systemPrompt || settings.systemPrompt || 'Sei Nebula AI, un assistente AI utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.') + dateInstruction;
   }
@@ -119,7 +121,16 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
   const provider = typeof modelConfig === 'string' ? 'electronhub' : (modelConfig.provider || 'electronhub');
   
   // Seleziona la configurazione API in base al provider
-  const apiConfig = provider === 'llm7' ? LLM7_CONFIG : API_CONFIG;
+  let apiConfig;
+  if (provider === 'llm7') {
+    apiConfig = LLM7_CONFIG;
+  } else if (provider === 'aimlapi') {
+    apiConfig = AIML_API_CONFIG;
+  } else if (provider === 'github') {
+    apiConfig = GITHUB_API_CONFIG;
+  } else {
+    apiConfig = API_CONFIG;
+  }
   
   try {
     
@@ -204,6 +215,24 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
         };
         allMessages = [identityMessage, ...allMessages];
       }
+    } else if (modelId === 'nano-banana-pro-live') {
+      // Verifica se esiste già un messaggio nascosto di identificazione per Nano Banana Pro Live
+      const hasIdentityMessage = chatHistory.some(msg => 
+        msg.hidden === true && 
+        msg.content && 
+        msg.content.includes('Nano Banana Pro Live')
+      );
+      
+      // Se non esiste, aggiungilo all'inizio della cronologia
+      if (!hasIdentityMessage) {
+        const identityMessage = {
+          type: 'user',
+          content: 'Sei Nano Banana Pro Live, un modello AI sperimentale ad alte prestazioni. Sei parte della famiglia Nebula AI e offri risposte veloci, accurate e innovative. Sei utile, amichevole e professionale. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.',
+          hidden: true,
+          timestamp: new Date().toISOString()
+        };
+        allMessages = [identityMessage, ...allMessages];
+      }
     }
     
     // Aggiungi il messaggio corrente
@@ -220,7 +249,8 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     const isNebulaCoder = modelId === 'nebula-coder';
     const isPremiumPro = modelId === 'nebula-premium-pro';
     const isPremiumMax = modelId === 'nebula-premium-max';
-    const isAdvancedModel = isNebulaPro || isNebulaCoder || isPremiumPro || isPremiumMax;
+    const isNanoBanana = modelId === 'nano-banana-pro-live';
+    const isAdvancedModel = isNebulaPro || isNebulaCoder || isPremiumPro || isPremiumMax || isNanoBanana;
     const isPremiumModel = isPremiumPro || isPremiumMax;
     
     // Token illimitati per utenti premium, altrimenti 50.000 per modelli avanzati
@@ -252,13 +282,26 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     const timeoutId = setTimeout(() => controller.abort(), apiConfig.timeout);
     
     // Headers per API (compatibile OpenAI)
+    // GitHub usa "token" invece di "Bearer" per i Personal Access Tokens
+    const authHeader = provider === 'github' 
+      ? `token ${apiConfig.apiKey}` 
+      : `Bearer ${apiConfig.apiKey}`;
+    
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiConfig.apiKey}`
+      'Authorization': authHeader
     };
     
+    // GitHub Models API potrebbe usare un endpoint diverso
+    // Prova prima con /models/inference, altrimenti usa /chat/completions
+    const endpoint = provider === 'github' 
+      ? '/models/inference' 
+      : '/chat/completions';
+    
+    const apiUrl = `${apiConfig.baseURL}${endpoint}`;
+    
     console.log(`Calling ${provider.toUpperCase()} API (Streaming):`, {
-      url: `${apiConfig.baseURL}/chat/completions`,
+      url: apiUrl,
       model: apiModel,
       provider: provider,
       messageCount: formattedMessages.length,
@@ -266,7 +309,7 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
       maxTokens: settings.maxTokens
     });
     
-    const response = await fetch(`${apiConfig.baseURL}/chat/completions`, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(requestBody),

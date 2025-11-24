@@ -1,7 +1,7 @@
 import { writable, readable } from 'svelte/store';
 
 // Store per lo stato generale dell'applicazione
-export const sidebarView = writable('chat'); // 'chat', 'search', 'library', 'projects'
+export const sidebarView = writable('chat'); // 'chat', 'search', 'library', 'projects', 'database-test'
 export const isSearchOpen = writable(false);
 export const searchQuery = writable('');
 export const isSettingsOpen = writable(false);
@@ -13,7 +13,6 @@ export const isPremiumModalOpen = writable(false);
 export const isAISettingsModalOpen = writable(false);
 export const isPromptLibraryModalOpen = writable(false);
 export const selectedPrompt = writable(null);
-export const isVoiceSelectionModalOpen = writable(false);
 export const isShortcutsModalOpen = writable(false);
 export const isReportBugModalOpen = writable(false);
 export const isPersonalizationModalOpen = writable(false);

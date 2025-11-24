@@ -9,12 +9,12 @@ export const isLoading = writable(true);
 
 // Inizializza lo store con i dati dal localStorage
 export function initAuth() {
-  const currentUser = getCurrentUser();
   const authenticated = isAuthenticated();
   
-  user.set(currentUser);
-  isAuthenticatedStore.set(authenticated);
-  isLoading.set(false);
+  // Inizializza come non autenticato finché non viene verificata la sessione
+  user.set(null);
+  isAuthenticatedStore.set(false);
+  isLoading.set(true);
   
   // Verifica la sessione con il server se c'è un token
   if (authenticated) {
@@ -28,9 +28,28 @@ export function initAuth() {
         // Sessione non valida, pulisci tutto
         user.set(null);
         isAuthenticatedStore.set(false);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        // Rimuovi anche i dati utente vecchi se presenti
+        localStorage.removeItem('nebula-ai-user');
       }
       isLoading.set(false);
+    }).catch(() => {
+      // In caso di errore, considera non autenticato
+      user.set(null);
+      isAuthenticatedStore.set(false);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      // Rimuovi anche i dati utente vecchi se presenti
+      localStorage.removeItem('nebula-ai-user');
+      isLoading.set(false);
     });
+  } else {
+    // Nessun token, utente non autenticato - pulisci eventuali dati vecchi
+    user.set(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('nebula-ai-user');
+    isLoading.set(false);
   }
 }
 
@@ -46,6 +65,10 @@ export async function setUser(userData) {
 export function clearUser() {
   user.set(null);
   isAuthenticatedStore.set(false);
+  // Rimuovi tutti i dati utente dal localStorage
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('nebula-ai-user');
   // Pulisci le chat salvate sull'account
   clearChatsOnLogout();
 }

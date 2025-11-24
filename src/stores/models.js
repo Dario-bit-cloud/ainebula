@@ -40,12 +40,12 @@ export const availableModels = writable([
     requiredPlan: 'max' // Piano minimo richiesto
   },
   { 
-    id: 'nebula-dreamer', 
-    name: 'Nebula Dreamer', 
-    description: 'Modello dedicato alla generazione di immagini da testo',
-    group: 'Nebula AI',
+    id: 'nano-banana-pro-live', 
+    name: 'Nano Banana Pro Live', 
+    description: 'Modello sperimentale ad alte prestazioni - Provalo ora!',
+    group: 'Sperimentali',
     premium: false,
-    imageGeneration: true // Flag per indicare che è un modello per generazione immagini
+    experimental: true // Flag per indicare che è un modello sperimentale
   }
 ]);
 

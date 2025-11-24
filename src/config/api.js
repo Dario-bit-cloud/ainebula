@@ -12,15 +12,20 @@ export const LLM7_CONFIG = {
   timeout: 30000 // 30 secondi
 };
 
-// Configurazione AssemblyAI per riconoscimento vocale
-export const ASSEMBLYAI_CONFIG = {
-  apiKey: 'f3a18631d42449979ff3066fa8689a8e',
-  wsUrl: 'wss://streaming.assemblyai.com/v3/ws', // v3 come nella documentazione
-  sampleRate: 16000,
-  formatTurns: true,
-  speechModel: 'universal-streaming-multilingual', // Modello multilingue per supportare italiano
-  languageDetection: false // Disabilita se vuoi forzare italiano, altrimenti rileva automaticamente
+// Configurazione API - AIML API per modelli sperimentali
+export const AIML_API_CONFIG = {
+  baseURL: 'https://api.aimlapi.com/v1',
+  apiKey: '75c8604a80b645cb8d9560d03dc20dfc',
+  timeout: 30000 // 30 secondi
 };
+
+// Configurazione API - GitHub Models API per modelli sperimentali
+export const GITHUB_API_CONFIG = {
+  baseURL: 'https://api.github.com',
+  apiKey: import.meta.env.VITE_GITHUB_API_KEY || '', // Usa variabile d'ambiente
+  timeout: 30000 // 30 secondi
+};
+
 
 // Mappatura modelli locali ai modelli API e provider
 export const MODEL_MAPPING = {
@@ -29,28 +34,7 @@ export const MODEL_MAPPING = {
   'nebula-coder': { model: 'gpt-4', provider: 'llm7' }, // Nebula Coder con LLM7.io (specializzato in coding)
   'nebula-premium-pro': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Premium Pro - Richiede abbonamento Pro
   'nebula-premium-max': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Premium Max - Richiede abbonamento Massimo
-  'nebula-dreamer': { model: 'dall-e-3', provider: 'electronhub', imageGeneration: true } // Nebula Dreamer - Generazione immagini
+  'nano-banana-pro-live': { model: 'nano-banana-pro-live', provider: 'github' } // Nano Banana Pro Live - Modello sperimentale GitHub Models API
 };
 
-// Configurazione per generazione immagini con fallback multipli
-export const IMAGE_GENERATION_CONFIG = {
-  providers: [
-    {
-      name: 'electronhub',
-      baseURL: 'https://api.electronhub.ai/v1',
-      apiKey: 'ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ',
-      priority: 1
-    },
-    {
-      name: 'llm7',
-      baseURL: 'https://api.llm7.io/v1',
-      apiKey: '9I0oxFYS9vFJKLYm6Tbpn6YMObVnMdsrNOPs/r6ZZA0T4Ve2Vn8eWcuYSOMy37eZ6TwyC4WUPmPE6/y6ioivxNo3HkPG72k12SoM25DN5i4+21BPY6E/DFoibTaN+zAW/216gIo=',
-      priority: 2
-    }
-  ],
-  timeout: 60000, // 60 secondi per la generazione immagini
-  defaultSize: '1024x1024', // Dimensioni predefinite
-  defaultQuality: 'standard', // 'standard' o 'hd'
-  defaultStyle: 'vivid' // 'vivid' o 'natural'
-};
 

@@ -3,7 +3,19 @@
   import { isGenerating } from '../stores/chat.js';
   import { isSettingsOpen, isSidebarOpen, isMobile, isAISettingsModalOpen, isPromptLibraryModalOpen, isPremiumModalOpen } from '../stores/app.js';
   import { user, hasPlanOrHigher } from '../stores/user.js';
+  import { isAuthenticatedStore, isLoading } from '../stores/auth.js';
+  import { createEventDispatcher } from 'svelte';
   import { onMount } from 'svelte';
+  
+  const dispatch = createEventDispatcher();
+  
+  function openLoginModal() {
+    dispatch('openAuth', { mode: 'login' });
+  }
+  
+  function openRegisterModal() {
+    dispatch('openAuth', { mode: 'register' });
+  }
   
   let isModelDropdownOpen = false;
   let modelSelectorButton;
@@ -150,6 +162,9 @@
                         {model.requiredPlan === 'pro' ? 'PRO' : 'MAX'}
                       </span>
                     {/if}
+                    {#if model.experimental}
+                      <span class="experimental-badge">SPERIMENTALE</span>
+                    {/if}
                   </div>
                   {#if model.description}
                     <div class="model-description">{model.description}</div>
@@ -168,30 +183,39 @@
     </div>
   </div>
   <div class="right-section">
-    <button class="icon-button" title="Libreria Prompt" on:click={togglePromptLibrary}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-      </svg>
-    </button>
-    <button class="icon-button" title="Impostazioni AI" on:click={toggleAISettings}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-      </svg>
-    </button>
-    <button class="icon-button" title="Impostazioni" on:click={toggleSettings}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/>
-      </svg>
-    </button>
-    {#if $isGenerating}
-      <div class="loading-indicator" title="Generazione in corso">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 12a9 9 0 11-6.219-8.56"/>
+    {#if !$isAuthenticatedStore && !$isLoading}
+      <button class="auth-button login-button" on:click={openLoginModal}>
+        Accedi
+      </button>
+      <button class="auth-button register-button" on:click={openRegisterModal}>
+        Registrati
+      </button>
+    {:else if $isAuthenticatedStore}
+      <button class="icon-button" title="Libreria Prompt" on:click={togglePromptLibrary}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
         </svg>
-      </div>
+      </button>
+      <button class="icon-button" title="Impostazioni AI" on:click={toggleAISettings}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </button>
+      <button class="icon-button" title="Impostazioni" on:click={toggleSettings}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/>
+        </svg>
+      </button>
+      {#if $isGenerating}
+        <div class="loading-indicator" title="Generazione in corso">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+          </svg>
+        </div>
+      {/if}
     {/if}
   </div>
 </div>
@@ -494,6 +518,21 @@
     color: white;
   }
 
+  .experimental-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1;
+    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+    color: #000;
+    margin-left: 6px;
+  }
+
   .model-description {
     font-size: 12px;
     color: var(--text-secondary);
@@ -539,6 +578,62 @@
     }
     to {
       transform: rotate(360deg);
+    }
+  }
+  
+  .auth-button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .login-button {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+  
+  .login-button:hover {
+    background: var(--hover-bg);
+    border-color: var(--text-secondary);
+  }
+  
+  .register-button {
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    color: white;
+  }
+  
+  .register-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  }
+  
+  @media (max-width: 768px) {
+    .auth-button {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+    
+    .right-section {
+      gap: 8px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .auth-button {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    
+    .login-button {
+      display: none; /* Nascondi login su schermi molto piccoli, mostra solo registrati */
     }
   }
 </style>

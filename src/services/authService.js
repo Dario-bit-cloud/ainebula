@@ -88,9 +88,10 @@ export async function verifySession() {
     if (data.success && data.user) {
       localStorage.setItem('user', JSON.stringify(data.user));
     } else {
-      // Token non valido, rimuovilo
+      // Token non valido, rimuovilo e tutti i dati utente
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
+      localStorage.removeItem('nebula-ai-user');
     }
     
     return data;
@@ -122,9 +123,10 @@ export async function logout() {
   } catch (error) {
     console.error('Errore durante il logout:', error);
   } finally {
-    // Rimuovi sempre il token e l'utente dal localStorage
+    // Rimuovi sempre il token e tutti i dati utente dal localStorage
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('nebula-ai-user');
   }
 }
 
