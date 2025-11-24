@@ -32,10 +32,22 @@ export const MODEL_MAPPING = {
   'nebula-dreamer': { model: 'dall-e-3', provider: 'electronhub', imageGeneration: true } // Nebula Dreamer - Generazione immagini
 };
 
-// Configurazione per generazione immagini
+// Configurazione per generazione immagini con fallback multipli
 export const IMAGE_GENERATION_CONFIG = {
-  baseURL: 'https://api.electronhub.ai/v1',
-  apiKey: 'ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ',
+  providers: [
+    {
+      name: 'electronhub',
+      baseURL: 'https://api.electronhub.ai/v1',
+      apiKey: 'ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ',
+      priority: 1
+    },
+    {
+      name: 'llm7',
+      baseURL: 'https://api.llm7.io/v1',
+      apiKey: '9I0oxFYS9vFJKLYm6Tbpn6YMObVnMdsrNOPs/r6ZZA0T4Ve2Vn8eWcuYSOMy37eZ6TwyC4WUPmPE6/y6ioivxNo3HkPG72k12SoM25DN5i4+21BPY6E/DFoibTaN+zAW/216gIo=',
+      priority: 2
+    }
+  ],
   timeout: 60000, // 60 secondi per la generazione immagini
   defaultSize: '1024x1024', // Dimensioni predefinite
   defaultQuality: 'standard', // 'standard' o 'hd'

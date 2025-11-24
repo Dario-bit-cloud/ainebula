@@ -11,11 +11,10 @@ import { IMAGE_GENERATION_CONFIG } from '../config/api.js';
  * @param {AbortController} abortController - Controller per annullare la richiesta
  * @returns {Promise<Object>} Oggetto con l'URL dell'immagine generata e il prompt utilizzato
  */
-export async function generateImage(prompt, options = {}, abortController = null) {
-  if (!prompt || !prompt.trim()) {
-    throw new Error('Il prompt non può essere vuoto');
-  }
-
+/**
+ * Prova a generare un'immagine con un provider specifico
+ */
+async function tryGenerateWithProvider(provider, prompt, options, controller) {
   const {
     size = IMAGE_GENERATION_CONFIG.defaultSize,
     quality = IMAGE_GENERATION_CONFIG.defaultQuality,
@@ -23,119 +22,139 @@ export async function generateImage(prompt, options = {}, abortController = null
     seed = null
   } = options;
 
+  const requestBody = {
+    model: 'dall-e-3',
+    prompt: prompt.trim(),
+    n: 1,
+    size: size,
+    quality: quality,
+    style: style
+  };
+
+  if (seed !== null && seed !== -1) {
+    requestBody.seed = seed;
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${provider.apiKey}`
+  };
+
+  console.log(`Trying image generation with ${provider.name}:`, {
+    url: `${provider.baseURL}/images/generations`,
+    prompt: prompt
+  });
+
+  const response = await fetch(`${provider.baseURL}/images/generations`, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(requestBody),
+    signal: controller.signal
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorData;
+    try {
+      errorData = JSON.parse(errorText);
+    } catch (e) {
+      errorData = { error: { message: errorText || `HTTP ${response.status}: ${response.statusText}` } };
+    }
+
+    // Se è un errore di crediti (402) o autenticazione (401), prova il prossimo provider
+    if (response.status === 402 || response.status === 401) {
+      throw new Error('PROVIDER_ERROR'); // Errore speciale per indicare di provare il prossimo provider
+    }
+
+    // Per altri errori, lancia l'errore normale
+    const errorMessage = errorData.error?.message || `API Error: ${response.status} ${response.statusText}`;
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  
+  if (!data.data || !data.data[0] || !data.data[0].url) {
+    throw new Error('Risposta API non valida: URL immagine non trovato');
+  }
+
+  return {
+    imageUrl: data.data[0].url,
+    prompt: data.data[0].revised_prompt || prompt,
+    originalPrompt: prompt,
+    size: size,
+    quality: quality,
+    style: style,
+    seed: seed,
+    provider: provider.name
+  };
+}
+
+export async function generateImage(prompt, options = {}, abortController = null) {
+  if (!prompt || !prompt.trim()) {
+    throw new Error('Il prompt non può essere vuoto');
+  }
+
+  // Ordina i provider per priorità
+  const providers = [...IMAGE_GENERATION_CONFIG.providers].sort((a, b) => a.priority - b.priority);
+
   // Crea controller se non fornito
   const controller = abortController || new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), IMAGE_GENERATION_CONFIG.timeout);
 
-  try {
-    // Prepara la richiesta
-    const requestBody = {
-      model: 'dall-e-3',
-      prompt: prompt.trim(),
-      n: 1, // Numero di immagini da generare
-      size: size,
-      quality: quality,
-      style: style
-    };
+  let lastError = null;
 
-    // Aggiungi seed se fornito (solo per alcuni modelli)
-    if (seed !== null && seed !== -1) {
-      requestBody.seed = seed;
-    }
+  // Prova ogni provider in ordine di priorità
+  for (const provider of providers) {
+    try {
+      clearTimeout(timeoutId);
+      const newTimeoutId = setTimeout(() => controller.abort(), IMAGE_GENERATION_CONFIG.timeout);
+      
+      const result = await tryGenerateWithProvider(provider, prompt, options, controller);
+      
+      clearTimeout(newTimeoutId);
+      
+      console.log(`✅ Image generated successfully with ${provider.name}:`, {
+        url: result.imageUrl,
+        revisedPrompt: result.prompt
+      });
 
-    // Headers per API (compatibile OpenAI)
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${IMAGE_GENERATION_CONFIG.apiKey}`
-    };
-
-    console.log('Calling Image Generation API:', {
-      url: `${IMAGE_GENERATION_CONFIG.baseURL}/images/generations`,
-      prompt: prompt,
-      size: size,
-      quality: quality,
-      style: style
-    });
-
-    const response = await fetch(`${IMAGE_GENERATION_CONFIG.baseURL}/images/generations`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(requestBody),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    console.log('Image Generation API Response status:', response.status, response.statusText);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Image Generation API Error response:', errorText);
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (e) {
-        errorData = { error: { message: errorText || `HTTP ${response.status}: ${response.statusText}` } };
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      console.warn(`⚠️ Provider ${provider.name} failed:`, error.message);
+      
+      // Se è un errore di provider (402/401), continua con il prossimo
+      if (error.message === 'PROVIDER_ERROR') {
+        lastError = error;
+        continue;
       }
 
-      // Messaggio più chiaro per errori comuni
-      let errorMessage = errorData.error?.message || `API Error: ${response.status} ${response.statusText}`;
-
-      if (response.status === 401) {
-        errorMessage = 'API Key non valida o scaduta. Verifica la tua API key in src/config/api.js';
-      } else if (response.status === 429) {
-        errorMessage = 'Troppe richieste. Limite di rate raggiunto. Aspetta un attimo e riprova.';
-      } else if (response.status === 402) {
-        errorMessage = 'Crediti insufficienti per la generazione di immagini.';
-      } else if (response.status === 400) {
-        // Errore di validazione del prompt
-        if (errorMessage.includes('prompt')) {
-          errorMessage = 'Il prompt contiene contenuti non consentiti o è troppo lungo. Prova con un prompt diverso.';
-        }
+      // Se è un errore di abort, lancialo immediatamente
+      if (error.name === 'AbortError') {
+        throw new Error('Generazione immagine interrotta dall\'utente.');
       }
 
-      throw new Error(errorMessage);
+      // Se è l'ultimo provider, lancia l'errore
+      if (provider === providers[providers.length - 1]) {
+        lastError = error;
+        break;
+      }
+
+      // Altrimenti continua con il prossimo provider
+      lastError = error;
     }
-
-    const data = await response.json();
-    
-    if (!data.data || !data.data[0] || !data.data[0].url) {
-      throw new Error('Risposta API non valida: URL immagine non trovato');
-    }
-
-    const imageUrl = data.data[0].url;
-    const revisedPrompt = data.data[0].revised_prompt || prompt; // Il prompt rivisto dall'API
-
-    console.log('Image generated successfully:', {
-      url: imageUrl,
-      revisedPrompt: revisedPrompt
-    });
-
-    return {
-      imageUrl: imageUrl,
-      prompt: revisedPrompt,
-      originalPrompt: prompt,
-      size: size,
-      quality: quality,
-      style: style,
-      seed: seed
-    };
-
-  } catch (error) {
-    console.error('❌ Error calling Image Generation API:', error);
-
-    // Se è un errore di timeout o rete, ritorna un messaggio specifico
-    if (error.name === 'AbortError') {
-      throw new Error('Generazione immagine interrotta dall\'utente.');
-    }
-
-    if (error.message.includes('API Error') || error.message.includes('API Key')) {
-      throw error;
-    }
-
-    // Per altri errori, rigenera l'errore con un messaggio più chiaro
-    throw new Error(`Errore nella generazione dell'immagine: ${error.message}`);
   }
+
+  // Se tutti i provider hanno fallito
+  console.error('❌ All image generation providers failed');
+  
+  // Messaggio più user-friendly
+  if (lastError?.message?.includes('402') || lastError?.message?.includes('Crediti')) {
+    throw new Error('Tutti i provider di generazione immagini hanno esaurito i crediti. Riprova più tardi o contatta il supporto.');
+  }
+
+  throw new Error(`Errore nella generazione dell'immagine: ${lastError?.message || 'Tutti i provider hanno fallito'}`);
 }
 
 /**
