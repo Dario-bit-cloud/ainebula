@@ -176,13 +176,17 @@
   }
   
   $: finalPrice = parseFloat(calculateTotal());
-  $: isFree = finalPrice === 0;
+  $: isFree = finalPrice === 0 || (couponApplied && couponDiscount === 100);
   
   async function handlePayment(event) {
     event.preventDefault();
     
-    // Validazione form solo se non è gratuito
-    if (!isFree) {
+    // Calcola se è gratuito (doppio controllo)
+    const currentTotal = parseFloat(calculateTotal());
+    const isCurrentlyFree = currentTotal === 0 || (couponApplied && couponDiscount === 100);
+    
+    // Validazione form solo se NON è gratuito
+    if (!isCurrentlyFree && requiresPaymentData) {
       if (!paymentData.cardNumber || paymentData.cardNumber.replace(/\s/g, '').length < 16) {
         alert('Inserisci un numero di carta valido');
         return;
@@ -204,7 +208,7 @@
     isProcessing = true;
     
     // Simula processamento pagamento (solo se non è gratuito)
-    if (!isFree) {
+    if (!isCurrentlyFree) {
       console.log('Processing payment:', {
         plan: selectedPlan,
         amount: calculateTotal(),
@@ -334,7 +338,7 @@
           </div>
         {:else}
           <!-- Form di Pagamento -->
-          <form class="payment-form" on:submit={handlePayment}>
+          <form class="payment-form" on:submit={handlePayment} novalidate>
             <div class="form-section">
               <h3>Riepilogo Ordine</h3>
               <div class="order-summary">
@@ -399,7 +403,7 @@
                     placeholder="1234 5678 9012 3456"
                     maxlength="19"
                     on:input={handleCardNumberInput}
-                    required
+                    required={!isFree}
                   />
                 </div>
                 
@@ -411,7 +415,7 @@
                     class="form-input"
                     placeholder="Mario Rossi"
                     bind:value={paymentData.cardHolder}
-                    required
+                    required={!isFree}
                   />
                 </div>
                 
@@ -425,7 +429,7 @@
                       placeholder="MM/AA"
                       maxlength="5"
                       on:input={handleExpiryInput}
-                      required
+                      required={!isFree}
                     />
                   </div>
                   
@@ -438,7 +442,7 @@
                       placeholder="123"
                       maxlength="4"
                       on:input={handleCvvInput}
-                      required
+                      required={!isFree}
                     />
                   </div>
                 </div>
