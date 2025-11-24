@@ -386,20 +386,27 @@
       // Verifica se il modello selezionato è Nebula Dreamer (unico modello per generazione immagini)
       const isNebulaDreamer = $selectedModel === 'nebula-dreamer';
       
-      // Rileva se il messaggio è una richiesta di generazione immagini
-      const imageGenerationKeywords = [
-        'genera immagine', 'crea immagine', 'disegna', 'fai un disegno', 'fai un\'immagine',
-        'immagine di', 'foto di', 'picture of', 'generate image', 'create image', 'draw',
-        'genera una immagine', 'crea una immagine', 'fai una immagine', 'fai una foto',
-        'mostrami', 'mostra', 'visualizza', 'rappresenta', 'illustra', 'mostra un\'immagine'
-      ];
-      const messageLower = messageText.toLowerCase().trim();
-      const isImageRequest = imageGenerationKeywords.some(keyword => 
-        messageLower.includes(keyword) || messageLower.startsWith(keyword)
-      );
+      // Nebula Dreamer genera sempre immagini, indipendentemente dal contenuto del messaggio
+      // Se non è Nebula Dreamer, controlla se il messaggio contiene parole chiave per generazione immagini
+      let shouldGenerateImage = false;
       
-      // Usa generazione immagini solo se è Nebula Dreamer E il messaggio è una richiesta di immagine
-      const shouldGenerateImage = isNebulaDreamer && isImageRequest;
+      if (isNebulaDreamer) {
+        // Nebula Dreamer genera sempre immagini
+        shouldGenerateImage = true;
+      } else {
+        // Per altri modelli, controlla se il messaggio contiene parole chiave
+        const imageGenerationKeywords = [
+          'genera immagine', 'crea immagine', 'disegna', 'fai un disegno', 'fai un\'immagine',
+          'immagine di', 'foto di', 'picture of', 'generate image', 'create image', 'draw',
+          'genera una immagine', 'crea una immagine', 'fai una immagine', 'fai una foto',
+          'mostrami', 'mostra', 'visualizza', 'rappresenta', 'illustra', 'mostra un\'immagine'
+        ];
+        const messageLower = messageText.toLowerCase().trim();
+        const isImageRequest = imageGenerationKeywords.some(keyword => 
+          messageLower.includes(keyword) || messageLower.startsWith(keyword)
+        );
+        shouldGenerateImage = isImageRequest;
+      }
       
       isGenerating.set(true);
       
