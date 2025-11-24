@@ -167,8 +167,37 @@
     }
   }
   
-  onMount(() => {
+  onMount(async () => {
     voiceAvailable = isVoiceAvailable();
+    
+    // Controlla il permesso del microfono
+    if (voiceAvailable) {
+      const micCheck = await checkMicrophonePermission();
+      if (!micCheck.available) {
+        voiceAvailable = false;
+        showMicrophoneError = true;
+        microphoneErrorType = micCheck.error;
+        if (micCheck.error === 'no-device') {
+          microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
+        } else if (micCheck.error === 'permission-denied') {
+          microphoneError = 'Autorizzazione rifiutata';
+        } else {
+          microphoneError = 'Errore nell\'accesso al microfono.';
+        }
+      }
+    } else {
+      // Se SpeechRecognition non è disponibile, controlla comunque il microfono
+      try {
+        const micCheck = await checkMicrophonePermission();
+        if (!micCheck.available && micCheck.error === 'no-device') {
+          showMicrophoneError = true;
+          microphoneErrorType = 'no-device';
+          microphoneError = 'Microfono non rilevato. Assicurati che il microfono sia collegato e funzionante.';
+        }
+      } catch (e) {
+        // Ignora errori se non è disponibile
+      }
+    }
     
     // Inizializza riconoscimento vocale per input testo
     if (voiceAvailable) {
@@ -190,6 +219,11 @@
         },
         (error) => {
           console.error('Voice recognition error:', error);
+          if (error === 'not-allowed' || error === 'no-speech') {
+            showMicrophoneError = true;
+            microphoneErrorType = 'permission-denied';
+            microphoneError = 'Autorizzazione rifiutata';
+          }
           isRecording = false;
           stopListening();
           // Mostra errore all'utente solo se non è un'interruzione volontaria
