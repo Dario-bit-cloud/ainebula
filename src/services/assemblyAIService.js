@@ -156,9 +156,15 @@ function handleWebSocketMessage(data) {
       accumulatedTranscript = textToShow;
       
       // Se è la fine del turno, invia il risultato automaticamente
+      // IMPORTANTE: invia solo se c'è testo e non è vuoto
       if (endOfTurn && textToShow.trim() && onResultCallback) {
-        onResultCallback(textToShow.trim());
-        accumulatedTranscript = '';
+        // Usa un timeout per evitare invii multipli rapidi
+        setTimeout(() => {
+          if (onResultCallback && textToShow.trim()) {
+            onResultCallback(textToShow.trim());
+            accumulatedTranscript = '';
+          }
+        }, 100);
       }
       
       // Log per debug - rilevamento lingua (solo per modello multilingue)
@@ -202,14 +208,21 @@ async function startListening() {
       await connectWebSocket();
     }
     
-    // Ottieni accesso al microfono
+    // Ottieni accesso al microfono con configurazione ottimizzata
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
         sampleRate: ASSEMBLYAI_CONFIG.sampleRate,
         echoCancellation: true,
         noiseSuppression: true,
-        autoGainControl: true
+        autoGainControl: true,
+        // Configurazioni aggiuntive per migliore qualità
+        latency: 0.01, // Bassa latenza
+        googEchoCancellation: true,
+        googNoiseSuppression: true,
+        googAutoGainControl: true,
+        googHighpassFilter: true,
+        googTypingNoiseDetection: true
       }
     });
     
@@ -222,9 +235,9 @@ async function startListening() {
     
     // Crea ScriptProcessorNode per processare l'audio
     // Nota: deprecato ma ancora supportato, AudioWorkletNode sarebbe meglio ma più complesso
-    // FRAMES_PER_BUFFER = 800 per 50ms di audio (0.05s * 16000Hz)
-    // Usiamo 4096 per ~256ms (più efficiente)
-    const bufferSize = 4096;
+    // FRAMES_PER_BUFFER = 800 per 50ms di audio (0.05s * 16000Hz) - come nella documentazione
+    // Usiamo 1600 per ~100ms (bilanciato tra latenza e qualità)
+    const bufferSize = 1600; // 100ms di audio a 16kHz
     processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
     
     processor.onaudioprocess = (event) => {
@@ -235,13 +248,26 @@ async function startListening() {
       try {
         const inputData = event.inputBuffer.getChannelData(0);
         
+        // Applica normalizzazione audio per migliorare la qualità
+        // Calcola il volume medio per normalizzazione
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) {
+          sum += Math.abs(inputData[i]);
+        }
+        const avgVolume = sum / inputData.length;
+        
+        // Normalizza solo se il volume è troppo basso (evita distorsione se già alto)
+        const normalizationFactor = avgVolume < 0.1 ? 1.5 : 1.0;
+        
         // Converti Float32Array (-1.0 a 1.0) in Int16Array (PCM 16-bit)
         // Come nella documentazione Python: pyaudio.paInt16
         const pcmData = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
-          // Clamp e converti a Int16
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          // Applica normalizzazione e clamp
+          let sample = inputData[i] * normalizationFactor;
+          sample = Math.max(-1, Math.min(1, sample));
+          // Converti a Int16
+          pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
         }
         
         // IMPORTANTE: Invia come messaggio BINARIO, non JSON!

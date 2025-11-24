@@ -48,6 +48,8 @@
   let errorMessage = '';
   let showError = false;
   let accumulatedText = ''; // Testo accumulato per invio manuale
+  let lastSentMessage = ''; // Prevenire invii duplicati
+  let lastSentTime = 0; // Timestamp ultimo invio per debounce
   
   $: currentVoice = availableVoices.find(v => v.id === $selectedVoice) || availableVoices[0];
   
@@ -100,8 +102,9 @@
       // Prova AssemblyAI
       recognition = initAssemblyAIRecognition(
         (transcript) => {
-          // Risultato finale - invia il messaggio automaticamente dopo 3 secondi di silenzio
-          if (transcript.trim() && !isProcessing) {
+          // Risultato finale - invia il messaggio automaticamente
+          // AssemblyAI invia automaticamente quando end_of_turn è true
+          if (transcript.trim() && !isProcessing && listeningState === 'listening') {
             // Cancella il timer di silenzio se presente
             if (silenceTimer) {
               clearTimeout(silenceTimer);
@@ -110,6 +113,10 @@
             // Reset del testo accumulato
             accumulatedText = '';
             clearAssemblyAITranscript();
+            // Ferma l'ascolto prima di inviare per evitare loop
+            if (recognition) {
+              recognition.stop();
+            }
             handleVoiceMessage(transcript.trim());
           }
         },
@@ -329,13 +336,31 @@
   }
   
   async function handleVoiceMessage(messageText) {
-    if (isProcessing || !messageText.trim()) return;
+    // Prevenire invii duplicati o troppo rapidi
+    const now = Date.now();
+    const timeSinceLastSend = now - lastSentTime;
+    const isDuplicate = messageText.trim() === lastSentMessage.trim();
+    
+    if (isProcessing || !messageText.trim() || isDuplicate || timeSinceLastSend < 2000) {
+      console.log('Message ignored:', { isProcessing, isEmpty: !messageText.trim(), isDuplicate, timeSinceLastSend });
+      return;
+    }
     
     isProcessing = true;
     listeningState = 'processing';
     currentTranscript = messageText;
     interimTranscript = '';
-    stopListening();
+    lastSentMessage = messageText.trim();
+    lastSentTime = now;
+    
+    // Ferma l'ascolto per evitare loop
+    if (useAssemblyAI) {
+      if (recognition) {
+        recognition.stop();
+      }
+    } else {
+      stopWebSpeechListening();
+    }
     
     try {
       // Crea o usa chat corrente
@@ -422,6 +447,7 @@
       
       // Reset del testo accumulato dopo l'invio
       accumulatedText = '';
+      lastSentMessage = ''; // Reset per permettere nuovi messaggi
       if (useAssemblyAI) {
         clearAssemblyAITranscript();
       } else {
@@ -432,12 +458,13 @@
       console.error('Error in voice mode:', error);
       listeningState = 'idle';
       isProcessing = false;
+      lastSentMessage = ''; // Reset in caso di errore
       showError = true;
       errorMessage = 'Errore nell\'invio del messaggio. Riprova.';
       
-      // Riavvia l'ascolto dopo un errore
+      // Riavvia l'ascolto dopo un errore (solo se non è già in ascolto)
       setTimeout(() => {
-        if ($isVoiceModeActive && isMicrophoneEnabled) {
+        if ($isVoiceModeActive && isMicrophoneEnabled && listeningState === 'idle' && !isProcessing) {
           startVoiceListening();
         }
       }, 2000);
