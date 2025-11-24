@@ -13,6 +13,10 @@
   let showMoveMenu = false;
   let moveMenuChatId = null;
   let moveMenuPosition = { x: 0, y: 0 };
+  let showSearchInput = false;
+  let searchInputRef = null;
+  let showTemporaryButton = false;
+  let temporaryButtonFading = false;
   
   // Organizza le chat per progetto
   $: organizedChats = (() => {
