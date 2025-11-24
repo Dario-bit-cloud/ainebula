@@ -53,3 +53,36 @@ export function isVoiceAvailable() {
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
+export async function requestMicrophonePermission() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Chiudi lo stream immediatamente, serve solo per richiedere il permesso
+    stream.getTracks().forEach(track => track.stop());
+    return { success: true };
+  } catch (error) {
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      return { success: false, error: 'permission-denied' };
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      return { success: false, error: 'no-device' };
+    } else {
+      return { success: false, error: 'unknown' };
+    }
+  }
+}
+
+export async function checkMicrophonePermission() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const hasMicrophone = devices.some(device => device.kind === 'audioinput');
+    if (!hasMicrophone) {
+      return { available: false, error: 'no-device' };
+    }
+    
+    // Prova a richiedere il permesso
+    const result = await requestMicrophonePermission();
+    return { available: result.success, error: result.error };
+  } catch (error) {
+    return { available: false, error: 'unknown' };
+  }
+}
+

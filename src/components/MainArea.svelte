@@ -5,7 +5,7 @@
   import { selectedModel } from '../stores/models.js';
   import { hasActiveSubscription } from '../stores/user.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
-  import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable } from '../services/voiceService.js';
+  import { initVoiceRecognition, startListening, stopListening, isVoiceAvailable, requestMicrophonePermission, checkMicrophonePermission } from '../services/voiceService.js';
   import { isPremiumModalOpen, isVoiceSelectionModalOpen, selectedPrompt, isMobile } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
   import { renderMarkdown, initCodeCopyButtons } from '../utils/markdown.js';
@@ -33,6 +33,9 @@
   let showImageStyles = false;
   let selectedImageIndex = null;
   let imageDescription = '';
+  let showMicrophoneError = false;
+  let microphoneError = '';
+  let microphoneErrorType = ''; // 'no-device', 'permission-denied', 'unknown'
   
   const imageStyles = [
     {
