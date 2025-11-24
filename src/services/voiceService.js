@@ -27,43 +27,56 @@ export function initVoiceRecognition(onResult, onError, onInterimResult = null) 
   recognition.interimResults = true; // Risultati intermedi per feedback visivo
   
   let finalTranscript = '';
+  let accumulatedTranscript = ''; // Accumula tutto il testo
   let silenceTimeout = null;
   
   recognition.onresult = (event) => {
     let interimTranscript = '';
     
-    // Reset timeout silenzio
+    // Reset timeout silenzio ogni volta che c'è attività
     if (silenceTimeout) {
       clearTimeout(silenceTimeout);
+      silenceTimeout = null;
     }
     
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const transcript = event.results[i][0].transcript;
       if (event.results[i].isFinal) {
+        // Accumula i risultati finali
         finalTranscript += transcript + ' ';
+        accumulatedTranscript = finalTranscript; // Aggiorna il testo accumulato
       } else {
+        // Risultati intermedi
         interimTranscript += transcript;
       }
     }
     
-    // Callback per risultati intermedi (feedback visivo)
-    if (onInterimResult && interimTranscript) {
-      onInterimResult(interimTranscript);
+    // Combina risultati finali e intermedi per il feedback visivo
+    const displayText = finalTranscript + interimTranscript;
+    
+    // Callback per risultati intermedi (feedback visivo) - mostra tutto il testo
+    if (onInterimResult && displayText.trim()) {
+      onInterimResult(displayText.trim());
     }
     
-    // Se c'è un risultato finale, chiama onResult
-    if (finalTranscript.trim()) {
-      onResult(finalTranscript.trim());
-      finalTranscript = ''; // Reset per il prossimo ciclo
+    // Aggiorna il testo accumulato con anche i risultati intermedi
+    if (interimTranscript) {
+      accumulatedTranscript = finalTranscript + interimTranscript;
+    } else if (finalTranscript) {
+      accumulatedTranscript = finalTranscript;
     }
     
-    // Timeout per rilevare fine frase dopo silenzio
+    // NON inviare immediatamente - aspetta sempre un periodo di silenzio
+    // Timeout per rilevare fine frase dopo silenzio prolungato
     silenceTimeout = setTimeout(() => {
-      if (finalTranscript.trim()) {
-        onResult(finalTranscript.trim());
+      // Invia il testo accumulato solo dopo silenzio prolungato
+      if (accumulatedTranscript.trim()) {
+        onResult(accumulatedTranscript.trim());
         finalTranscript = '';
+        accumulatedTranscript = '';
       }
-    }, 2000); // 2 secondi di silenzio = fine frase
+      silenceTimeout = null;
+    }, 4000); // 4 secondi di silenzio = fine frase (aumentato per frasi più lunghe)
   };
   
   recognition.onerror = (event) => {
@@ -183,7 +196,7 @@ export function speakText(text, voiceId = null, onEnd = null) {
   
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'it-IT';
-  utterance.rate = 1.0;
+  utterance.rate = 1.25; // Velocità aumentata da 1.0 a 1.25 (25% più veloce)
   utterance.pitch = 1.0;
   utterance.volume = 1.0;
   

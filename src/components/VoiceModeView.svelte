@@ -111,15 +111,8 @@
         }
         
         // Se c'è testo intermedio, imposta un timer per rilevare fine frase
-        if (interim.trim()) {
-          silenceTimer = setTimeout(() => {
-            // Dopo 2 secondi di silenzio, considera la frase completa
-            if (interim.trim() && !isProcessing && listeningState === 'listening') {
-              handleVoiceMessage(interim.trim());
-            }
-            silenceTimer = null;
-          }, 2000);
-        }
+        // NON inviare immediatamente - aspetta un silenzio più lungo
+        // Il timeout è gestito nel servizio vocale stesso
       }
     );
   }
