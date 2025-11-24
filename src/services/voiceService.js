@@ -5,6 +5,7 @@ let isListening = false;
 let shouldAutoRestart = false;
 let speechSynthesis = null;
 let currentUtterance = null;
+let currentAccumulatedText = ''; // Testo accumulato disponibile per invio manuale
 
 // Inizializza Speech Synthesis
 if (typeof window !== 'undefined') {
@@ -54,29 +55,32 @@ export function initVoiceRecognition(onResult, onError, onInterimResult = null) 
     // Combina risultati finali e intermedi per il feedback visivo
     const displayText = finalTranscript + interimTranscript;
     
+    // Aggiorna il testo accumulato globale per accesso esterno
+    if (interimTranscript) {
+      accumulatedTranscript = finalTranscript + interimTranscript;
+      currentAccumulatedText = accumulatedTranscript;
+    } else if (finalTranscript) {
+      accumulatedTranscript = finalTranscript;
+      currentAccumulatedText = accumulatedTranscript;
+    }
+    
     // Callback per risultati intermedi (feedback visivo) - mostra tutto il testo
     if (onInterimResult && displayText.trim()) {
       onInterimResult(displayText.trim());
     }
     
-    // Aggiorna il testo accumulato con anche i risultati intermedi
-    if (interimTranscript) {
-      accumulatedTranscript = finalTranscript + interimTranscript;
-    } else if (finalTranscript) {
-      accumulatedTranscript = finalTranscript;
-    }
-    
-    // NON inviare immediatamente - aspetta sempre un periodo di silenzio
-    // Timeout per rilevare fine frase dopo silenzio prolungato
+    // Invia automaticamente dopo 3 secondi di silenzio
     silenceTimeout = setTimeout(() => {
-      // Invia il testo accumulato solo dopo silenzio prolungato
+      // Invia il testo accumulato solo dopo silenzio
       if (accumulatedTranscript.trim()) {
-        onResult(accumulatedTranscript.trim());
+        const textToSend = accumulatedTranscript.trim();
         finalTranscript = '';
         accumulatedTranscript = '';
+        currentAccumulatedText = '';
+        onResult(textToSend);
       }
       silenceTimeout = null;
-    }, 4000); // 4 secondi di silenzio = fine frase (aumentato per frasi più lunghe)
+    }, 3000); // 3 secondi di silenzio = fine frase
   };
   
   recognition.onerror = (event) => {
@@ -140,6 +144,14 @@ export function stopListening() {
       console.log('Recognition stop error:', e);
     }
   }
+}
+
+export function getCurrentTranscript() {
+  return currentAccumulatedText || '';
+}
+
+export function clearCurrentTranscript() {
+  currentAccumulatedText = '';
 }
 
 export function isListeningActive() {

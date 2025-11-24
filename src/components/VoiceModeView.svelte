@@ -13,7 +13,9 @@
     speakText,
     stopSpeaking,
     isSpeaking,
-    isListeningActive
+    isListeningActive,
+    getCurrentTranscript,
+    clearCurrentTranscript
   } from '../services/voiceService.js';
   import { 
     chats, 
@@ -37,6 +39,7 @@
   let listeningState = 'idle'; // 'idle', 'listening', 'processing', 'speaking'
   let errorMessage = '';
   let showError = false;
+  let accumulatedText = ''; // Testo accumulato per invio manuale
   
   $: currentVoice = availableVoices.find(v => v.id === $selectedVoice) || availableVoices[0];
   
@@ -79,13 +82,16 @@
   function initializeVoiceRecognition() {
     recognition = initVoiceRecognition(
       (transcript) => {
-        // Risultato finale - invia il messaggio
+        // Risultato finale - invia il messaggio automaticamente
         if (transcript.trim() && !isProcessing) {
           // Cancella il timer di silenzio se presente
           if (silenceTimer) {
             clearTimeout(silenceTimer);
             silenceTimer = null;
           }
+          // Reset del testo accumulato
+          accumulatedText = '';
+          clearCurrentTranscript();
           handleVoiceMessage(transcript.trim());
         }
       },
@@ -104,15 +110,13 @@
       (interim) => {
         // Risultato intermedio - mostra feedback visivo
         interimTranscript = interim;
+        // Aggiorna il testo accumulato dal servizio vocale
+        accumulatedText = getCurrentTranscript() || interim;
         
         // Reset timer silenzio quando c'è attività vocale
         if (silenceTimer) {
           clearTimeout(silenceTimer);
         }
-        
-        // Se c'è testo intermedio, imposta un timer per rilevare fine frase
-        // NON inviare immediatamente - aspetta un silenzio più lungo
-        // Il timeout è gestito nel servizio vocale stesso
       }
     );
   }
@@ -151,6 +155,8 @@
     if (recognition && !isListeningActive()) {
       currentTranscript = '';
       interimTranscript = '';
+      accumulatedText = '';
+      clearCurrentTranscript();
       listeningState = 'listening';
       stopSpeaking(); // Ferma eventuale TTS in corso
       startListening();
@@ -166,6 +172,37 @@
     listeningState = 'idle';
     currentTranscript = '';
     interimTranscript = '';
+    accumulatedText = '';
+    clearCurrentTranscript();
+  }
+  
+  function handleManualSend() {
+    const textToSend = getCurrentTranscript() || accumulatedText || interimTranscript;
+    if (textToSend.trim() && !isProcessing && listeningState === 'listening') {
+      // Cancella il timer automatico
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+      // Reset del testo accumulato
+      const finalText = textToSend.trim();
+      accumulatedText = '';
+      interimTranscript = '';
+      clearCurrentTranscript();
+      handleVoiceMessage(finalText);
+    }
+  }
+  
+  function handleStopSpeaking() {
+    stopSpeaking();
+    listeningState = 'idle';
+    isProcessing = false;
+    // Riprendi l'ascolto automaticamente
+    setTimeout(() => {
+      if ($isVoiceModeActive && isMicrophoneEnabled) {
+        startVoiceListening();
+      }
+    }, 500);
   }
   
   async function handleVoiceMessage(messageText) {
@@ -260,6 +297,10 @@
         }, 500);
       }
       
+      // Reset del testo accumulato dopo l'invio
+      accumulatedText = '';
+      clearCurrentTranscript();
+      
     } catch (error) {
       console.error('Error in voice mode:', error);
       listeningState = 'idle';
@@ -312,6 +353,27 @@
       });
     }
   }
+  
+  // Aggiorna periodicamente il testo accumulato durante l'ascolto
+  let updateInterval = null;
+  $: {
+    if (listeningState === 'listening' && !updateInterval) {
+      updateInterval = setInterval(() => {
+        if (listeningState === 'listening') {
+          accumulatedText = getCurrentTranscript() || interimTranscript;
+        }
+      }, 500); // Aggiorna ogni 500ms
+    } else if (listeningState !== 'listening' && updateInterval) {
+      clearInterval(updateInterval);
+      updateInterval = null;
+    }
+  }
+  
+  onDestroy(() => {
+    if (updateInterval) {
+      clearInterval(updateInterval);
+    }
+  });
 </script>
 
 {#if $isVoiceModeActive}
@@ -403,6 +465,31 @@
     </div>
     
     <div class="voice-controls">
+      {#if listeningState === 'listening' && (accumulatedText.trim() || interimTranscript.trim())}
+        <button 
+          class="control-button send" 
+          on:click={handleManualSend}
+          title="Invia messaggio"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      {/if}
+      
+      {#if listeningState === 'speaking'}
+        <button 
+          class="control-button stop-speaking" 
+          on:click={handleStopSpeaking}
+          title="Ferma lettura e continua"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="6" width="12" height="12" rx="2"/>
+          </svg>
+        </button>
+      {/if}
+      
       <button 
         class="control-button microphone" 
         class:active={listeningState === 'listening'}
@@ -415,7 +502,7 @@
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="6" y="6" width="12" height="12" rx="2"/>
           </svg>
-        {:else if listeningState === 'processing' || listeningState === 'speaking'}
+        {:else if listeningState === 'processing'}
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="8" x2="12" y2="12"/>
@@ -760,6 +847,26 @@
     50% {
       transform: scale(1.05);
     }
+  }
+
+  .control-button.send {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+  }
+
+  .control-button.send:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 30px rgba(16, 185, 129, 0.5);
+  }
+
+  .control-button.stop-speaking {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
+  }
+
+  .control-button.stop-speaking:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 30px rgba(245, 158, 11, 0.5);
   }
 
   .control-button.close {
