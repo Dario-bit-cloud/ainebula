@@ -383,10 +383,8 @@
       await tick();
       scrollToBottom();
       
-      // Verifica se il modello supporta generazione immagini
-      const models = get(availableModels);
-      const selectedModelData = models.find(m => m.id === $selectedModel);
-      const modelSupportsImageGeneration = selectedModelData?.imageGeneration === true;
+      // Verifica se il modello selezionato è Nebula Dreamer (unico modello per generazione immagini)
+      const isNebulaDreamer = $selectedModel === 'nebula-dreamer';
       
       // Rileva se il messaggio è una richiesta di generazione immagini
       const imageGenerationKeywords = [
@@ -400,8 +398,8 @@
         messageLower.includes(keyword) || messageLower.startsWith(keyword)
       );
       
-      // Usa generazione immagini se il modello la supporta E il messaggio è una richiesta di immagine
-      const shouldGenerateImage = modelSupportsImageGeneration && isImageRequest;
+      // Usa generazione immagini solo se è Nebula Dreamer E il messaggio è una richiesta di immagine
+      const shouldGenerateImage = isNebulaDreamer && isImageRequest;
       
       isGenerating.set(true);
       
