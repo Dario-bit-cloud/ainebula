@@ -11,6 +11,7 @@
   import { renderMarkdown, initCodeCopyButtons } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
   import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
+  import PrivacyModal from './PrivacyModal.svelte';
   
   let inputValue = '';
   let inputRef;
@@ -32,6 +33,7 @@
   let selectedImageIndex = null;
   let imageDescription = '';
   let showPrivacyCard = true;
+  let isPrivacyModalOpen = false;
   
   const imageStyles = [
     {
@@ -975,10 +977,10 @@
           </div>
           
           {#if showPrivacyCard}
-            <div class="privacy-card">
+            <div class="privacy-card" on:click={() => isPrivacyModalOpen = true} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && (isPrivacyModalOpen = true)}>
               <div class="privacy-card-header">
                 <span class="privacy-card-title">Qualunque cosa mi chiedi è:</span>
-                <button class="privacy-card-close" on:click={() => showPrivacyCard = false} title="Chiudi">
+                <button class="privacy-card-close" on:click|stopPropagation={() => showPrivacyCard = false} title="Chiudi">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"/>
                     <line x1="6" y1="6" x2="18" y2="18"/>
@@ -1016,6 +1018,12 @@
                   <h3 class="privacy-feature-title">Trattato con rispetto</h3>
                   <p class="privacy-feature-description">Le nostre conversazioni non vengono mai usate per l'addestramento.</p>
                 </div>
+              </div>
+              <div class="privacy-card-footer">
+                <span class="privacy-card-link">Scopri di più</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
               </div>
             </div>
           {/if}
@@ -1458,6 +1466,8 @@
   </div>
 </main>
 
+<PrivacyModal bind:isOpen={isPrivacyModalOpen} />
+
 <!-- Modal errore microfono -->
 
 <style>
@@ -1766,6 +1776,18 @@
     border-radius: 16px;
     padding: 24px;
     animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .privacy-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-color: var(--accent-blue);
+  }
+  
+  .privacy-card:active {
+    transform: translateY(0);
   }
   
   .privacy-card-header {
@@ -1849,6 +1871,37 @@
     line-height: 1.6;
     margin: 0;
   }
+  
+  .privacy-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    color: var(--accent-blue);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .privacy-card-link {
+    color: var(--accent-blue);
+    transition: color 0.2s;
+  }
+  
+  .privacy-card:hover .privacy-card-link {
+    color: #60a5fa;
+  }
+  
+  .privacy-card-footer svg {
+    color: var(--accent-blue);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .privacy-card:hover .privacy-card-footer svg {
+    transform: translateX(4px);
+  }
 
   @media (max-width: 768px) {
     .welcome-message {
@@ -1895,6 +1948,11 @@
     
     .privacy-icon {
       margin: 0 auto 8px;
+    }
+    
+    .privacy-card-footer {
+      margin-top: 16px;
+      padding-top: 16px;
     }
 
     .welcome-text {
