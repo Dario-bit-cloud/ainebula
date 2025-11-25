@@ -1934,25 +1934,7 @@
     }
     
     .privacy-card {
-      padding: 20px 16px;
-    }
-    
-    .privacy-features {
-      grid-template-columns: 1fr;
-      gap: 20px;
-    }
-    
-    .privacy-feature {
-      text-align: center;
-    }
-    
-    .privacy-icon {
-      margin: 0 auto 8px;
-    }
-    
-    .privacy-card-footer {
-      margin-top: 16px;
-      padding-top: 16px;
+      display: none;
     }
 
     .welcome-text {
