@@ -8,9 +8,10 @@
   import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
-  import { t, availableLanguages } from '../utils/i18n.js';
-  import { currentLanguage } from '../stores/language.js';
+  import { availableLanguages } from '../utils/i18n.js';
+  import { currentLanguage, t } from '../stores/language.js';
   
   let activeSection = 'generale';
   let theme = 'system';
@@ -284,28 +285,28 @@
     const deleteWord = deleteWords[currentLang] || deleteWords['it'];
     
     const firstConfirmation = await showPrompt(
-      t('deleteAccountConfirm1'),
-      t('deleteAccount'),
+      get(t)('deleteAccountConfirm1'),
+      get(t)('deleteAccount'),
       '',
       `Digita "${deleteWord}"`,
-      t('confirm'),
-      t('cancel'),
+      get(t)('confirm'),
+      get(t)('cancel'),
       'text'
     );
     
     if (firstConfirmation !== deleteWord) {
       if (firstConfirmation !== null) {
-        await showAlert(t('deleteAccountInvalid'), t('operationCancelled'), t('ok'), 'error');
+        await showAlert(get(t)('deleteAccountInvalid'), get(t)('operationCancelled'), get(t)('ok'), 'error');
       }
       return;
     }
     
     // Seconda conferma: dialog di conferma finale
     const secondConfirmation = await showConfirm(
-      t('deleteAccountConfirm2'),
-      t('deleteAccount'),
-      t('deleteAccountFinal'),
-      t('cancel'),
+      get(t)('deleteAccountConfirm2'),
+      get(t)('deleteAccount'),
+      get(t)('deleteAccountFinal'),
+      get(t)('cancel'),
       'danger'
     );
     
@@ -333,7 +334,7 @@
         // Pulisci tutto il localStorage
         localStorage.clear();
         
-        await showAlert(t('deleteAccountSuccess'), t('deleteAccount'), t('ok'), 'success');
+        await showAlert(get(t)('deleteAccountSuccess'), get(t)('deleteAccount'), get(t)('ok'), 'success');
         
         // Ricarica la pagina dopo un breve delay
         setTimeout(() => {
@@ -341,12 +342,12 @@
         }, 1500);
       } else {
         isDeletingAccount = false;
-        await showAlert(t('deleteAccountError', { error: result.message || t('error') }), t('error'), t('ok'), 'error');
+        await showAlert(get(t)('deleteAccountError', { error: result.message || get(t)('error') }), get(t)('error'), get(t)('ok'), 'error');
       }
     } catch (error) {
       isDeletingAccount = false;
       console.error('Errore durante eliminazione account:', error);
-      await showAlert(t('deleteAccountError', { error: error.message }), t('error'), t('ok'), 'error');
+      await showAlert(get(t)('deleteAccountError', { error: error.message }), get(t)('error'), get(t)('ok'), 'error');
     }
   }
   
@@ -407,7 +408,7 @@
   async function handleDownloadSubscriptionKey() {
     const userData = $userStore;
     if (!userData.subscription?.key) {
-      await showAlert(t('noKeyAvailable'), t('keyNotAvailable'), t('ok'), 'warning');
+      await showAlert(get(t)('noKeyAvailable'), get(t)('keyNotAvailable'), get(t)('ok'), 'warning');
       return;
     }
     
@@ -429,7 +430,7 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    await showAlert(t('downloadKeySuccess'), t('keyDownloaded'), t('ok'), 'success');
+    await showAlert(get(t)('downloadKeySuccess'), get(t)('keyDownloaded'), get(t)('ok'), 'success');
   }
   
   function handleImportSubscriptionKey() {
@@ -456,12 +457,12 @@
                 active: true
               }
             }));
-            showAlert(t('importKeySuccess'), t('keyImported'), t('ok'), 'success');
+            showAlert(get(t)('importKeySuccess'), get(t)('keyImported'), get(t)('ok'), 'success');
           } else {
-            showAlert(t('invalidFile'), t('error'), t('ok'), 'error');
+            showAlert(get(t)('invalidFile'), get(t)('error'), get(t)('ok'), 'error');
           }
         } catch (error) {
-          showAlert(t('importError'), t('error'), t('ok'), 'error');
+          showAlert(get(t)('importError'), get(t)('error'), get(t)('ok'), 'error');
           console.error('Import error:', error);
         }
       };
@@ -575,9 +576,9 @@
   }
   
   function getPlanName(plan) {
-    if (!plan || plan === 'free') return t('free');
-    if (plan === 'pro') return t('pro');
-    if (plan === 'max') return t('max');
+    if (!plan || plan === 'free') return get(t)('free');
+    if (plan === 'pro') return get(t)('pro');
+    if (plan === 'max') return get(t)('max');
     return plan;
   }
   
@@ -606,7 +607,7 @@
     <div class="modal-content">
       <!-- Header -->
       <div class="modal-header">
-        <h2 class="modal-title">{t('settings')}</h2>
+        <h2 class="modal-title">{$t('settings')}</h2>
         <button class="close-button" on:click={closeModal}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -637,7 +638,7 @@
           <!-- Generale -->
           {#if activeSection === 'generale'}
             <div class="setting-section" class:section-visible={activeSection === 'generale'}>
-              <h3 class="setting-title">{t('theme')}</h3>
+              <h3 class="setting-title">{$t('theme')}</h3>
               <div class="theme-buttons">
                 <button 
                   class="theme-button" 
@@ -655,7 +656,7 @@
                     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                   </svg>
-                  <span>{t('light')}</span>
+                  <span>{$t('light')}</span>
                 </button>
                 <button 
                   class="theme-button" 
@@ -665,7 +666,7 @@
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
                   </svg>
-                  <span>{t('dark')}</span>
+                  <span>{$t('dark')}</span>
                 </button>
                 <button 
                   class="theme-button" 
@@ -677,13 +678,13 @@
                     <line x1="8" y1="21" x2="16" y2="21"/>
                     <line x1="12" y1="17" x2="12" y2="21"/>
                   </svg>
-                  <span>{t('system')}</span>
+                  <span>{$t('system')}</span>
                 </button>
               </div>
             </div>
             
             <div class="setting-section" class:section-visible={activeSection === 'generale'}>
-              <h3 class="setting-title">{t('language')}</h3>
+              <h3 class="setting-title">{$t('language')}</h3>
               <select class="setting-select" bind:value={language} on:change={handleLanguageChange}>
                 {#each availableLanguages as lang}
                   <option value={lang.code}>{lang.nativeName[$currentLanguage] || lang.name}</option>
@@ -696,38 +697,38 @@
           {#if activeSection === 'abbonamento'}
             {#if isLoadingSubscription}
               <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
-                <div class="loading-state">{t('loadingSubscription')}</div>
+                <div class="loading-state">{$t('loadingSubscription')}</div>
               </div>
             {:else}
               <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
-                <h3 class="setting-title">{t('subscriptionStatus')}</h3>
+                <h3 class="setting-title">{$t('subscriptionStatus')}</h3>
                 
                 <div class="subscription-status">
                   <div class="subscription-badge" class:active={isActive} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
                     <span class="badge-label">{planName}</span>
                     {#if isActive}
-                      <span class="badge-status">{t('active')}</span>
+                      <span class="badge-status">{$t('active')}</span>
                     {:else}
-                      <span class="badge-status">{t('inactive')}</span>
+                      <span class="badge-status">{$t('inactive')}</span>
                     {/if}
                   </div>
                 </div>
                 
                 <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
-                  <div class="setting-label">{t('currentPlan')}</div>
+                  <div class="setting-label">{$t('currentPlan')}</div>
                   <div class="setting-value">{planName}</div>
                 </div>
                 
                 {#if subscription?.expiresAt}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
-                    <div class="setting-label">{t('expiration')}</div>
+                    <div class="setting-label">{$t('expiration')}</div>
                     <div class="setting-value">{formatDate(subscription.expiresAt)}</div>
                   </div>
                 {/if}
                 
                 {#if subscription?.startedAt}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
-                    <div class="setting-label">{t('activationDate')}</div>
+                    <div class="setting-label">{$t('activationDate')}</div>
                     <div class="setting-value">{formatDate(subscription.startedAt)}</div>
                   </div>
                 {/if}
@@ -735,27 +736,27 @@
                 {#if !isActive || subscription?.plan === 'free'}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                     <div class="setting-info">
-                      <div class="setting-label">{t('upgradePlan')}</div>
-                      <div class="setting-description">{t('upgradeDescription')}</div>
+                      <div class="setting-label">{$t('upgradePlan')}</div>
+                      <div class="setting-description">{$t('upgradeDescription')}</div>
                     </div>
                     <button class="manage-button" on:click={handleUpgrade}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
                       </svg>
-                      {t('upgrade')}
+                      {$t('upgrade')}
                     </button>
                   </div>
                 {:else}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                     <div class="setting-info">
-                      <div class="setting-label">{t('manageSubscription')}</div>
-                      <div class="setting-description">{t('manageDescription')}</div>
+                      <div class="setting-label">{$t('manageSubscription')}</div>
+                      <div class="setting-description">{$t('manageDescription')}</div>
                     </div>
                     <button class="manage-button" on:click={handleUpgrade}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
                       </svg>
-                      {t('manage')}
+                      {$t('manage')}
                     </button>
                   </div>
                 {/if}
@@ -766,7 +767,7 @@
           <!-- Profilo -->
           {#if activeSection === 'profilo'}
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">{t('username')}</div>
+              <div class="setting-label">{$t('username')}</div>
               <div class="setting-value">
                 {#if $isAuthenticatedStore && $authUser?.username}
                   {$authUser.username}
@@ -779,7 +780,7 @@
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">{t('phoneNumber')}</div>
+              <div class="setting-label">{$t('phoneNumber')}</div>
               <div class="setting-value">
                 {#if isEditingPhone}
                   <div class="phone-edit-container">
@@ -787,7 +788,7 @@
                       type="tel" 
                       class="phone-input" 
                       bind:value={phoneInput} 
-                      placeholder={t('phoneNumber')}
+                      placeholder={$t('phoneNumber')}
                       disabled={isSavingPhone}
                     />
                     <div class="phone-edit-actions">
@@ -796,14 +797,14 @@
                         on:click={savePhoneNumber} 
                         disabled={isSavingPhone}
                       >
-                        {isSavingPhone ? t('save') + '...' : t('save')}
+                        {isSavingPhone ? get(t)('save') + '...' : get(t)('save')}
                       </button>
                       <button 
                         class="phone-cancel-button" 
                         on:click={cancelEditingPhone}
                         disabled={isSavingPhone}
                       >
-                        {t('cancel')}
+                        {$t('cancel')}
                       </button>
                     </div>
                   </div>
@@ -813,7 +814,7 @@
                     <button 
                       class="phone-edit-button" 
                       on:click={startEditingPhone}
-                      title={t('edit') + ' ' + t('phoneNumber')}
+                      title={$t('edit') + ' ' + get(t)('phoneNumber')}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
@@ -825,14 +826,14 @@
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">{t('disconnectAllDevices')}</div>
-              <button class="danger-button" on:click={handleDisconnect}>{t('disconnect')}</button>
+              <div class="setting-label">{$t('disconnectAllDevices')}</div>
+              <button class="danger-button" on:click={handleDisconnect}>{$t('disconnect')}</button>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">{t('deleteAccount')}</div>
+              <div class="setting-label">{$t('deleteAccount')}</div>
               <button class="danger-button" on:click={handleDeleteAccount} disabled={isDeletingAccount}>
-                {isDeletingAccount ? t('deletingAccount') : t('delete')}
+                {isDeletingAccount ? get(t)('deletingAccount') : get(t)('delete')}
               </button>
             </div>
           {/if}
@@ -840,25 +841,25 @@
           <!-- Dati -->
           {#if activeSection === 'dati'}
             <div class="setting-row" class:row-visible={activeSection === 'dati'}>
-              <div class="setting-label">{t('sharedLinks')}</div>
-              <button class="manage-button" on:click={handleManageSharedLinks}>{t('manage')}</button>
+              <div class="setting-label">{$t('sharedLinks')}</div>
+              <button class="manage-button" on:click={handleManageSharedLinks}>{$t('manage')}</button>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'dati'}>
               <div class="setting-info">
-                <div class="setting-label">{t('exportData')}</div>
-                <div class="setting-description">{t('exportDescription')}</div>
+                <div class="setting-label">{$t('exportData')}</div>
+                <div class="setting-description">{$t('exportDescription')}</div>
               </div>
               <button class="manage-button" on:click={handleExportData} disabled={isExporting}>
-                {isExporting ? t('exportCompleted') + '...' : t('exportData')}
+                {isExporting ? get(t)('exportCompleted') + '...' : get(t)('exportData')}
               </button>
             </div>
             
             {#if $userStore.subscription?.active && $userStore.subscription?.key}
               <div class="setting-row" class:row-visible={activeSection === 'dati'}>
                 <div class="setting-info">
-                  <div class="setting-label">{t('subscriptionKey')}</div>
-                  <div class="setting-description">{t('subscriptionKeyDescription')}</div>
+                  <div class="setting-label">{$t('subscriptionKey')}</div>
+                  <div class="setting-description">{$t('subscriptionKeyDescription')}</div>
                 </div>
                 <div class="setting-actions">
                   <button class="manage-button" on:click={handleDownloadSubscriptionKey}>
@@ -867,7 +868,7 @@
                       <polyline points="7 10 12 15 17 10"/>
                       <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    {t('downloadKey')}
+                    {$t('downloadKey')}
                   </button>
                   <button class="manage-button secondary" on:click={handleImportSubscriptionKey}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -875,16 +876,16 @@
                       <polyline points="17 8 12 3 7 8"/>
                       <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
-                    {t('importKey')}
+                    {$t('importKey')}
                   </button>
                 </div>
               </div>
             {/if}
             
             <div class="setting-row" class:row-visible={activeSection === 'dati'}>
-              <div class="setting-label">{t('deleteAllChats')}</div>
+              <div class="setting-label">{$t('deleteAllChats')}</div>
               <button class="danger-button" on:click={handleDeleteAllChats} disabled={isDeletingAllChats}>
-                {isDeletingAllChats ? t('deletingAccount') + '...' : t('clearAll')}
+                {isDeletingAllChats ? get(t)('deletingAccount') + '...' : get(t)('clearAll')}
               </button>
             </div>
           {/if}
@@ -892,13 +893,13 @@
           <!-- Informazioni -->
           {#if activeSection === 'informazioni'}
             <div class="setting-row" class:row-visible={activeSection === 'informazioni'}>
-              <div class="setting-label">{t('termsOfService')}</div>
-              <button class="view-button" on:click={handleViewTerms}>{t('view')}</button>
+              <div class="setting-label">{$t('termsOfService')}</div>
+              <button class="view-button" on:click={handleViewTerms}>{$t('view')}</button>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'informazioni'}>
-              <div class="setting-label">{t('privacyPolicy')}</div>
-              <button class="view-button" on:click={handleViewPrivacy}>{t('view')}</button>
+              <div class="setting-label">{$t('privacyPolicy')}</div>
+              <button class="view-button" on:click={handleViewPrivacy}>{$t('view')}</button>
             </div>
           {/if}
         </div>
@@ -978,7 +979,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 20px 24px;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--border-color);
     animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
   }
   
@@ -1043,8 +1044,8 @@
 
   .settings-sidebar {
     width: 200px;
-    background-color: #2d2d2d;
-    border-right: 1px solid #3a3a3a;
+    background-color: var(--bg-tertiary);
+    border-right: 1px solid var(--border-color);
     padding: 16px 0;
     display: flex;
     flex-direction: column;
@@ -1055,7 +1056,7 @@
     .settings-sidebar {
       width: 100%;
       border-right: none;
-      border-bottom: 1px solid #3a3a3a;
+      border-bottom: 1px solid var(--border-color);
       padding: 8px;
       flex-direction: row;
       overflow-x: auto;
@@ -1077,7 +1078,7 @@
     padding: 12px 20px;
     background: none;
     border: none;
-    color: #ffffff;
+    color: var(--text-primary);
     font-size: 14px;
     text-align: left;
     cursor: pointer;
@@ -1093,18 +1094,18 @@
     top: 0;
     height: 100%;
     width: 3px;
-    background-color: #3b82f6;
+    background-color: var(--accent-blue);
     transform: scaleY(0);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .sidebar-item:hover {
-    background-color: #3a3a3a;
+    background-color: var(--hover-bg);
     transform: translateX(4px);
   }
 
   .sidebar-item.active {
-    background-color: #3a3a3a;
+    background-color: var(--hover-bg);
   }
 
   .sidebar-item.active::before {
@@ -1194,7 +1195,7 @@
   .setting-title {
     font-size: 16px;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--text-primary);
     margin: 0 0 16px 0;
   }
 
@@ -1210,10 +1211,10 @@
     align-items: center;
     gap: 8px;
     padding: 16px;
-    background-color: #3a3a3a;
-    border: 1px solid #3a3a3a;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    color: #ffffff;
+    color: var(--text-primary);
     font-size: 14px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1229,7 +1230,7 @@
     width: 0;
     height: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.05);
     transform: translate(-50%, -50%);
     transition: width 0.6s, height 0.6s;
   }
@@ -1240,15 +1241,15 @@
   }
 
   .theme-button:hover {
-    background-color: #454545;
+    background-color: var(--hover-bg);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
   .theme-button.active {
-    background-color: #3a3a3a;
-    border-color: #ffffff;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+    background-color: var(--bg-tertiary);
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
   }
 
   .theme-button svg {
@@ -1266,10 +1267,10 @@
     width: 100%;
     max-width: 300px;
     padding: 10px 12px;
-    background-color: #3a3a3a;
-    border: 1px solid #3a3a3a;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    color: #ffffff;
+    color: var(--text-primary);
     font-size: 14px;
     font-family: inherit;
     outline: none;
@@ -1278,13 +1279,13 @@
   }
 
   .setting-select:hover {
-    border-color: #4a4a4a;
+    border-color: var(--text-secondary);
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .setting-select:focus {
-    border-color: #3b82f6;
+    border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
   }
 
@@ -1293,7 +1294,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 0;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--border-color);
     animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
   }
 
@@ -1318,13 +1319,13 @@
 
   .setting-label {
     font-size: 14px;
-    color: #ffffff;
+    color: var(--text-primary);
     font-weight: 500;
   }
 
   .setting-value {
     font-size: 14px;
-    color: #a0a0a0;
+    color: var(--text-secondary);
   }
 
   .setting-info {
@@ -1334,7 +1335,7 @@
 
   .setting-description {
     font-size: 13px;
-    color: #a0a0a0;
+    color: var(--text-secondary);
     margin-top: 4px;
     line-height: 1.5;
   }
@@ -1342,10 +1343,10 @@
   .manage-button,
   .view-button {
     padding: 8px 16px;
-    background-color: #3a3a3a;
+    background-color: var(--bg-tertiary);
     border: none;
     border-radius: 6px;
-    color: #ffffff;
+    color: var(--text-primary);
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -1364,7 +1365,7 @@
     width: 0;
     height: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.05);
     transform: translate(-50%, -50%);
     transition: width 0.6s, height 0.6s;
   }
@@ -1377,9 +1378,9 @@
 
   .manage-button:hover,
   .view-button:hover {
-    background-color: #454545;
+    background-color: var(--hover-bg);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
   .manage-button:active,
@@ -1443,12 +1444,12 @@
     gap: 12px;
     padding: 12px 20px;
     border-radius: 8px;
-    background-color: #3a3a3a;
-    border: 1px solid #3a3a3a;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
   }
   
   .subscription-badge.active {
-    border-color: #3b82f6;
+    border-color: var(--accent-blue);
   }
   
   .subscription-badge.pro {
@@ -1464,7 +1465,7 @@
   .badge-label {
     font-size: 16px;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--text-primary);
   }
   
   .badge-status {
@@ -1483,11 +1484,11 @@
   
   .manage-button.secondary {
     background-color: transparent;
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--border-color);
   }
   
   .manage-button.secondary:hover {
-    background-color: #3a3a3a;
+    background-color: var(--bg-tertiary);
   }
 
   .phone-display-container {
@@ -1499,7 +1500,7 @@
   .phone-edit-button {
     background: none;
     border: none;
-    color: #a0a0a0;
+    color: var(--text-secondary);
     cursor: pointer;
     padding: 4px;
     display: flex;
@@ -1510,8 +1511,8 @@
   }
 
   .phone-edit-button:hover {
-    color: #ffffff;
-    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    background-color: var(--hover-bg);
   }
 
   .phone-edit-container {
@@ -1523,10 +1524,10 @@
 
   .phone-input {
     padding: 8px 12px;
-    background-color: #3a3a3a;
-    border: 1px solid #3a3a3a;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
-    color: #ffffff;
+    color: var(--text-primary);
     font-size: 14px;
     font-family: inherit;
     outline: none;
@@ -1534,7 +1535,7 @@
   }
 
   .phone-input:focus {
-    border-color: #3b82f6;
+    border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
   }
 
@@ -1560,7 +1561,7 @@
   }
 
   .phone-save-button {
-    background-color: #3b82f6;
+    background-color: var(--accent-blue);
     color: #ffffff;
   }
 
@@ -1575,12 +1576,12 @@
   }
 
   .phone-cancel-button {
-    background-color: #3a3a3a;
-    color: #ffffff;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
   }
 
   .phone-cancel-button:hover:not(:disabled) {
-    background-color: #454545;
+    background-color: var(--hover-bg);
   }
 
   .phone-cancel-button:disabled {

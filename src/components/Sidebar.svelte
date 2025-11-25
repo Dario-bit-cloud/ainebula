@@ -3,12 +3,12 @@
   import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, loadChats, syncChatsOnLogin } from '../stores/chat.js';
   import { isAuthenticatedStore, user as authUser } from '../stores/auth.js';
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { projects, updateProject, deleteProject } from '../stores/projects.js';
   import { showConfirm } from '../services/dialogService.js';
-  import { t } from '../utils/i18n.js';
-  import { currentLanguage } from '../stores/language.js';
+  import { currentLanguage, t } from '../stores/language.js';
   
   let activeItem = 'new-chat';
   let searchInput = '';
@@ -213,7 +213,7 @@
   
   async function handleDeleteChat(event, chatId) {
     event.stopPropagation();
-    const confirmed = await showConfirm(t('deleteChatConfirm'), t('deleteChat'), t('delete'), t('cancel'), 'danger');
+    const confirmed = await showConfirm(get(t)('deleteChatConfirm'), get(t)('deleteChat'), get(t)('delete'), get(t)('cancel'), 'danger');
     if (confirmed) {
       await deleteChat(chatId);
     }
@@ -232,9 +232,9 @@
     const diff = now - date;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     
-    if (days === 0) return t('today');
-    if (days === 1) return t('yesterday');
-    if (days < 7) return t('daysAgo', { n: days });
+    if (days === 0) return get(t)('today');
+    if (days === 1) return get(t)('yesterday');
+    if (days < 7) return get(t)('daysAgo', { n: days });
     const lang = $currentLanguage || 'it';
     const localeMap = { it: 'it-IT', en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE' };
     return date.toLocaleDateString(localeMap[lang] || 'it-IT', { day: 'numeric', month: 'short' });
@@ -284,7 +284,7 @@
   
   async function handleProjectDelete(event, projectId) {
     event.stopPropagation();
-    const confirmed = await showConfirm(t('deleteFolderConfirm'), t('deleteFolder'), t('delete'), t('cancel'), 'danger');
+    const confirmed = await showConfirm(get(t)('deleteFolderConfirm'), get(t)('deleteFolder'), get(t)('delete'), get(t)('cancel'), 'danger');
     if (confirmed) {
       // Rimuovi projectId dalle chat prima di eliminare la cartella
       $chats.forEach(chat => {
@@ -330,7 +330,7 @@
     <div class="new-chat-wrapper" on:click={() => handleMenuClick('new-chat')}>
       <div class="new-chat-glow"></div>
       <button class="new-chat-button" role="button">
-        {t('newChat')}
+        {$t('newChat')}
         <svg
           aria-hidden="true"
           viewBox="0 0 10 10"
@@ -352,9 +352,9 @@
     </div>
     
     {#each [
-      { id: 'search', label: t('searchChats'), icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
-      { id: 'library', label: t('library'), icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-      { id: 'projects', label: t('projects'), icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
+      { id: 'search', label: $t('searchChats'), icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
+      { id: 'library', label: $t('library'), icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+      { id: 'projects', label: $t('projects'), icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
     ] as item}
       <div class="nav-item-wrapper">
         {#if item.id === 'search'}
@@ -383,7 +383,7 @@
                 id="query"
                 class="search-input"
                 type="search"
-                placeholder={t('searchChats') + '...'}
+                placeholder={$t('searchChats') + '...'}
                 name="searchbar"
                 bind:value={searchInput}
                 on:input={(e) => searchQuery.set(e.target.value)}
@@ -393,7 +393,7 @@
               <button 
                 class="search-close-button"
                 on:click={() => handleMenuClick('search')}
-                title={t('close')}
+                title={$t('close')}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
@@ -456,8 +456,8 @@
             {/each}
           {:else if $searchQuery && $searchQuery.trim()}
             <div class="no-results">
-              <p>{t('noResultsFound')}</p>
-              <p class="no-results-subtitle">{t('noChatFound')}</p>
+              <p>{$t('noResultsFound')}</p>
+              <p class="no-results-subtitle">{$t('noChatFound')}</p>
             </div>
           {/if}
         {/if}
@@ -488,7 +488,7 @@
                   <button 
                     class="project-delete" 
                     on:click={(e) => handleProjectDelete(e, project.id)}
-                    title={t('deleteFolder')}
+                    title={$t('deleteFolder')}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <line x1="18" y1="6" x2="6" y2="18"/>
@@ -512,7 +512,7 @@
                           <button 
                             class="chat-move" 
                             on:click={(e) => handleMoveChat(e, chat.id)}
-                            title={t('moveToFolder')}
+                            title={$t('moveToFolder')}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                               <polyline points="9 18 15 12 9 6"/>
@@ -521,7 +521,7 @@
                           <button 
                             class="chat-delete" 
                             on:click={(e) => handleDeleteChat(e, chat.id)}
-                            title={t('deleteChat')}
+                            title={$t('deleteChat')}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                               <polyline points="3 6 5 6 21 6"/>
@@ -541,7 +541,7 @@
           {#if organizedChats.unassigned.length > 0}
             <div class="project-folder">
               <div class="project-header unassigned-header">
-                <span class="project-name">{t('chatWithoutFolder')}</span>
+                <span class="project-name">{$t('chatWithoutFolder')}</span>
                 <span class="project-count">({organizedChats.unassigned.length})</span>
               </div>
               <div class="project-chats">
@@ -559,7 +559,7 @@
                       <button 
                         class="chat-move" 
                         on:click={(e) => handleMoveChat(e, chat.id)}
-                        title={t('moveToFolder')}
+                        title={$t('moveToFolder')}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <polyline points="9 18 15 12 9 6"/>
@@ -568,7 +568,7 @@
                       <button 
                         class="chat-delete" 
                         on:click={(e) => handleDeleteChat(e, chat.id)}
-                        title={t('deleteChat')}
+                        title={$t('deleteChat')}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <polyline points="3 6 5 6 21 6"/>
@@ -596,7 +596,7 @@
                 <button 
                   class="chat-delete" 
                   on:click={(e) => handleDeleteChat(e, chat.id)}
-                  title={t('deleteChat')}
+                  title={$t('deleteChat')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"/>
@@ -607,12 +607,12 @@
             {/each}
           {:else if $searchQuery}
             <div class="empty-state">
-              <p>{t('noChatFound')}</p>
+              <p>{$t('noChatFound')}</p>
             </div>
           {:else}
             <div class="empty-state">
-              <p>{t('noChatsYet')}</p>
-              <p class="empty-hint">{t('createNewChat')}</p>
+              <p>{$t('noChatsYet')}</p>
+              <p class="empty-hint">{$t('createNewChat')}</p>
             </div>
           {/if}
         {:else}
@@ -633,7 +633,7 @@
                   <button 
                     class="chat-delete" 
                     on:click={(e) => handleDeleteChat(e, chat.id)}
-                    title={t('deleteChat')}
+                    title={$t('deleteChat')}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="3 6 5 6 21 6"/>
@@ -683,7 +683,7 @@
                             <button 
                               class="chat-delete" 
                               on:click={(e) => handleDeleteChat(e, chat.id)}
-                              title={t('deleteChat')}
+                              title={$t('deleteChat')}
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"/>
@@ -700,8 +700,8 @@
             {/each}
           {:else}
             <div class="empty-state">
-              <p>{t('noChatsYet')}</p>
-              <p class="empty-hint">{t('createNewChat')}</p>
+              <p>{$t('noChatsYet')}</p>
+              <p class="empty-hint">{$t('createNewChat')}</p>
             </div>
           {/if}
         {/if}
@@ -710,10 +710,10 @@
     {#if showMoveMenu}
       <div class="move-menu-backdrop" on:click={closeMoveMenu}></div>
       <div class="move-menu" style="left: {moveMenuPosition.x}px; top: {moveMenuPosition.y}px">
-        <div class="move-menu-header">{t('moveToFolder')}</div>
+        <div class="move-menu-header">{$t('moveToFolder')}</div>
         <div class="move-menu-options">
           <button class="move-option" on:click={handleRemoveFromProject}>
-            <span>{t('removeFromFolder')}</span>
+            <span>{$t('removeFromFolder')}</span>
           </button>
           {#each $projects as project}
             <button class="move-option" on:click={() => handleMoveToProject(project.id)}>
@@ -740,14 +740,14 @@
         </svg>
       </div>
       <div class="user-details">
-        <div class="username">{$userStore.name || $isAuthenticatedStore ? ($authUser?.username || t('user')) : t('user')}</div>
+        <div class="username">{$userStore.name || $isAuthenticatedStore ? ($authUser?.username || $t('user')) : $t('user')}</div>
         <div class="workspace">
           {#if $isAuthenticatedStore && $authUser?.email}
             {$authUser.email}
           {:else if $userStore.email}
             {$userStore.email}
           {:else}
-            {t('noWorkspace')}
+            {$t('noWorkspace')}
           {/if}
         </div>
       </div>
@@ -759,7 +759,7 @@
         <path d="M23 21v-2a4 4 0 00-3-3.87"/>
         <path d="M16 3.13a4 4 0 010 7.75"/>
       </svg>
-      <span>{t('inviteAndEarn')}</span>
+      <span>{$t('inviteAndEarn')}</span>
     </button>
   </div>
 </aside>
@@ -1055,10 +1055,10 @@
     justify-content: center;
     width: 100%;
     padding: 12px 32px;
-    background-color: #171717;
+    background-color: var(--text-primary);
     border: none;
     border-radius: 12px;
-    color: white;
+    color: var(--bg-primary);
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
@@ -1067,8 +1067,9 @@
   }
   
   .new-chat-button:hover {
-    background-color: #1f1f1f;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    background-color: var(--text-primary);
+    opacity: 0.9;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
   }
   
@@ -1193,12 +1194,12 @@
     height: 45px;
     padding-left: 2.5rem;
     padding-right: 2.5rem;
-    box-shadow: 0 0 0 1.5px #2b2c37, 0 0 25px -17px #000;
+    box-shadow: 0 0 0 1.5px var(--border-color);
     border: 0;
     border-radius: 12px;
-    background-color: #16171d;
+    background-color: var(--bg-tertiary);
     outline: none;
-    color: #bdbecb;
+    color: var(--text-primary);
     transition: all 0.25s cubic-bezier(0.19, 1, 0.22, 1);
     cursor: text;
     z-index: 0;
@@ -1206,11 +1207,11 @@
   }
 
   .search-input::placeholder {
-    color: #bdbecb;
+    color: var(--text-secondary);
   }
 
   .search-input:hover {
-    box-shadow: 0 0 0 2.5px #2f303d, 0px 0px 25px -15px #000;
+    box-shadow: 0 0 0 2.5px var(--border-color);
   }
 
   .search-input:active {
@@ -1218,13 +1219,13 @@
   }
 
   .search-input:focus {
-    box-shadow: 0 0 0 2.5px #2f303d;
+    box-shadow: 0 0 0 2.5px var(--accent-blue);
   }
 
   .search-icon {
     position: absolute;
     left: 1rem;
-    fill: #bdbecb;
+    fill: var(--text-secondary);
     width: 1rem;
     height: 1rem;
     pointer-events: none;
@@ -1243,7 +1244,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #bdbecb;
+    color: var(--text-secondary);
     opacity: 0.6;
     transition: all 0.2s ease;
     z-index: 2;
@@ -1252,7 +1253,7 @@
 
   .search-close-button:hover {
     opacity: 1;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--hover-bg);
   }
 
   .no-results {

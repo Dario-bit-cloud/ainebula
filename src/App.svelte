@@ -298,12 +298,49 @@
   
   let authModalMode = 'login'; // 'login' o 'register'
   
-  // Inizializza autenticazione
+  // Inizializza autenticazione e tema
   onMount(() => {
     window.addEventListener('keydown', handleKeyboardShortcuts);
     initAuth();
     // Precarica SettingsModal dato che è un componente importante
     loadSettingsModal();
+    
+    // Inizializza il tema all'avvio
+    const savedTheme = localStorage.getItem('nebula-theme') || 'system';
+    const root = document.documentElement;
+    if (savedTheme === 'light') {
+      root.style.setProperty('--bg-primary', '#ffffff');
+      root.style.setProperty('--bg-secondary', '#f5f5f5');
+      root.style.setProperty('--bg-tertiary', '#e5e5e5');
+      root.style.setProperty('--text-primary', '#171717');
+      root.style.setProperty('--text-secondary', '#525252');
+      root.style.setProperty('--border-color', '#d4d4d4');
+    } else if (savedTheme === 'dark') {
+      root.style.setProperty('--bg-primary', '#171717');
+      root.style.setProperty('--bg-secondary', '#1f1f1f');
+      root.style.setProperty('--bg-tertiary', '#2a2a2a');
+      root.style.setProperty('--text-primary', '#ffffff');
+      root.style.setProperty('--text-secondary', '#a0a0a0');
+      root.style.setProperty('--border-color', '#3a3a3a');
+    } else {
+      // Sistema - usa preferenza sistema
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        root.style.setProperty('--bg-primary', '#171717');
+        root.style.setProperty('--bg-secondary', '#1f1f1f');
+        root.style.setProperty('--bg-tertiary', '#2a2a2a');
+        root.style.setProperty('--text-primary', '#ffffff');
+        root.style.setProperty('--text-secondary', '#a0a0a0');
+        root.style.setProperty('--border-color', '#3a3a3a');
+      } else {
+        root.style.setProperty('--bg-primary', '#ffffff');
+        root.style.setProperty('--bg-secondary', '#f5f5f5');
+        root.style.setProperty('--bg-tertiary', '#e5e5e5');
+        root.style.setProperty('--text-primary', '#171717');
+        root.style.setProperty('--text-secondary', '#525252');
+        root.style.setProperty('--border-color', '#d4d4d4');
+      }
+    }
   });
   
   function handleOpenAuth(event) {

@@ -1,6 +1,6 @@
 // Sistema di traduzioni i18n per Nebula AI
 
-const translations = {
+export const translations = {
   it: {
     // Generale
     'settings': 'Impostazioni',
@@ -1106,9 +1106,9 @@ export function getCurrentLanguage() {
   return saved || 'it';
 }
 
-// Funzione per tradurre
-export function t(key, params = {}) {
-  const lang = getCurrentLanguage();
+// Funzione per tradurre (versione non reattiva, per uso in contesti non-Svelte)
+export function t(key, params = {}, langOverride = null) {
+  const lang = langOverride || getCurrentLanguage();
   const translation = translations[lang]?.[key] || translations['it']?.[key] || key;
   
   // Sostituisci i parametri {param}

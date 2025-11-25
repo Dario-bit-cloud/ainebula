@@ -1,7 +1,8 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { get } from 'svelte/store';
   import { showConfirm } from '../services/dialogService.js';
-  import { t } from '../utils/i18n.js';
+  import { t } from '../stores/language.js';
   
   export let messageIndex;
   export let messageType; // 'user' o 'ai'
@@ -26,7 +27,7 @@
   }
   
   async function handleDelete() {
-    const confirmed = await showConfirm(t('deleteMessageConfirm') + ' ' + t('deleteMessageConfirmAll'), t('deleteMessage'), t('delete'), t('cancel'), 'danger');
+    const confirmed = await showConfirm(get(t)('deleteMessageConfirm') + ' ' + get(t)('deleteMessageConfirmAll'), get(t)('deleteMessage'), get(t)('delete'), get(t)('cancel'), 'danger');
     if (confirmed) {
       dispatch('delete');
       showMenu = false;
@@ -76,26 +77,26 @@
 <div class="message-actions-container">
   <div class="message-actions">
     {#if messageType === 'ai'}
-      <button class="action-button" on:click={handleThumbsUp} title={t('useful')}>
+      <button class="action-button" on:click={handleThumbsUp} title={$t('useful')}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
         </svg>
       </button>
-      <button class="action-button" on:click={handleThumbsDown} title={t('notUseful')}>
+      <button class="action-button" on:click={handleThumbsDown} title={$t('notUseful')}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zm7-13h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17"/>
         </svg>
       </button>
     {/if}
     
-      <button class="action-button" on:click={handleCopy} title={t('copy')}>
+      <button class="action-button" on:click={handleCopy} title={$t('copy')}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
         <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
       </svg>
     </button>
     
-    <button class="action-button menu-button" on:click={toggleMenu} title={t('moreActions')}>
+    <button class="action-button menu-button" on:click={toggleMenu} title={$t('moreActions')}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="1"/>
         <circle cx="19" cy="12" r="1"/>
@@ -111,7 +112,7 @@
               <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
-            {t('edit')}
+            {$t('edit')}
           </button>
         {/if}
         
@@ -122,7 +123,7 @@
               <polyline points="1 20 1 14 7 14"/>
               <path d="M3.51 9a9 9 0 0114.85 3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
             </svg>
-            {t('regenerate')}
+            {$t('regenerate')}
           </button>
           
           <button class="menu-item" on:click={handleReadAloud}>
@@ -132,7 +133,7 @@
               <path d="M19.07 4.93a10 10 0 010 14.14"/>
               <path d="M22 2l-2 2 2 2 2-2-2-2z" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            {t('readAloud')}
+            {$t('readAloud')}
           </button>
           
           <button class="menu-item" on:click={handleReport}>
@@ -141,7 +142,7 @@
               <line x1="4" y1="22" x2="4" y2="15"/>
               <line x1="4" y1="9" x2="4" y2="3"/>
             </svg>
-            {t('reportMessage')}
+            {$t('reportMessage')}
           </button>
           
           <div class="menu-divider"></div>
@@ -150,14 +151,14 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2v20M2 12h20"/>
             </svg>
-            {t('moreDetailed')}
+            {$t('moreDetailed')}
           </button>
           
           <button class="menu-item" on:click={handleMoreSimple}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            {t('moreSimple')}
+            {$t('moreSimple')}
           </button>
         {/if}
         
@@ -166,7 +167,7 @@
             <polyline points="3 6 5 6 21 6"/>
             <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
           </svg>
-          {t('delete')}
+          {$t('delete')}
         </button>
       </div>
     {/if}
