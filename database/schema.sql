@@ -236,3 +236,7 @@ CREATE INDEX IF NOT EXISTS idx_data_exports_token ON data_exports(export_token);
 -- Aggiungi colonna phone_number alla tabella users
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);
 
+-- Aggiungi colonne per 2FA (Two-Factor Authentication)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(255);
+
