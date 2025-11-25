@@ -312,7 +312,7 @@ export async function verifySession() {
       return { success: false, message: 'Nessun token trovato' };
     }
     
-    const response = await fetch(`${API_BASE_URL}/me`, {
+    const response = await fetch(`${API_BASE_URL}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -364,7 +364,7 @@ export async function logout() {
     const token = localStorage.getItem('auth_token');
     
     if (token) {
-      await fetch(`${API_BASE_URL}/logout`, {
+      await fetch(`${API_BASE_URL}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -413,7 +413,7 @@ export function isAuthenticated() {
  * Elimina l'account dell'utente corrente e tutti i dati associati
  */
 export async function deleteAccount() {
-  const url = `${API_BASE_URL}/delete-account`;
+  const url = `${API_BASE_URL}?action=delete-account`;
   const token = getToken();
   
   if (!token) {
@@ -503,7 +503,7 @@ export async function deleteAccount() {
  * Genera QR code per 2FA
  */
 export async function generate2FA() {
-  const url = `${API_BASE_URL}/2fa/generate`;
+  const url = `${API_BASE_URL}/2fa?action=generate`;
   const token = getToken();
   
   if (!token) {
@@ -537,7 +537,7 @@ export async function generate2FA() {
  * Verifica e abilita 2FA
  */
 export async function verify2FA(code) {
-  const url = `${API_BASE_URL}/2fa/verify`;
+  const url = `${API_BASE_URL}/2fa?action=verify`;
   const token = getToken();
   
   if (!token) {
@@ -572,7 +572,7 @@ export async function verify2FA(code) {
  * Disabilita 2FA
  */
 export async function disable2FA(code) {
-  const url = `${API_BASE_URL}/2fa/disable`;
+  const url = `${API_BASE_URL}/2fa?action=disable`;
   const token = getToken();
   
   if (!token) {
@@ -607,7 +607,7 @@ export async function disable2FA(code) {
  * Verifica lo stato del 2FA
  */
 export async function get2FAStatus() {
-  const url = `${API_BASE_URL}/2fa/status`;
+  const url = `${API_BASE_URL}/2fa?action=status`;
   const token = getToken();
   
   if (!token) {

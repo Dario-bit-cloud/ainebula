@@ -141,7 +141,7 @@
           return 'http://localhost:3001/api/auth';
         };
 
-        const response = await fetch(`${getApiBaseUrl()}/disconnect-all`, {
+        const response = await fetch(`${getApiBaseUrl()}?action=disconnect-all`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -249,7 +249,7 @@
         return 'http://localhost:3001/api/auth';
       };
 
-      const response = await fetch(`${getApiBaseUrl()}/update-phone`, {
+      const response = await fetch(`${getApiBaseUrl()}?action=update-phone`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
