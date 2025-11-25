@@ -15,11 +15,6 @@ Per far funzionare l'autenticazione su Vercel, devi configurare le seguenti vari
    - Genera una chiave sicura: `openssl rand -base64 32`
    - **IMPORTANTE**: Usa una chiave diversa per produzione!
 
-3. **ADMIN_SECRET** (opzionale, per inizializzare il database)
-   - Una chiave segreta per proteggere l'endpoint di inizializzazione database
-   - Genera una chiave sicura: `openssl rand -base64 32`
-   - Usata per chiamare `/api/admin/init-db`
-
 ### Come Configurare le Variabili su Vercel
 
 1. Vai su [Vercel Dashboard](https://vercel.com/dashboard)
@@ -28,13 +23,10 @@ Per far funzionare l'autenticazione su Vercel, devi configurare le seguenti vari
 4. Aggiungi le variabili:
    - `DATABASE_URL` = (la tua connection string Neon)
    - `JWT_SECRET` = (una chiave segreta sicura)
-   - `ADMIN_SECRET` = (una chiave segreta per inizializzare il database)
 
 ## 🗄️ Inizializzazione Database
 
-**IMPORTANTE**: Dopo aver configurato le variabili d'ambiente, devi inizializzare il database per creare le tabelle necessarie.
-
-Vedi `VERCEL_DATABASE_INIT.md` per istruzioni dettagliate su come inizializzare il database usando l'endpoint `/api/admin/init-db`.
+**✅ AUTOMATICO**: Le tabelle del database vengono create automaticamente al primo utilizzo. Non serve configurazione manuale!
 
 ## 📁 Struttura API Routes
 

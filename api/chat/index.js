@@ -7,6 +7,101 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const connectionString = process.env.DATABASE_URL;
 const sql = neon(connectionString);
 
+// Flag per evitare creazioni multiple simultanee
+let isInitializing = false;
+let isInitialized = false;
+
+// Funzione per inizializzare automaticamente le tabelle
+async function ensureTablesExist() {
+  if (isInitialized) return true;
+  if (isInitializing) {
+    // Aspetta che l'inizializzazione finisca
+    while (isInitializing) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return isInitialized;
+  }
+  
+  isInitializing = true;
+  
+  try {
+    // Verifica se la tabella chats esiste
+    const tableCheck = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'chats'
+      )
+    `;
+    
+    if (!tableCheck[0].exists) {
+      console.log('🔧 [CHAT API] Creazione tabelle database...');
+      
+      // Crea tabella chats
+      await sql`
+        CREATE TABLE IF NOT EXISTS chats (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title VARCHAR(500) NOT NULL,
+          project_id VARCHAR(255),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          is_temporary BOOLEAN DEFAULT FALSE
+        )
+      `;
+      
+      // Crea tabella messages
+      await sql`
+        CREATE TABLE IF NOT EXISTS messages (
+          id SERIAL PRIMARY KEY,
+          chat_id VARCHAR(255) NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+          type VARCHAR(20) NOT NULL,
+          content TEXT NOT NULL,
+          hidden BOOLEAN DEFAULT FALSE,
+          timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+      
+      // Crea indici
+      await sql`CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_chats_project_id ON chats(project_id)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_chats_updated_at ON chats(updated_at)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id)`;
+      
+      // Crea funzione e trigger per updated_at
+      await sql`
+        CREATE OR REPLACE FUNCTION update_updated_at_column()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+        END;
+        $$ language 'plpgsql'
+      `;
+      
+      await sql`DROP TRIGGER IF EXISTS update_chats_updated_at ON chats`;
+      await sql`
+        CREATE TRIGGER update_chats_updated_at 
+        BEFORE UPDATE ON chats
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+      `;
+      
+      console.log('✅ [CHAT API] Tabelle create con successo');
+    }
+    
+    isInitialized = true;
+    return true;
+  } catch (error) {
+    console.error('❌ [CHAT API] Errore creazione tabelle:', error);
+    isInitializing = false;
+    return false;
+  } finally {
+    isInitializing = false;
+  }
+}
+
 // Middleware per verificare autenticazione
 async function authenticateToken(req) {
   const authHeader = req.headers['authorization'];
@@ -48,6 +143,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
+  }
+
+  // Assicurati che le tabelle esistano (automatico)
+  const tablesReady = await ensureTablesExist();
+  if (!tablesReady) {
+    return res.status(500).json({
+      success: false,
+      message: 'Errore inizializzazione database'
+    });
   }
 
   // Verifica autenticazione
