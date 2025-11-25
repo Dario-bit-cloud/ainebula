@@ -1401,10 +1401,9 @@
     </div>
   </div>
   
-    <div class="disclaimer">
-      Contenuto generato da IA. Verificare sempre l'accuratezza delle risposte, che possono contenere inesattezze.
-    </div>
-  {/if}
+  <div class="disclaimer">
+    Contenuto generato da IA. Verificare sempre l'accuratezza delle risposte, che possono contenere inesattezze.
+  </div>
 </main>
 
 <!-- Modal errore microfono -->
