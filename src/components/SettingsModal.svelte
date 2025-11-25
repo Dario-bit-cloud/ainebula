@@ -2,6 +2,7 @@
   import { isSettingsOpen } from '../stores/app.js';
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
+  import { user as authUser, isAuthenticatedStore } from '../stores/auth.js';
   import { onMount } from 'svelte';
   
   let activeSection = 'generale';
@@ -339,8 +340,16 @@
           <!-- Profilo -->
           {#if activeSection === 'profilo'}
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">Indirizzo email</div>
-              <div class="setting-value">{maskEmail($userStore.email)}</div>
+              <div class="setting-label">Username</div>
+              <div class="setting-value">
+                {#if $isAuthenticatedStore && $authUser?.username}
+                  {$authUser.username}
+                {:else if $userStore.name}
+                  {$userStore.name}
+                {:else}
+                  -
+                {/if}
+              </div>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>

@@ -7,7 +7,6 @@
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
   import { availableModels } from '../stores/models.js';
   import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView } from '../stores/app.js';
-  import DatabaseTestPage from './DatabaseTestPage.svelte';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
   import { renderMarkdown, initCodeCopyButtons } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
@@ -901,9 +900,6 @@
 </script>
 
 <main class="main-area">
-  {#if $sidebarView === 'database-test'}
-    <DatabaseTestPage />
-  {:else}
   {#if showError}
     <div class="error-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
