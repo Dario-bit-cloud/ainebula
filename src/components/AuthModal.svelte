@@ -62,10 +62,22 @@
           closeModal();
         }, 1000);
       } else {
-        error = result.message || 'Si è verificato un errore';
+        // Mostra un messaggio di errore più dettagliato
+        const errorDetails = [];
+        if (result.message) errorDetails.push(result.message);
+        if (result.error) errorDetails.push(`Dettagli: ${result.error}`);
+        if (result.errorType) errorDetails.push(`Tipo: ${result.errorType}`);
+        if (result.url) errorDetails.push(`URL: ${result.url}`);
+        
+        error = errorDetails.length > 0 
+          ? errorDetails.join(' | ') 
+          : 'Si è verificato un errore. Controlla la console per i dettagli.';
+        
+        console.error('❌ [AUTH MODAL] Errore autenticazione:', result);
       }
     } catch (err) {
-      error = 'Errore di connessione. Verifica che il server sia avviato.';
+      console.error('❌ [AUTH MODAL] Errore durante autenticazione:', err);
+      error = `Errore di connessione: ${err.message || 'Errore sconosciuto'}. Verifica che il server sia avviato su http://localhost:3001`;
     } finally {
       isLoading = false;
     }

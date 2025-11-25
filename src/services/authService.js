@@ -1,34 +1,101 @@
 // Servizio per gestire l'autenticazione
 
-const API_BASE_URL = 'http://localhost:3001/api/auth';
+// Determina l'URL base dell'API in base all'ambiente
+const getApiBaseUrl = () => {
+  // In produzione, usa l'URL relativo o quello del server
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    // Se siamo su localhost, usa localhost:3001
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001/api/auth';
+    }
+    // Altrimenti usa lo stesso hostname con porta 3001 o URL assoluto
+    // Per Vercel/produzione, potrebbe essere necessario un URL diverso
+    return `${window.location.protocol}//${hostname}:3001/api/auth`;
+  }
+  return 'http://localhost:3001/api/auth';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+console.log('🔧 [AUTH SERVICE] API Base URL configurato:', API_BASE_URL);
 
 /**
  * Registra un nuovo utente
  */
 export async function register(username, password) {
+  const url = `${API_BASE_URL}/register`;
+  const requestBody = { username, password };
+  
+  console.log('📝 [REGISTER] Inizio registrazione:', {
+    url,
+    username,
+    timestamp: new Date().toISOString()
+  });
+  
   try {
-    const response = await fetch(`${API_BASE_URL}/register`, {
+    console.log('📤 [REGISTER] Invio richiesta:', {
+      method: 'POST',
+      url,
+      headers: { 'Content-Type': 'application/json' },
+      body: { username, password: '***' }
+    });
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify(requestBody)
     });
     
-    const data = await response.json();
+    console.log('📥 [REGISTER] Risposta ricevuta:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
+    let data;
+    const responseText = await response.text();
+    console.log('📄 [REGISTER] Body risposta (raw):', responseText);
+    
+    try {
+      data = JSON.parse(responseText);
+      console.log('✅ [REGISTER] Body risposta (parsed):', data);
+    } catch (parseError) {
+      console.error('❌ [REGISTER] Errore parsing JSON:', parseError);
+      return {
+        success: false,
+        message: 'Errore nel formato della risposta del server',
+        error: `Errore parsing: ${parseError.message}`,
+        rawResponse: responseText
+      };
+    }
     
     if (data.success && data.token) {
-      // Salva il token nel localStorage
+      console.log('✅ [REGISTER] Registrazione riuscita, salvataggio token');
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+    } else {
+      console.warn('⚠️ [REGISTER] Registrazione fallita:', data);
     }
     
     return data;
   } catch (error) {
+    console.error('❌ [REGISTER] Errore durante la richiesta:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      url,
+      timestamp: new Date().toISOString()
+    });
+    
     return {
       success: false,
       message: 'Errore nella comunicazione con il server',
-      error: error.message
+      error: error.message,
+      errorType: error.name,
+      url
     };
   }
 }
@@ -37,29 +104,81 @@ export async function register(username, password) {
  * Effettua il login
  */
 export async function login(username, password) {
+  const url = `${API_BASE_URL}/login`;
+  const requestBody = { username, password };
+  
+  console.log('🔐 [LOGIN] Inizio login:', {
+    url,
+    username,
+    timestamp: new Date().toISOString()
+  });
+  
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    console.log('📤 [LOGIN] Invio richiesta:', {
+      method: 'POST',
+      url,
+      headers: { 'Content-Type': 'application/json' },
+      body: { username, password: '***' } // Non loggare la password reale
+    });
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify(requestBody)
     });
     
-    const data = await response.json();
+    console.log('📥 [LOGIN] Risposta ricevuta:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    let data;
+    const responseText = await response.text();
+    console.log('📄 [LOGIN] Body risposta (raw):', responseText);
+    
+    try {
+      data = JSON.parse(responseText);
+      console.log('✅ [LOGIN] Body risposta (parsed):', data);
+    } catch (parseError) {
+      console.error('❌ [LOGIN] Errore parsing JSON:', parseError);
+      console.error('📄 [LOGIN] Testo ricevuto:', responseText);
+      return {
+        success: false,
+        message: 'Errore nel formato della risposta del server',
+        error: `Errore parsing: ${parseError.message}`,
+        rawResponse: responseText
+      };
+    }
     
     if (data.success && data.token) {
+      console.log('✅ [LOGIN] Login riuscito, salvataggio token');
       // Salva il token nel localStorage
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+    } else {
+      console.warn('⚠️ [LOGIN] Login fallito:', data);
     }
     
     return data;
   } catch (error) {
+    console.error('❌ [LOGIN] Errore durante la richiesta:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      url,
+      timestamp: new Date().toISOString()
+    });
+    
     return {
       success: false,
       message: 'Errore nella comunicazione con il server',
-      error: error.message
+      error: error.message,
+      errorType: error.name,
+      url
     };
   }
 }

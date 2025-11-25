@@ -14,11 +14,38 @@ const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
 const app = express();
 const PORT = 3001;
 
-// Middleware
+// Middleware CORS - permette richieste da localhost e da qualsiasi origine in produzione
 app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true
+  origin: function (origin, callback) {
+    // Permetti richieste senza origin (es. Postman, mobile apps)
+    if (!origin) return callback(null, true);
+    
+    // Permetti localhost su qualsiasi porta
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+    
+    // In produzione, potresti voler limitare a domini specifici
+    // Per ora permettiamo tutte le origini
+    callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Middleware per loggare tutte le richieste
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`\n📨 [REQUEST] ${req.method} ${req.path}`, {
+    timestamp,
+    origin: req.get('origin'),
+    userAgent: req.get('user-agent'),
+    ip: req.ip
+  });
+  next();
+});
+
 app.use(express.json());
 
 // Middleware per verificare l'autenticazione
@@ -165,8 +192,27 @@ app.get('/api/db/info', async (req, res) => {
 
 // Registrazione
 app.post('/api/auth/register', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  console.log('\n📝 [SERVER REGISTER] Richiesta ricevuta:', {
+    timestamp,
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    headers: {
+      origin: req.get('origin'),
+      referer: req.get('referer'),
+      'content-type': req.get('content-type')
+    }
+  });
+  
   try {
     const { username, password } = req.body;
+    
+    console.log('📥 [SERVER REGISTER] Body ricevuto:', {
+      username: username || 'MISSING',
+      password: password ? '***' : 'MISSING',
+      hasUsername: !!username,
+      hasPassword: !!password
+    });
     
     // Validazione
     if (!username || !password) {
@@ -229,7 +275,7 @@ app.post('/api/auth/register', async (req, res) => {
       UPDATE users SET last_login = NOW() WHERE id = ${userId}
     `;
     
-    res.json({
+    const response = {
       success: true,
       message: 'Registrazione completata con successo',
       user: {
@@ -237,9 +283,17 @@ app.post('/api/auth/register', async (req, res) => {
         username: username.toLowerCase()
       },
       token: sessionToken
-    });
+    };
+    
+    console.log('✅ [SERVER REGISTER] Registrazione completata per:', username.toLowerCase());
+    res.json(response);
   } catch (error) {
-    console.error('Errore registrazione:', error);
+    console.error('❌ [SERVER REGISTER] Errore:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      timestamp
+    });
     res.status(500).json({
       success: false,
       message: 'Errore durante la registrazione',
@@ -250,24 +304,50 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  console.log('\n🔐 [SERVER LOGIN] Richiesta ricevuta:', {
+    timestamp,
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    headers: {
+      origin: req.get('origin'),
+      referer: req.get('referer'),
+      'content-type': req.get('content-type')
+    }
+  });
+  
   try {
     const { username, password } = req.body;
     
+    console.log('📥 [SERVER LOGIN] Body ricevuto:', {
+      username: username || 'MISSING',
+      password: password ? '***' : 'MISSING',
+      hasUsername: !!username,
+      hasPassword: !!password
+    });
+    
     if (!username || !password) {
+      console.warn('⚠️ [SERVER LOGIN] Credenziali mancanti');
       return res.status(400).json({
         success: false,
         message: 'Username e password sono obbligatori'
       });
     }
     
+    const usernameLower = username.toLowerCase();
+    console.log('🔍 [SERVER LOGIN] Ricerca utente:', usernameLower);
+    
     // Trova l'utente
     const users = await sql`
       SELECT id, email, username, password_hash, is_active
       FROM users
-      WHERE username = ${username.toLowerCase()}
+      WHERE username = ${usernameLower}
     `;
     
+    console.log('👤 [SERVER LOGIN] Utenti trovati:', users.length);
+    
     if (users.length === 0) {
+      console.warn('❌ [SERVER LOGIN] Utente non trovato:', usernameLower);
       return res.status(401).json({
         success: false,
         message: 'Credenziali non valide'
@@ -275,8 +355,14 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     const user = users[0];
+    console.log('✅ [SERVER LOGIN] Utente trovato:', {
+      id: user.id,
+      username: user.username,
+      isActive: user.is_active
+    });
     
     if (!user.is_active) {
+      console.warn('⚠️ [SERVER LOGIN] Account disattivato:', user.id);
       return res.status(403).json({
         success: false,
         message: 'Account disattivato'
@@ -284,9 +370,12 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     // Verifica password
+    console.log('🔑 [SERVER LOGIN] Verifica password...');
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    console.log('🔑 [SERVER LOGIN] Password valida:', isValidPassword);
     
     if (!isValidPassword) {
+      console.warn('❌ [SERVER LOGIN] Password non valida per utente:', user.username);
       return res.status(401).json({
         success: false,
         message: 'Credenziali non valide'
@@ -294,6 +383,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     // Crea sessione
+    console.log('🎫 [SERVER LOGIN] Creazione sessione...');
     const sessionToken = jwt.sign(
       { userId: user.id, email: user.email, username: user.username },
       JWT_SECRET,
@@ -307,12 +397,17 @@ app.post('/api/auth/login', async (req, res) => {
       VALUES (${sessionId}, ${user.id}, ${sessionToken}, ${expiresAt}, ${req.ip}, ${req.get('user-agent')})
     `;
     
+    console.log('✅ [SERVER LOGIN] Sessione creata:', {
+      sessionId,
+      expiresAt: expiresAt.toISOString()
+    });
+    
     // Aggiorna last_login
     await sql`
       UPDATE users SET last_login = NOW() WHERE id = ${user.id}
     `;
     
-    res.json({
+    const response = {
       success: true,
       message: 'Login completato con successo',
       user: {
@@ -320,9 +415,17 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username
       },
       token: sessionToken
-    });
+    };
+    
+    console.log('✅ [SERVER LOGIN] Login completato con successo per:', user.username);
+    res.json(response);
   } catch (error) {
-    console.error('Errore login:', error);
+    console.error('❌ [SERVER LOGIN] Errore:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      timestamp
+    });
     res.status(500).json({
       success: false,
       message: 'Errore durante il login',
@@ -860,8 +963,13 @@ app.get('/api/user/payments', authenticateToken, async (req, res) => {
 // ==================== FINE ENDPOINT ABBONAMENTI ====================
 
 app.listen(PORT, () => {
+  console.log('\n' + '='.repeat(60));
   console.log(`🚀 Server API avviato su http://localhost:${PORT}`);
-  console.log(`📊 Endpoint disponibili:`);
+  console.log(`📅 Data avvio: ${new Date().toISOString()}`);
+  console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Database: ${connectionString ? '✅ Configurato' : '❌ Non configurato'}`);
+  console.log('='.repeat(60));
+  console.log(`\n📊 Endpoint disponibili:`);
   console.log(`   GET  /api/db/test - Test connessione`);
   console.log(`   GET  /api/db/info - Informazioni database`);
   console.log(`   POST /api/db/query - Esegui query SELECT`);
@@ -879,5 +987,7 @@ app.listen(PORT, () => {
   console.log(`   POST /api/user/subscription - Crea/aggiorna abbonamento`);
   console.log(`   DELETE /api/user/subscription/:id - Cancella abbonamento`);
   console.log(`   GET  /api/user/payments - Ottieni storico pagamenti`);
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ Server pronto a ricevere richieste\n');
 });
 
