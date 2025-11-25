@@ -1,5 +1,7 @@
 // Servizio per gestire l'autenticazione
 
+import { initializeEncryption, clearEncryptionKey } from './encryptionService.js';
+
 // Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
@@ -35,9 +37,12 @@ console.log('🔧 [AUTH SERVICE] API Base URL configurato:', API_BASE_URL);
 /**
  * Registra un nuovo utente
  */
-export async function register(username, password) {
+export async function register(username, password, referralCode = null) {
   const url = `${API_BASE_URL}/register`;
   const requestBody = { username, password };
+  if (referralCode) {
+    requestBody.referralCode = referralCode;
+  }
   
   console.log('📝 [REGISTER] Inizio registrazione:', {
     url,
@@ -88,6 +93,18 @@ export async function register(username, password) {
       console.log('✅ [REGISTER] Registrazione riuscita, salvataggio token');
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Inizializza la crittografia end-to-end per i messaggi
+      if (data.user && data.user.id) {
+        try {
+          console.log('🔒 [REGISTER] Inizializzazione crittografia end-to-end...');
+          await initializeEncryption(password, data.user.id);
+          console.log('✅ [REGISTER] Crittografia inizializzata con successo');
+        } catch (error) {
+          console.error('❌ [REGISTER] Errore inizializzazione crittografia:', error);
+          // Non bloccare la registrazione se la crittografia fallisce
+        }
+      }
       
       // Salva l'account nel sistema account multipli
       if (typeof window !== 'undefined' && data.user) {
@@ -184,6 +201,18 @@ export async function login(username, password) {
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
+      // Inizializza la crittografia end-to-end per i messaggi
+      if (data.user && data.user.id) {
+        try {
+          console.log('🔒 [LOGIN] Inizializzazione crittografia end-to-end...');
+          await initializeEncryption(password, data.user.id);
+          console.log('✅ [LOGIN] Crittografia inizializzata con successo');
+        } catch (error) {
+          console.error('❌ [LOGIN] Errore inizializzazione crittografia:', error);
+          // Non bloccare il login se la crittografia fallisce
+        }
+      }
+      
       // Salva l'account nel sistema account multipli
       if (typeof window !== 'undefined' && data.user) {
         import('../stores/accounts.js').then(module => {
@@ -279,6 +308,11 @@ export async function logout() {
     console.error('Errore durante il logout:', error);
   } finally {
     // Rimuovi sempre il token e tutti i dati utente dal localStorage
+    const user = getCurrentUser();
+    if (user && user.id) {
+      // Rimuovi la chiave di crittografia
+      clearEncryptionKey(user.id);
+    }
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     localStorage.removeItem('nebula-ai-user');
@@ -305,5 +339,95 @@ export function getCurrentUser() {
  */
 export function isAuthenticated() {
   return !!localStorage.getItem('auth_token');
+}
+
+/**
+ * Elimina l'account dell'utente corrente e tutti i dati associati
+ */
+export async function deleteAccount() {
+  const url = `${API_BASE_URL}/delete-account`;
+  const token = getToken();
+  
+  if (!token) {
+    return {
+      success: false,
+      message: 'Nessun token di autenticazione trovato'
+    };
+  }
+  
+  console.log('🗑️ [DELETE ACCOUNT] Inizio eliminazione account');
+  
+  try {
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const responseText = await response.text();
+    let data;
+    
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ [DELETE ACCOUNT] Errore parsing JSON:', parseError);
+      return {
+        success: false,
+        message: 'Errore nel formato della risposta del server',
+        error: `Errore parsing: ${parseError.message}`,
+        rawResponse: responseText
+      };
+    }
+    
+    if (data.success) {
+      console.log('✅ [DELETE ACCOUNT] Account eliminato con successo');
+      
+      // Rimuovi la chiave di crittografia
+      const user = getCurrentUser();
+      if (user && user.id) {
+        clearEncryptionKey(user.id);
+      }
+      
+      // Rimuovi tutti i dati dal localStorage
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('nebula-ai-user');
+      localStorage.removeItem('nebula-ai-chats');
+      localStorage.removeItem('nebula-auth-token');
+      localStorage.removeItem('nebula-session');
+      
+      // Rimuovi l'account dal sistema account multipli
+      if (typeof window !== 'undefined') {
+        import('../stores/accounts.js').then(module => {
+          const currentAccount = module.getCurrentAccount();
+          if (currentAccount) {
+            module.removeAccount(currentAccount.id);
+          }
+        });
+      }
+    } else {
+      console.warn('⚠️ [DELETE ACCOUNT] Eliminazione fallita:', data);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('❌ [DELETE ACCOUNT] Errore durante la richiesta:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      url,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message,
+      errorType: error.name,
+      url
+    };
+  }
 }
 

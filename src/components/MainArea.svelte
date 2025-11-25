@@ -6,7 +6,7 @@
   import { hasActiveSubscription } from '../stores/user.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
   import { availableModels } from '../stores/models.js';
-  import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView } from '../stores/app.js';
+  import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView, isSidebarOpen } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
   import { renderMarkdown, initCodeCopyButtons } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
@@ -34,6 +34,16 @@
   let imageDescription = '';
   let showPrivacyCard = true;
   let isPrivacyModalOpen = false;
+  let mainAreaElement;
+  
+  // Variabili per gestione swipe
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let isSwiping = false;
+  const SWIPE_THRESHOLD = 50; // Soglia minima per aprire la sidebar (in px)
+  const SWIPE_EDGE_THRESHOLD = 20; // Area dal bordo sinistro dove inizia lo swipe (in px)
+  const MAX_VERTICAL_SWIPE = 30; // Massimo movimento verticale consentito (in px)
   
   const imageStyles = [
     {
@@ -169,6 +179,67 @@
     }
   });
 
+  // Funzioni per gestione swipe
+  function handleTouchStart(event) {
+    // Solo su mobile e quando la sidebar è chiusa
+    if (!get(isMobile) || get(isSidebarOpen)) return;
+    
+    const touch = event.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchStartTime = Date.now();
+    isSwiping = false;
+    
+    // Inizia lo swipe solo se si parte dal bordo sinistro
+    if (touchStartX <= SWIPE_EDGE_THRESHOLD) {
+      isSwiping = true;
+    }
+  }
+  
+  function handleTouchMove(event) {
+    if (!get(isMobile) || !isSwiping || get(isSidebarOpen)) return;
+    
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+    
+    // Se lo swipe verticale è troppo grande, annulla
+    if (deltaY > MAX_VERTICAL_SWIPE) {
+      isSwiping = false;
+      return;
+    }
+    
+    // Previeni lo scroll orizzontale durante lo swipe
+    if (deltaX > 10) {
+      event.preventDefault();
+    }
+  }
+  
+  function handleTouchEnd(event) {
+    if (!get(isMobile) || !isSwiping || get(isSidebarOpen)) return;
+    
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+    const deltaTime = Date.now() - touchStartTime;
+    
+    // Verifica che sia uno swipe valido
+    if (
+      deltaX > SWIPE_THRESHOLD && // Swipe verso destra abbastanza lungo
+      deltaY < MAX_VERTICAL_SWIPE && // Non troppo verticale
+      deltaTime < 300 && // Veloce (meno di 300ms)
+      touchStartX <= SWIPE_EDGE_THRESHOLD // Partito dal bordo sinistro
+    ) {
+      // Apri la sidebar
+      isSidebarOpen.set(true);
+    }
+    
+    isSwiping = false;
+    touchStartX = 0;
+    touchStartY = 0;
+    touchStartTime = 0;
+  }
+
   onMount(() => {
     // Se non c'è una chat corrente, creane una nuova
     currentChatId.subscribe(id => {
@@ -203,6 +274,16 @@
     
     // Aggiungi listener globale per l'incolla
     window.addEventListener('paste', handlePaste);
+    
+    // Aggiungi listener per swipe su mobile
+    // Usa tick per assicurarsi che l'elemento sia disponibile
+    tick().then(() => {
+      if (mainAreaElement) {
+        mainAreaElement.addEventListener('touchstart', handleTouchStart, { passive: true });
+        mainAreaElement.addEventListener('touchmove', handleTouchMove, { passive: false });
+        mainAreaElement.addEventListener('touchend', handleTouchEnd, { passive: true });
+      }
+    });
     
     // Scroll automatico quando arrivano nuovi messaggi
     const unsubscribe = currentChat.subscribe(async (chat) => {
@@ -244,8 +325,12 @@
     // Cleanup
     // Cleanup function
     return () => {
-      window.removeEventListener('keydown', handleEscape);
       window.removeEventListener('paste', handlePaste);
+      if (mainAreaElement) {
+        mainAreaElement.removeEventListener('touchstart', handleTouchStart);
+        mainAreaElement.removeEventListener('touchmove', handleTouchMove);
+        mainAreaElement.removeEventListener('touchend', handleTouchEnd);
+      }
       if (messagesContainer) {
         messagesContainer.removeEventListener('scroll', handleScroll);
         // Rimuovi listener per copia codice
@@ -902,7 +987,7 @@
   
 </script>
 
-<main class="main-area">
+<main class="main-area" bind:this={mainAreaElement}>
   {#if showError}
     <div class="error-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

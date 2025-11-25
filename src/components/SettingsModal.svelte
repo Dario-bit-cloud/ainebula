@@ -2,7 +2,9 @@
   import { isSettingsOpen } from '../stores/app.js';
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
-  import { user as authUser, isAuthenticatedStore } from '../stores/auth.js';
+  import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
+  import { deleteAccount } from '../services/authService.js';
+  import { getCurrentAccount, removeAccount } from '../stores/accounts.js';
   import { onMount } from 'svelte';
   
   let activeSection = 'generale';
@@ -106,19 +108,60 @@
     }
   }
   
-  function handleDeleteAccount() {
-    const confirmation = prompt('Per confermare, digita "ELIMINA" in maiuscolo:');
-    if (confirmation === 'ELIMINA') {
-      if (confirm('Questa azione è irreversibile. Sei assolutamente sicuro?')) {
-        // Elimina tutti i dati
-        localStorage.clear();
-        alert('Account eliminato. La pagina verrà ricaricata.');
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+  let isDeletingAccount = false;
+  
+  async function handleDeleteAccount() {
+    // Prima conferma: richiedi di digitare "ELIMINA"
+    const firstConfirmation = prompt('⚠️ ATTENZIONE: Questa azione è IRREVERSIBILE!\n\nTutti i tuoi dati verranno eliminati permanentemente:\n- Account e profilo\n- Tutte le chat e messaggi\n- Tutti i progetti\n- Tutte le impostazioni\n- Tutti gli abbonamenti\n\nPer confermare, digita "ELIMINA" in maiuscolo:');
+    
+    if (firstConfirmation !== 'ELIMINA') {
+      if (firstConfirmation !== null) {
+        alert('Conferma non valida. Operazione annullata.');
       }
-    } else if (confirmation !== null) {
-      alert('Conferma non valida. Operazione annullata.');
+      return;
+    }
+    
+    // Seconda conferma: dialog di conferma finale
+    const secondConfirmation = confirm('⚠️ ULTIMA CONFERMA ⚠️\n\nSei ASSOLUTAMENTE SICURO di voler eliminare il tuo account?\n\nQuesta azione NON può essere annullata.\n\nTutti i tuoi dati verranno eliminati permanentemente dal database.');
+    
+    if (!secondConfirmation) {
+      return;
+    }
+    
+    try {
+      isDeletingAccount = true;
+      
+      // Chiama l'API per eliminare l'account
+      const result = await deleteAccount();
+      
+      if (result.success) {
+        // Pulisci tutti gli store locali
+        clearUser();
+        chats.set([]);
+        
+        // Rimuovi l'account dal sistema account multipli se presente
+        const currentAccount = getCurrentAccount();
+        if (currentAccount) {
+          removeAccount(currentAccount.id);
+        }
+        
+        // Pulisci tutto il localStorage
+        localStorage.clear();
+        
+        alert('✅ Account eliminato con successo. Tutti i dati sono stati rimossi permanentemente.\n\nLa pagina verrà ricaricata.');
+        
+        // Ricarica la pagina dopo un breve delay
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      } else {
+        isDeletingAccount = false;
+        alert(`❌ Errore durante l'eliminazione dell'account: ${result.message || 'Errore sconosciuto'}`);
+      }
+    } catch (error) {
+      isDeletingAccount = false;
+      console.error('Errore durante eliminazione account:', error);
+      alert(`❌ Errore durante l'eliminazione dell'account: ${error.message}`);
     }
   }
   
@@ -364,7 +407,9 @@
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
               <div class="setting-label">Elimina account</div>
-              <button class="danger-button" on:click={handleDeleteAccount}>Elimina</button>
+              <button class="danger-button" on:click={handleDeleteAccount} disabled={isDeletingAccount}>
+                {isDeletingAccount ? 'Eliminazione in corso...' : 'Elimina'}
+              </button>
             </div>
           {/if}
           

@@ -1,5 +1,12 @@
 // Servizio per gestire le chat nel database
 
+import { 
+  encryptMessages, 
+  decryptMessages, 
+  getEncryptionKeyForUser 
+} from './encryptionService.js';
+import { getCurrentUser } from './authService.js';
+
 // Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
@@ -28,7 +35,7 @@ const API_BASE_URL = getApiBaseUrl();
 console.log('🔧 [CHAT SERVICE] API Base URL configurato:', API_BASE_URL);
 
 /**
- * Ottiene tutte le chat dell'utente dal database
+ * Ottiene tutte le chat dell'utente dal database e le decrittografa
  */
 export async function getChatsFromDatabase() {
   const url = API_BASE_URL;
@@ -72,6 +79,31 @@ export async function getChatsFromDatabase() {
         success: data.success,
         count: data.chats?.length || 0
       });
+      
+      // Decrittografa i messaggi se la crittografia è disponibile
+      if (data.success && data.chats && Array.isArray(data.chats)) {
+        const user = getCurrentUser();
+        if (user && user.id) {
+          const encryptionKey = await getEncryptionKeyForUser(user.id);
+          if (encryptionKey) {
+            console.log('🔓 [CHAT SERVICE] Decrittografia messaggi...');
+            for (const chat of data.chats) {
+              if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+                try {
+                  chat.messages = await decryptMessages(chat.messages, encryptionKey);
+                  console.log(`✅ [CHAT SERVICE] Decrittografati ${chat.messages.length} messaggi per chat ${chat.id}`);
+                } catch (error) {
+                  console.error(`❌ [CHAT SERVICE] Errore decrittografia chat ${chat.id}:`, error);
+                  // Continua anche se la decrittografia fallisce (per retrocompatibilità)
+                }
+              }
+            }
+            console.log('🔓 [CHAT SERVICE] Decrittografia completata');
+          } else {
+            console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
+          }
+        }
+      }
     } catch (parseError) {
       console.error('❌ [CHAT SERVICE] Errore parsing JSON:', parseError);
       return {
@@ -102,7 +134,7 @@ export async function getChatsFromDatabase() {
 }
 
 /**
- * Salva una chat nel database
+ * Salva una chat nel database dopo aver crittografato i messaggi
  */
 export async function saveChatToDatabase(chat) {
   const url = API_BASE_URL;
@@ -123,10 +155,52 @@ export async function saveChatToDatabase(chat) {
       return { success: false, message: 'Non autenticato' };
     }
     
+    // Prepara i messaggi per il salvataggio
+    let messagesToSave = chat.messages || [];
+    
+    // Crittografa i messaggi se la crittografia è disponibile
+    const user = getCurrentUser();
+    if (user && user.id) {
+      const encryptionKey = await getEncryptionKeyForUser(user.id);
+      if (encryptionKey && messagesToSave.length > 0) {
+        console.log('🔒 [CHAT SERVICE] Crittografia messaggi prima del salvataggio...');
+        try {
+          // Crittografa solo i messaggi che non sono già crittografati
+          const messagesToEncrypt = [];
+          const messageIndices = [];
+          
+          messagesToSave.forEach((msg, index) => {
+            if (msg.content && 
+                typeof msg.content === 'string' && 
+                !msg.content.startsWith('encrypted:')) {
+              messagesToEncrypt.push(msg);
+              messageIndices.push(index);
+            }
+          });
+          
+          if (messagesToEncrypt.length > 0) {
+            const encryptedMessages = await encryptMessages(messagesToEncrypt, encryptionKey);
+            // Sostituisci i messaggi originali con quelli crittografati
+            messageIndices.forEach((originalIndex, encryptedIndex) => {
+              messagesToSave[originalIndex] = encryptedMessages[encryptedIndex];
+            });
+            console.log(`✅ [CHAT SERVICE] Crittografati ${encryptedMessages.length} messaggi`);
+          } else {
+            console.log('ℹ️ [CHAT SERVICE] Tutti i messaggi sono già crittografati');
+          }
+        } catch (error) {
+          console.error('❌ [CHAT SERVICE] Errore crittografia messaggi:', error);
+          // Continua comunque con il salvataggio (per retrocompatibilità)
+        }
+      } else {
+        console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, salvataggio in chiaro');
+      }
+    }
+    
     const requestBody = {
       id: chat.id,
       title: chat.title,
-      messages: chat.messages || [],
+      messages: messagesToSave,
       projectId: chat.projectId || null,
       isTemporary: false
     };

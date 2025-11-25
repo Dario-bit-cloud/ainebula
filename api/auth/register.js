@@ -36,11 +36,12 @@ export default async function handler(req, res) {
   });
 
   try {
-    const { username, password } = req.body;
+    const { username, password, referralCode } = req.body;
 
     console.log('📥 [VERCEL REGISTER] Body ricevuto:', {
       username: username || 'MISSING',
-      password: password ? '***' : 'MISSING'
+      password: password ? '***' : 'MISSING',
+      referralCode: referralCode || 'NONE'
     });
 
     if (!username || !password) {
@@ -82,11 +83,78 @@ export default async function handler(req, res) {
     const userId = randomBytes(16).toString('hex');
     const email = `${username.toLowerCase()}@nebula.local`;
 
+    // Genera un codice referral per il nuovo utente
+    function generateReferralCode() {
+      return randomBytes(8).toString('hex');
+    }
+    
+    let userReferralCode = generateReferralCode();
+    let codeExists = true;
+    while (codeExists) {
+      const existing = await sql`
+        SELECT id FROM users WHERE referral_code = ${userReferralCode}
+      `;
+      if (existing.length === 0) {
+        codeExists = false;
+      } else {
+        userReferralCode = generateReferralCode();
+      }
+    }
+
     // Crea l'utente
     await sql`
-      INSERT INTO users (id, email, username, password_hash)
-      VALUES (${userId}, ${email}, ${username.toLowerCase()}, ${passwordHash})
+      INSERT INTO users (id, email, username, password_hash, referral_code)
+      VALUES (${userId}, ${email}, ${username.toLowerCase()}, ${passwordHash}, ${userReferralCode})
     `;
+
+    // Gestisci il referral se presente
+    if (referralCode) {
+      try {
+        // Trova il referrer
+        const [referrer] = await sql`
+          SELECT id FROM users WHERE referral_code = ${referralCode}
+        `;
+
+        if (referrer && referrer.id !== userId) {
+          // Crea il record referral
+          const referralId = randomBytes(16).toString('hex');
+          await sql`
+            INSERT INTO referrals (id, referrer_id, referred_id, referral_code, status)
+            VALUES (${referralId}, ${referrer.id}, ${userId}, ${referralCode}, 'completed')
+          `;
+
+          // Verifica se il referrer ha già raggiunto il massimo guadagnabile
+          const [earningsCheck] = await sql`
+            SELECT 
+              COALESCE(SUM(CASE WHEN re.status IN ('available', 'withdrawn') THEN re.amount ELSE 0 END), 0) as total_earnings
+            FROM referral_earnings re
+            WHERE re.user_id = ${referrer.id}
+          `;
+
+          const totalEarnings = parseFloat(earningsCheck?.total_earnings || 0);
+          const REFERRAL_REWARD = 20.00;
+          const MAX_EARNINGS = 500.00;
+
+          // Crea il guadagno solo se non ha raggiunto il massimo
+          if (totalEarnings < MAX_EARNINGS) {
+            const earningId = randomBytes(16).toString('hex');
+            const rewardAmount = Math.min(REFERRAL_REWARD, MAX_EARNINGS - totalEarnings);
+            
+            await sql`
+              INSERT INTO referral_earnings (id, user_id, referral_id, amount, status)
+              VALUES (${earningId}, ${referrer.id}, ${referralId}, ${rewardAmount}, 'available')
+            `;
+
+            console.log(`✅ [REFERRAL] Guadagno di €${rewardAmount.toFixed(2)} creato per referrer ${referrer.id}`);
+          } else {
+            console.log(`⚠️ [REFERRAL] Referrer ${referrer.id} ha già raggiunto il massimo guadagnabile`);
+          }
+        }
+      } catch (refError) {
+        console.error('❌ [REFERRAL] Errore durante la gestione del referral:', refError);
+        // Non bloccare la registrazione se il referral fallisce
+      }
+    }
 
     // Crea sessione
     const sessionToken = jwt.sign({ userId, email, username: username.toLowerCase() }, JWT_SECRET, { expiresIn: '7d' });

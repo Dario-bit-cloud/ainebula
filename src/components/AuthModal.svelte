@@ -21,7 +21,7 @@
   const MAX_RETRIES = 3;
   let isRetrying = false;
   
-  // Carica credenziali salvate al mount
+  // Carica credenziali salvate al mount e referral code dall'URL
   onMount(() => {
     const savedUsername = localStorage.getItem('saved_username');
     const savedPassword = localStorage.getItem('saved_password');
@@ -33,6 +33,16 @@
         password = savedPassword;
       }
       rememberCredentials = savedRemember;
+    }
+
+    // Leggi referral code dall'URL
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refCode = urlParams.get('ref');
+      if (refCode) {
+        // Salva il referral code nel localStorage per usarlo durante la registrazione
+        localStorage.setItem('pending_referral_code', refCode);
+      }
     }
   });
   
@@ -75,7 +85,13 @@
       if (isLogin) {
         result = await login(username, password);
       } else {
-        result = await register(username, password);
+        // Leggi referral code dal localStorage se presente
+        const referralCode = localStorage.getItem('pending_referral_code');
+        result = await register(username, password, referralCode);
+        // Rimuovi il referral code dopo l'uso
+        if (referralCode) {
+          localStorage.removeItem('pending_referral_code');
+        }
       }
       
       if (result.success) {

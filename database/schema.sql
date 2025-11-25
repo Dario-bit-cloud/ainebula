@@ -113,6 +113,41 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabella per i referral
+CREATE TABLE IF NOT EXISTS referrals (
+    id VARCHAR(255) PRIMARY KEY,
+    referrer_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    referred_id VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
+    referral_code VARCHAR(50) UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'completed', 'paid'
+    earnings DECIMAL(10,2) DEFAULT 0.00,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Tabella per i guadagni referral
+CREATE TABLE IF NOT EXISTS referral_earnings (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    referral_id VARCHAR(255) NOT NULL REFERENCES referrals(id) ON DELETE CASCADE,
+    amount DECIMAL(10,2) NOT NULL DEFAULT 20.00,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'available', 'withdrawn'
+    withdrawn_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabella per i ritiri
+CREATE TABLE IF NOT EXISTS withdrawals (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount DECIMAL(10,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
+    payment_method VARCHAR(50), -- 'bank_transfer', 'paypal', 'stripe', ecc.
+    payment_details JSONB, -- Dettagli del pagamento (IBAN, email PayPal, ecc.)
+    processed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indici per migliorare le performance
 CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
@@ -132,6 +167,14 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_expires_at ON subscriptions(expires
 CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
 CREATE INDEX IF NOT EXISTS idx_payments_subscription_id ON payments(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_id ON referrals(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_referred_id ON referrals(referred_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code);
+CREATE INDEX IF NOT EXISTS idx_referral_earnings_user_id ON referral_earnings(user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_earnings_referral_id ON referral_earnings(referral_id);
+CREATE INDEX IF NOT EXISTS idx_referral_earnings_status ON referral_earnings(status);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON withdrawals(user_id);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals(status);
 
 -- Funzione per aggiornare automaticamente updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -154,4 +197,8 @@ CREATE TRIGGER update_user_settings_updated_at BEFORE UPDATE ON user_settings
 
 CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aggiungi colonna referral_code alla tabella users
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(50) UNIQUE;
+CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
 
