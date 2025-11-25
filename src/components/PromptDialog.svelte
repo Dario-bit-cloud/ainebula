@@ -78,7 +78,8 @@
         {:else}
           <input
             bind:this={inputRef}
-            bind:value={inputValue}
+            value={inputValue}
+            on:input={(e) => inputValue = e.target.value}
             type={type}
             class="input-field"
             placeholder={placeholder}
