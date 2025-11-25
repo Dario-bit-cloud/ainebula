@@ -239,17 +239,16 @@
 
 <div class="auth-modal-overlay" on:click={closeModal} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && closeModal()}>
   <div class="auth-modal" on:click|stopPropagation role="dialog" aria-labelledby="auth-title">
-    <div class="auth-modal-header">
-      <h2 id="auth-title">{isLogin ? 'Accedi' : 'Registrati'}</h2>
-      <button class="close-button" on:click={closeModal} aria-label="Chiudi">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
+    <button class="close-button" on:click={closeModal} aria-label="Chiudi">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
     
-    <div class="auth-modal-content">
+    <form class="form" on:submit|preventDefault={handleSubmit}>
+      <p id="heading">{isLogin ? 'Login' : 'Registrati'}</p>
+
       {#if error}
         <div class="error-message">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -270,91 +269,98 @@
           {successMessage}
         </div>
       {/if}
-      
-      <form on:submit|preventDefault={handleSubmit}>
-        <div class="form-group">
-          <label for="username">Username</label>
+
+      <div class="field">
+        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M13.106 7.222c0-2.967-2.249-5.032-5.482-5.032-3.35 0-5.646 2.318-5.646 5.702 0 3.493 2.235 5.708 5.762 5.708.862 0 1.689-.123 2.304-.335v-.862c-.43.199-1.354.328-2.29.328-2.926 0-4.813-1.88-4.813-4.798 0-2.844 1.921-4.881 4.594-4.881 2.735 0 4.608 1.688 4.608 4.156 0 1.682-.554 2.769-1.416 2.769-.492 0-.772-.28-.772-.76V5.206H8.923v.834h-.11c-.266-.595-.881-.964-1.6-.964-1.4 0-2.378 1.162-2.378 2.823 0 1.737.957 2.906 2.379 2.906.8 0 1.415-.39 1.709-1.087h.11c.081.67.703 1.148 1.503 1.148 1.572 0 2.57-1.415 2.57-3.643zm-7.177.704c0-1.197.54-1.907 1.456-1.907.93 0 1.524.738 1.524 1.907S8.308 9.84 7.371 9.84c-.895 0-1.442-.725-1.442-1.914z"></path>
+        </svg>
+        <input
+          autocomplete="off"
+          placeholder="Username"
+          class="input-field"
+          type="text"
+          bind:value={username}
+          required
+          disabled={isLoading}
+          autocomplete="username"
+          minlength={isLogin ? undefined : "3"}
+        />
+      </div>
+
+      <div class="field">
+        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path>
+        </svg>
+        <input
+          placeholder="Password"
+          class="input-field"
+          type="password"
+          bind:value={password}
+          required
+          disabled={isLoading}
+          autocomplete={isLogin ? "current-password" : "new-password"}
+        />
+      </div>
+
+      {#if !isLogin}
+        <div class="field">
+          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path>
+          </svg>
           <input
-            id="username"
-            type="text"
-            bind:value={username}
-            placeholder={isLogin ? "Il tuo username" : "Scegli un username (min. 3 caratteri)"}
-            required
-            disabled={isLoading}
-            autocomplete="username"
-            minlength={isLogin ? undefined : "3"}
-          />
-        </div>
-        
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input
-            id="password"
+            placeholder="Conferma Password"
+            class="input-field"
             type="password"
-            bind:value={password}
-            placeholder={isLogin ? "La tua password" : "Minimo 6 caratteri"}
+            bind:value={confirmPassword}
             required
             disabled={isLoading}
-            autocomplete={isLogin ? "current-password" : "new-password"}
+            autocomplete="new-password"
           />
         </div>
-        
-        {#if !isLogin}
-          <div class="form-group">
-            <label for="confirmPassword">Conferma Password</label>
+      {/if}
+
+      {#if isRetrying && retryCount > 0}
+        <div class="retry-info">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+          Tentativo {retryCount}/{MAX_RETRIES}...
+        </div>
+      {/if}
+
+      {#if isLogin}
+        <div class="remember-credentials">
+          <label class="remember-label">
             <input
-              id="confirmPassword"
-              type="password"
-              bind:value={confirmPassword}
-              placeholder="Ripeti la password"
-              required
+              type="checkbox"
+              bind:checked={rememberCredentials}
               disabled={isLoading}
-              autocomplete="new-password"
             />
-          </div>
-        {/if}
-        
-        {#if isLogin}
-          <div class="form-group remember-credentials">
-            <label class="remember-label">
-              <input
-                type="checkbox"
-                bind:checked={rememberCredentials}
-                disabled={isLoading}
-              />
-              <span>Ricorda le credenziali</span>
-            </label>
-          </div>
-        {/if}
-        
-        {#if isRetrying && retryCount > 0}
-          <div class="retry-info">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-            </svg>
-            Tentativo {retryCount}/{MAX_RETRIES}...
-          </div>
-        {/if}
-        
-        <button type="submit" class="submit-button" disabled={isLoading}>
+            <span>Ricorda le credenziali</span>
+          </label>
+        </div>
+      {/if}
+
+      <div class="btn">
+        <button class="button1" type="submit" disabled={isLoading}>
           {#if isLoading}
             <span class="spinner"></span>
-            {isLogin ? 'Accesso in corso...' : 'Registrazione in corso...'}
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{isLogin ? 'Accesso...' : 'Registrazione...'}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           {:else}
-            {isLogin ? 'Accedi' : 'Registrati'}
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{isLogin ? 'Login' : 'Registrati'}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           {/if}
         </button>
-      </form>
-      
-      <div class="auth-switch">
-        <p>
-          {isLogin ? "Non hai un account? " : "Hai già un account? "}
-          <button type="button" class="switch-button" on:click={switchMode} disabled={isLoading}>
-            {isLogin ? 'Registrati' : 'Accedi'}
-          </button>
-        </p>
+        <button class="button2" type="button" on:click={switchMode} disabled={isLoading}>
+          {isLogin ? 'Sign Up' : 'Login'}
+        </button>
       </div>
-    </div>
+
+      {#if isLogin}
+        <button class="button3" type="button" disabled={isLoading}>
+          Forgot Password
+        </button>
+      {/if}
+    </form>
   </div>
 </div>
 
@@ -384,14 +390,11 @@
   }
   
   .auth-modal {
-    background: var(--bg-secondary, #1a1a1a);
-    border: 1px solid var(--border-color, #333);
-    border-radius: 16px;
+    position: relative;
     width: 90%;
     max-width: 440px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     animation: slideUp 0.3s ease;
   }
   
@@ -406,40 +409,178 @@
     }
   }
   
-  .auth-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 24px;
-    border-bottom: 1px solid var(--border-color, #333);
-  }
-  
-  .auth-modal-header h2 {
-    margin: 0;
-    font-size: 24px;
-    color: var(--text-primary, #ffffff);
-  }
-  
   .close-button {
-    background: none;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(37, 37, 37, 0.8);
     border: none;
-    color: var(--text-secondary, #999);
+    color: #ffffff;
     cursor: pointer;
-    padding: 4px;
+    padding: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: 50%;
     transition: all 0.2s ease;
+    z-index: 10;
+    width: 32px;
+    height: 32px;
   }
   
   .close-button:hover {
-    background: var(--hover-bg, #2a2a2a);
-    color: var(--text-primary, #ffffff);
+    background: rgba(0, 0, 0, 0.8);
+    transform: scale(1.1);
   }
   
-  .auth-modal-content {
-    padding: 24px;
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-left: 2em;
+    padding-right: 2em;
+    padding-bottom: 0.4em;
+    padding-top: 2em;
+    background-color: #171717;
+    border-radius: 25px;
+    transition: .4s ease-in-out;
+    position: relative;
+  }
+  
+  .form:hover {
+    transform: scale(1.02);
+    border: 1px solid black;
+  }
+  
+  #heading {
+    text-align: center;
+    margin: 2em 0 1em 0;
+    color: rgb(255, 255, 255);
+    font-size: 1.2em;
+    font-weight: 600;
+  }
+  
+  .field {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    border-radius: 25px;
+    padding: 0.6em;
+    border: none;
+    outline: none;
+    color: white;
+    background-color: #171717;
+    box-shadow: inset 2px 5px 10px rgb(5, 5, 5);
+  }
+  
+  .input-icon {
+    height: 1.3em;
+    width: 1.3em;
+    fill: white;
+    flex-shrink: 0;
+  }
+  
+  .input-field {
+    background: none;
+    border: none;
+    outline: none;
+    width: 100%;
+    color: #d3d3d3;
+    font-size: 14px;
+  }
+  
+  .input-field::placeholder {
+    color: #666;
+  }
+  
+  .input-field:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .form .btn {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+    margin-top: 2.5em;
+    gap: 0.5em;
+  }
+  
+  .button1 {
+    padding: 0.5em;
+    padding-left: 1.1em;
+    padding-right: 1.1em;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+    transition: .4s ease-in-out;
+    background-color: #252525;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  
+  .button1:hover:not(:disabled) {
+    background-color: black;
+    color: white;
+  }
+  
+  .button1:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .button2 {
+    padding: 0.5em;
+    padding-left: 2.3em;
+    padding-right: 2.3em;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+    transition: .4s ease-in-out;
+    background-color: #252525;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .button2:hover:not(:disabled) {
+    background-color: black;
+    color: white;
+  }
+  
+  .button2:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .button3 {
+    margin-bottom: 3em;
+    padding: 0.5em;
+    border-radius: 5px;
+    border: none;
+    outline: none;
+    transition: .4s ease-in-out;
+    background-color: #252525;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    width: 100%;
+  }
+  
+  .button3:hover:not(:disabled) {
+    background-color: red;
+    color: white;
+  }
+  
+  .button3:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
   
   .error-message,
@@ -449,7 +590,7 @@
     gap: 8px;
     padding: 12px 16px;
     border-radius: 8px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     font-size: 14px;
   }
   
@@ -465,68 +606,55 @@
     color: #22c55e;
   }
   
-  .form-group {
-    margin-bottom: 20px;
+  .remember-credentials {
+    margin: 1em 0;
+    display: flex;
+    justify-content: center;
   }
   
-  .form-group label {
-    display: block;
-    margin-bottom: 8px;
+  .remember-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
     font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary, #ffffff);
+    color: #d3d3d3;
+    user-select: none;
   }
   
-  .form-group input {
-    width: 100%;
-    padding: 12px 16px;
-    background: var(--bg-tertiary, #2a2a2a);
-    border: 1px solid var(--border-color, #333);
-    border-radius: 8px;
-    color: var(--text-primary, #ffffff);
-    font-size: 16px;
-    transition: all 0.2s ease;
-    box-sizing: border-box;
+  .remember-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #252525;
   }
   
-  .form-group input:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-  
-  .form-group input:disabled {
+  .remember-label input[type="checkbox"]:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
   
-  .submit-button {
-    width: 100%;
-    padding: 14px;
-    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
+  .remember-label:hover {
+    color: #ffffff;
+  }
+  
+  .retry-info {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin-top: 8px;
+    padding: 12px 16px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    margin: 10px 0;
+    color: #60a5fa;
+    font-size: 14px;
+    animation: pulse 2s ease-in-out infinite;
   }
   
-  .submit-button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-  }
-  
-  .submit-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
+  .retry-info svg {
+    animation: spin 1s linear infinite;
   }
   
   .spinner {
@@ -536,85 +664,11 @@
     border-top-color: white;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
   }
   
   @keyframes spin {
     to { transform: rotate(360deg); }
-  }
-  
-  .auth-switch {
-    margin-top: 24px;
-    text-align: center;
-    color: var(--text-secondary, #999);
-    font-size: 14px;
-  }
-  
-  .switch-button {
-    background: none;
-    border: none;
-    color: #3b82f6;
-    cursor: pointer;
-    font-weight: 600;
-    text-decoration: underline;
-    padding: 0;
-    margin-left: 4px;
-  }
-  
-  .switch-button:hover:not(:disabled) {
-    color: #60a5fa;
-  }
-  
-  .switch-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  
-  .remember-credentials {
-    margin-bottom: 16px;
-  }
-  
-  .remember-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    color: var(--text-secondary, #999);
-    user-select: none;
-  }
-  
-  .remember-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    accent-color: #3b82f6;
-  }
-  
-  .remember-label input[type="checkbox"]:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  
-  .remember-label:hover {
-    color: var(--text-primary, #ffffff);
-  }
-  
-  .retry-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 8px;
-    margin-bottom: 16px;
-    color: #60a5fa;
-    font-size: 14px;
-    animation: pulse 2s ease-in-out infinite;
-  }
-  
-  .retry-info svg {
-    animation: spin 1s linear infinite;
   }
   
   @keyframes pulse {
@@ -632,9 +686,19 @@
       max-height: 95vh;
     }
     
-    .auth-modal-header,
-    .auth-modal-content {
-      padding: 20px;
+    .form {
+      padding-left: 1.5em;
+      padding-right: 1.5em;
+    }
+    
+    .form .btn {
+      flex-direction: column;
+    }
+    
+    .button2 {
+      width: 100%;
+      padding-left: 1.1em;
+      padding-right: 1.1em;
     }
   }
 </style>
