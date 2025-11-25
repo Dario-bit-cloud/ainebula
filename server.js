@@ -35,7 +35,7 @@ async function authenticateToken(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     
     // Verifica che la sessione esista nel database
-    const session = await sql`
+    const sessions = await sql`
       SELECT s.*, u.id as user_id, u.email, u.username, u.is_active
       FROM sessions s
       JOIN users u ON s.user_id = u.id
@@ -44,16 +44,16 @@ async function authenticateToken(req, res, next) {
         AND u.is_active = true
     `;
     
-    if (session.length === 0) {
+    if (sessions.length === 0) {
       return res.status(401).json({ success: false, message: 'Sessione non valida' });
     }
     
     req.user = {
-      id: session[0].user_id,
-      email: session[0].email,
-      username: session[0].username
+      id: sessions[0].user_id,
+      email: sessions[0].email,
+      username: sessions[0].username
     };
-    req.session = session[0];
+    req.session = sessions[0];
     
     next();
   } catch (error) {

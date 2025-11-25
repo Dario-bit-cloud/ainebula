@@ -246,15 +246,21 @@
 
 <style>
   .database-test-page {
-    min-height: 100vh;
+    height: 100%;
+    width: 100%;
     background: var(--bg-primary, #0a0a0a);
     color: var(--text-primary, #ffffff);
-    padding: 40px 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
   
   .container {
     max-width: 1000px;
     margin: 0 auto;
+    padding: 40px 20px;
+    min-height: 100%;
   }
   
   h1 {
