@@ -276,7 +276,7 @@
     isActivating = false;
     
     // Chiudi modal dopo conferma
-    setTimeout(() => {
+    setTimeout(async () => {
       closeModal();
       await showAlert(`Abbonamento ${plans[selectedPlan].name} attivato con successo! Benvenuto in Premium!`, 'Abbonamento attivato', 'OK', 'success');
     }, 500);
