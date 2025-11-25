@@ -39,7 +39,7 @@
     }
   }
   
-  function handleCreateProject() {
+  async function handleCreateProject() {
     if (!projectName.trim()) {
       await showAlert('Inserisci un nome per la cartella', 'Nome mancante', 'OK', 'warning');
       return;
