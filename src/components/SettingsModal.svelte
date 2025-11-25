@@ -184,7 +184,7 @@
     }
   }
   
-  function handleExportData() {
+  async function handleExportData() {
     const exportData = {
       user: $userStore,
       chats: $chats,
