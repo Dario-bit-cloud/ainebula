@@ -1,6 +1,6 @@
 <script>
   import { user as userStore } from '../stores/user.js';
-  import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, createTemporaryChat, loadChats, syncChatsOnLogin } from '../stores/chat.js';
+  import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, loadChats, syncChatsOnLogin } from '../stores/chat.js';
   import { isAuthenticatedStore } from '../stores/auth.js';
   import { onMount } from 'svelte';
   import { selectedModel, setModel } from '../stores/models.js';
@@ -17,8 +17,6 @@
   let moveMenuPosition = { x: 0, y: 0 };
   let showSearchInput = false;
   let searchInputRef = null;
-  let showTemporaryButton = false;
-  let temporaryButtonFading = false;
   
   // Carica le chat quando l'utente si autentica
   let lastAuthState = false;
@@ -51,7 +49,6 @@
     };
     
     $chats.forEach(chat => {
-      if (chat.isTemporary) return;
       if (chat.projectId) {
         if (!organized.projects[chat.projectId]) {
           organized.projects[chat.projectId] = [];
@@ -92,7 +89,6 @@
       searchTimeout = setTimeout(() => {
         const query = $searchQuery.toLowerCase().trim();
         filteredChats = $chats.filter(chat => {
-          if (chat.isTemporary) return false;
           // Cerca nel titolo
           if (chat.title.toLowerCase().includes(query)) return true;
           // Cerca nei messaggi (solo nei primi messaggi per performance)
@@ -103,9 +99,7 @@
         });
       }, 150); // Debounce di 150ms
     } else {
-      filteredChats = $chats
-        .filter(chat => !chat.isTemporary)
-        .slice(0, 10); // Mostra le ultime 10 chat
+      filteredChats = $chats.slice(0, 10); // Mostra le ultime 10 chat
     }
   }
   
@@ -128,16 +122,6 @@
   async function handleMenuClick(itemId) {
     switch(itemId) {
       case 'new-chat':
-        // Rimuovi chat temporanea se esiste
-        const tempChat = $chats.find(chat => chat.isTemporary);
-        if (tempChat) {
-          temporaryButtonFading = true;
-          setTimeout(() => {
-            chats.update(allChats => allChats.filter(chat => !chat.isTemporary));
-            showTemporaryButton = false;
-            temporaryButtonFading = false;
-          }, 300);
-        }
         await createNewChat();
         sidebarView.set('chat');
         activeItem = null; // Nessun item attivo quando si è in una chat
@@ -378,7 +362,7 @@
       { id: 'projects', label: 'Progetti', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
       { id: 'database-test', label: 'Test Database', icon: 'M4 7h16M4 12h16M4 17h16', customIcon: true }
     ] as item}
-      <div class="nav-item-wrapper" class:with-temporary={item.id === 'search' && showTemporaryButton}>
+      <div class="nav-item-wrapper">
         {#if item.id === 'search'}
           {#if !showSearchInput}
             <button 
@@ -423,26 +407,6 @@
                 </svg>
               </button>
             </div>
-          {/if}
-          
-          {#if showTemporaryButton}
-            <button 
-              class="temporary-chat-nav-button"
-              class:fading={temporaryButtonFading}
-              on:click={() => {
-                createTemporaryChat();
-                sidebarView.set('chat');
-                activeItem = null;
-                if ($isMobile) {
-                  isSidebarOpen.set(false);
-                }
-              }}
-              title="Chat temporanea"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            </button>
           {/if}
         {:else}
           <button 
@@ -1120,73 +1084,8 @@
     margin-bottom: 4px;
   }
 
-  .nav-item-wrapper.with-temporary {
-    gap: 6px;
-  }
-
   .search-button {
     flex: 1;
-  }
-  
-  .temporary-chat-nav-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    background: rgba(99, 102, 241, 0.1);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-radius: 8px;
-    color: #6366f1;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 1;
-    transform: scale(1);
-    animation: temporaryButtonSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .temporary-chat-nav-button:hover {
-    background: rgba(99, 102, 241, 0.2);
-    border-color: rgba(99, 102, 241, 0.5);
-    transform: scale(1.05);
-  }
-
-  .temporary-chat-nav-button:active {
-    transform: scale(0.95);
-  }
-
-  .temporary-chat-nav-button.fading {
-    animation: temporaryButtonFadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  }
-
-  @keyframes temporaryButtonSlideIn {
-    from {
-      opacity: 0;
-      transform: scale(0.8) translateX(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateX(0);
-    }
-  }
-
-  @keyframes temporaryButtonFadeOut {
-    from {
-      opacity: 1;
-      transform: scale(1) translateX(0);
-    }
-    to {
-      opacity: 0;
-      transform: scale(0.8) translateX(-10px);
-    }
-  }
-
-  @media (max-width: 768px) {
-    .temporary-chat-nav-button {
-      width: 32px;
-      height: 32px;
-    }
   }
 
   .search-group-animated {

@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick, afterUpdate } from 'svelte';
   import { get } from 'svelte/store';
-  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, createTemporaryChat, saveChatsToStorage } from '../stores/chat.js';
+  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, saveChatsToStorage } from '../stores/chat.js';
   import { selectedModel } from '../stores/models.js';
   import { hasActiveSubscription } from '../stores/user.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
@@ -68,7 +68,6 @@
   
   // Variabili reattive
   let messages = [];
-  let isTemporaryChat = false;
   let currentChatTokens = 0;
   let maxTokens = 4000;
   let tokenUsagePercentage = 0;
@@ -83,11 +82,9 @@
   $: {
     try {
       messages = $currentChat?.messages || [];
-      isTemporaryChat = $currentChat?.isTemporary || false;
     } catch (error) {
       console.error('Error accessing currentChat:', error);
       messages = [];
-      isTemporaryChat = false;
     }
   }
   
@@ -302,14 +299,6 @@
     }
     
     if (hasText && !$isGenerating) {
-      // Se c'è una chat temporanea e stiamo inviando un messaggio, rimuovila
-      const tempChat = $chats.find(chat => chat.isTemporary);
-      if (tempChat && $currentChatId === tempChat.id) {
-        // La chat temporanea diventerà permanente quando viene salvata
-      } else if (tempChat && $currentChatId !== tempChat.id) {
-        // Se stiamo inviando in una chat normale, rimuovi quella temporanea
-        chats.update(allChats => allChats.filter(chat => !chat.isTemporary));
-      }
       const chatId = $currentChatId || await createNewChat();
       
       const userMessage = { 
@@ -909,33 +898,6 @@
     }
   }
   
-  function convertToPermanent() {
-    const chatId = $currentChatId;
-    if (!chatId) return;
-    
-    chats.update(allChats => {
-      return allChats.map(chat => {
-        if (chat.id === chatId && chat.isTemporary) {
-          return {
-            ...chat,
-            isTemporary: false,
-            id: Date.now().toString() // Nuovo ID per la chat permanente
-          };
-        }
-        return chat;
-      });
-    });
-    
-    // Aggiorna currentChatId con il nuovo ID
-    chats.subscribe(allChats => {
-      const updatedChat = allChats.find(c => c.id !== chatId && !c.isTemporary && c.title === 'Chat temporanea');
-      if (updatedChat) {
-        currentChatId.set(updatedChat.id);
-      }
-    })();
-    
-    saveChatsToStorage();
-  }
 </script>
 
 <main class="main-area">
@@ -1004,35 +966,12 @@
   <div class="messages-container" bind:this={messagesContainer}>
     {#if visibleMessages.length === 0}
       <div class="welcome-message">
-        {#if !$currentChatId}
-          <button class="temporary-chat-button" on:click={() => createTemporaryChat()}>
-            <div class="welcome-logo">
-              <img src="/logo.png" alt="Nebula AI" />
-            </div>
-            <h1 class="welcome-text">Attiva chat temporanea</h1>
-          </button>
-        {:else}
-          <div class="welcome-content">
-            <div class="welcome-logo">
-              <img src="/logo.png" alt="Nebula AI" />
-            </div>
-            <h1 class="welcome-text">Come posso aiutarti?</h1>
+        <div class="welcome-content">
+          <div class="welcome-logo">
+            <img src="/logo.png" alt="Nebula AI" />
           </div>
-        {/if}
-      </div>
-    {/if}
-    
-    {#if isTemporaryChat}
-      <div class="temporary-chat-banner">
-        <div class="temporary-chat-indicator">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-          </svg>
-          <span>Chat temporanea - Non verrà salvata</span>
+          <h1 class="welcome-text">Come posso aiutarti?</h1>
         </div>
-        <button class="convert-to-permanent" on:click={() => convertToPermanent()}>
-          Salva chat
-        </button>
       </div>
     {/if}
     
@@ -2849,69 +2788,6 @@
     border-top: 1px solid var(--border-color);
   }
 
-  .temporary-chat-button {
-    background: none;
-    border: 2px solid white;
-    border-radius: 12px;
-    padding: 24px 32px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    transition: all 0.3s ease;
-    color: var(--text-primary);
-  }
-
-  .temporary-chat-button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  .temporary-chat-icon {
-    color: var(--text-primary);
-  }
-
-  .temporary-chat-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background-color: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 16px;
-    animation: slideDown 0.3s ease;
-  }
-
-  .temporary-chat-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-secondary);
-    font-size: 13px;
-  }
-
-  .temporary-chat-indicator svg {
-    color: var(--text-secondary);
-  }
-
-  .convert-to-permanent {
-    padding: 6px 12px;
-    background-color: var(--accent-blue);
-    border: none;
-    border-radius: 6px;
-    color: white;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .convert-to-permanent:hover {
-    background-color: #2563eb;
-    transform: translateY(-1px);
-  }
 
 
 </style>

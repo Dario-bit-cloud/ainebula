@@ -23,8 +23,7 @@ export async function createNewChat(projectId = null) {
     messages: [],
     projectId: projectId || null,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    isTemporary: false
+    updatedAt: new Date().toISOString()
   };
   
   chats.update(allChats => [newChat, ...allChats]);
@@ -64,25 +63,6 @@ export function removeChatFromProject(chatId) {
   moveChatToProject(chatId, null);
 }
 
-export function createTemporaryChat() {
-  // Rimuovi eventuali chat temporanee esistenti
-  chats.update(allChats => allChats.filter(chat => !chat.isTemporary));
-  
-  const newChat = {
-    id: 'temp-' + Date.now().toString(),
-    title: 'Chat temporanea',
-    messages: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    isTemporary: true
-  };
-  
-  chats.update(allChats => [newChat, ...allChats]);
-  currentChatId.set(newChat.id);
-  // Non salvare le chat temporanee nel localStorage
-  return newChat.id;
-}
-
 export async function addMessage(chatId, message) {
   chats.update(allChats => {
     return allChats.map(chat => {
@@ -92,11 +72,6 @@ export async function addMessage(chatId, message) {
           messages: [...chat.messages, message],
           updatedAt: new Date().toISOString()
         };
-        
-        // Se è una chat temporanea e si aggiunge il primo messaggio, diventa permanente
-        if (chat.isTemporary && chat.messages.length === 0) {
-          updatedChat.isTemporary = false;
-        }
         
         // Aggiorna il titolo se è la prima domanda
         if (chat.messages.length === 0 && message.type === 'user') {
@@ -109,10 +84,10 @@ export async function addMessage(chatId, message) {
     });
   });
   
-  // Salva solo se non è una chat temporanea e ha almeno un messaggio visibile
+  // Salva solo se ha almeno un messaggio visibile
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
-  if (chat && !chat.isTemporary && chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
+  if (chat && chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
     if (get(isAuthenticatedStore)) {
       // Salva nel database se autenticato
       await saveChatToDatabase(chat);
@@ -145,12 +120,6 @@ export async function deleteChat(chatId) {
 }
 
 export function loadChat(chatId) {
-  // Se si carica una chat normale, rimuovi eventuali chat temporanee
-  const allChats = get(chats);
-  const chat = allChats.find(c => c.id === chatId);
-  if (chat && !chat.isTemporary) {
-    chats.update(allChats => allChats.filter(c => !c.isTemporary || c.id === chatId));
-  }
   currentChatId.set(chatId);
 }
 
@@ -222,9 +191,8 @@ export function saveChatsToStorage() {
   if (typeof window !== 'undefined') {
     let currentChats = [];
     const unsubscribe = chats.subscribe(value => {
-      // Filtra le chat temporanee e quelle senza messaggi - non salviamo quelle
+      // Filtra quelle senza messaggi - non salviamo quelle
       currentChats = value.filter(chat => 
-        !chat.isTemporary && 
         chat.messages && 
         chat.messages.length > 0 &&
         chat.messages.some(msg => !msg.hidden) // Almeno un messaggio visibile

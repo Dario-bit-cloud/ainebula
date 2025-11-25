@@ -128,7 +128,7 @@ export async function saveChatToDatabase(chat) {
       title: chat.title,
       messages: chat.messages || [],
       projectId: chat.projectId || null,
-      isTemporary: chat.isTemporary || false
+      isTemporary: false
     };
     
     console.log('📤 [CHAT SERVICE] Invio richiesta POST:', {

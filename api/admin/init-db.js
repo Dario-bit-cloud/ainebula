@@ -1,14 +1,41 @@
-// Script semplificato per creare le tabelle
+// API Route per inizializzare il database su Vercel
+// Protegge l'endpoint con una chiave segreta
 import { neon } from '@neondatabase/serverless';
 
-const connectionString = process.env.DATABASE_URL || 
-  'postgresql://neondb_owner:npg_Xpw3ovIOqnz0@ep-spring-leaf-ads75xz2-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require';
+const connectionString = process.env.DATABASE_URL;
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'change-me-in-production';
 
 const sql = neon(connectionString);
 
-async function createTables() {
+export default async function handler(req, res) {
+  // Abilita CORS
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
+  }
+
+  // Verifica la chiave segreta
+  const authHeader = req.headers['authorization'];
+  const providedSecret = authHeader && authHeader.replace('Bearer ', '');
+
+  if (providedSecret !== ADMIN_SECRET) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Unauthorized. Fornisci ADMIN_SECRET nell\'header Authorization come Bearer token.' 
+    });
+  }
+
   try {
-    console.log('📊 Creazione tabelle...');
+    console.log('📊 Inizializzazione database...');
     
     // Crea tabella users
     await sql`
@@ -23,7 +50,7 @@ async function createTables() {
         is_active BOOLEAN DEFAULT TRUE
       )
     `;
-    console.log('✅ Tabella users creata');
+    console.log('✅ Tabella users creata/verificata');
     
     // Crea tabella sessions
     await sql`
@@ -37,7 +64,7 @@ async function createTables() {
         user_agent TEXT
       )
     `;
-    console.log('✅ Tabella sessions creata');
+    console.log('✅ Tabella sessions creata/verificata');
     
     // Crea tabella chats
     await sql`
@@ -51,7 +78,7 @@ async function createTables() {
         is_temporary BOOLEAN DEFAULT FALSE
       )
     `;
-    console.log('✅ Tabella chats creata');
+    console.log('✅ Tabella chats creata/verificata');
     
     // Crea tabella messages
     await sql`
@@ -65,7 +92,7 @@ async function createTables() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `;
-    console.log('✅ Tabella messages creata');
+    console.log('✅ Tabella messages creata/verificata');
     
     // Crea indici
     await sql`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`;
@@ -78,7 +105,7 @@ async function createTables() {
     await sql`CREATE INDEX IF NOT EXISTS idx_chats_project_id ON chats(project_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_chats_updated_at ON chats(updated_at)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id)`;
-    console.log('✅ Indici creati');
+    console.log('✅ Indici creati/verificati');
     
     // Crea funzione per aggiornare updated_at
     await sql`
@@ -90,7 +117,7 @@ async function createTables() {
       END;
       $$ language 'plpgsql'
     `;
-    console.log('✅ Funzione update_updated_at_column creata');
+    console.log('✅ Funzione update_updated_at_column creata/verificata');
     
     // Crea trigger per aggiornare updated_at su chats
     await sql`
@@ -101,7 +128,7 @@ async function createTables() {
       BEFORE UPDATE ON chats
       FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
     `;
-    console.log('✅ Trigger per chats creato');
+    console.log('✅ Trigger per chats creato/verificato');
     
     // Verifica le tabelle
     const tables = await sql`
@@ -111,18 +138,21 @@ async function createTables() {
       ORDER BY table_name
     `;
     
-    console.log('\n📋 Tabelle create:');
-    tables.forEach(table => {
-      console.log(`   - ${table.table_name}`);
+    const tableNames = tables.map(t => t.table_name);
+    
+    return res.json({
+      success: true,
+      message: 'Database inizializzato con successo!',
+      tables: tableNames
     });
     
-    console.log('\n✅ Database inizializzato con successo!');
-    
   } catch (error) {
-    console.error('❌ Errore:', error.message);
-    process.exit(1);
+    console.error('❌ Errore durante l\'inizializzazione:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Errore durante l\'inizializzazione del database',
+      error: error.message
+    });
   }
 }
-
-createTables();
 
