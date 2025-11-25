@@ -1,8 +1,8 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { register, login } from '../services/authService.js';
-  import { setUser } from '../stores/auth.js';
-  import { isAuthenticatedStore } from '../stores/auth.js';
+  import { setUser, isAuthenticatedStore } from '../stores/auth.js';
+  import { get } from 'svelte/store';
   
   const dispatch = createEventDispatcher();
   
@@ -16,11 +16,35 @@
   let error = '';
   let isLoading = false;
   let successMessage = '';
+  let rememberCredentials = false;
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
+  let isRetrying = false;
+  
+  // Carica credenziali salvate al mount
+  onMount(() => {
+    const savedUsername = localStorage.getItem('saved_username');
+    const savedPassword = localStorage.getItem('saved_password');
+    const savedRemember = localStorage.getItem('remember_credentials') === 'true';
+    
+    if (savedUsername && savedRemember) {
+      username = savedUsername;
+      if (savedPassword) {
+        password = savedPassword;
+      }
+      rememberCredentials = savedRemember;
+    }
+  });
   
   async function handleSubmit() {
     error = '';
     successMessage = '';
+    retryCount = 0;
     
+    await attemptLogin();
+  }
+  
+  async function attemptLogin() {
     // Validazione
     if (!username || !password) {
       error = 'Username e password sono obbligatori';
@@ -43,6 +67,7 @@
     }
     
     isLoading = true;
+    isRetrying = retryCount > 0;
     
     try {
       let result;
@@ -54,32 +79,98 @@
       }
       
       if (result.success) {
+        // Salva le credenziali se richiesto
+        if (rememberCredentials && isLogin) {
+          localStorage.setItem('saved_username', username);
+          localStorage.setItem('saved_password', password);
+          localStorage.setItem('remember_credentials', 'true');
+        } else {
+          // Rimuovi credenziali salvate se non si vuole ricordare
+          localStorage.removeItem('saved_username');
+          localStorage.removeItem('saved_password');
+          localStorage.removeItem('remember_credentials');
+        }
+        
         setUser(result.user);
         successMessage = isLogin ? 'Login completato con successo!' : 'Registrazione completata con successo!';
         
-        // Chiudi il modal dopo un breve delay
-        setTimeout(() => {
-          closeModal();
-        }, 1000);
+        // Chiudi il modal solo dopo aver verificato che l'utente è autenticato
+        setTimeout(async () => {
+          // Verifica che l'utente sia effettivamente autenticato prima di chiudere
+          await new Promise(resolve => setTimeout(resolve, 500)); // Attendi che lo store si aggiorni
+          
+          const isAuth = get(isAuthenticatedStore);
+          if (isAuth) {
+            closeModal();
+          } else {
+            // Se non è autenticato, riprova
+            retryCount++;
+            if (retryCount < MAX_RETRIES) {
+              console.log(`🔄 [AUTH MODAL] Utente non autenticato, riprovo... (${retryCount}/${MAX_RETRIES})`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await attemptLogin();
+            } else {
+              error = 'Impossibile completare il login. Riprova più tardi.';
+              isLoading = false;
+              isRetrying = false;
+            }
+          }
+        }, 1500);
       } else {
+        // Se è un errore di connessione, riprova automaticamente
+        const isConnectionError = result.errorType === 'TypeError' || 
+                                  result.message?.includes('Failed to fetch') ||
+                                  result.message?.includes('Errore nella comunicazione');
+        
+        if (isConnectionError && retryCount < MAX_RETRIES) {
+          retryCount++;
+          console.log(`🔄 [AUTH MODAL] Tentativo ${retryCount}/${MAX_RETRIES}...`);
+          
+          // Attendi prima di riprovare (backoff esponenziale)
+          const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          // Riprova automaticamente
+          await attemptLogin();
+          return;
+        }
+        
         // Mostra un messaggio di errore più dettagliato
         const errorDetails = [];
         if (result.message) errorDetails.push(result.message);
-        if (result.error) errorDetails.push(`Dettagli: ${result.error}`);
-        if (result.errorType) errorDetails.push(`Tipo: ${result.errorType}`);
-        if (result.url) errorDetails.push(`URL: ${result.url}`);
+        if (result.error && !result.error.includes('Failed to fetch')) {
+          errorDetails.push(`Dettagli: ${result.error}`);
+        }
+        
+        if (retryCount >= MAX_RETRIES) {
+          errorDetails.push(`Tentativi esauriti (${MAX_RETRIES}).`);
+        }
         
         error = errorDetails.length > 0 
           ? errorDetails.join(' | ') 
           : 'Si è verificato un errore. Controlla la console per i dettagli.';
         
         console.error('❌ [AUTH MODAL] Errore autenticazione:', result);
+        isLoading = false;
+        isRetrying = false;
       }
     } catch (err) {
+      // Se è un errore di connessione, riprova
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        console.log(`🔄 [AUTH MODAL] Tentativo ${retryCount}/${MAX_RETRIES} dopo errore...`);
+        
+        const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        await attemptLogin();
+        return;
+      }
+      
       console.error('❌ [AUTH MODAL] Errore durante autenticazione:', err);
-      error = `Errore di connessione: ${err.message || 'Errore sconosciuto'}. Verifica che il server sia avviato su http://localhost:3001`;
-    } finally {
+      error = `Errore di connessione: ${err.message || 'Errore sconosciuto'}. Tentativi esauriti (${MAX_RETRIES}).`;
       isLoading = false;
+      isRetrying = false;
     }
   }
   
@@ -92,9 +183,33 @@
     isLogin = !isLogin;
     error = '';
     successMessage = '';
-    username = '';
-    password = '';
     confirmPassword = '';
+    retryCount = 0;
+    isRetrying = false;
+    
+    // Se si passa a login, carica le credenziali salvate
+    if (isLogin) {
+      const savedUsername = localStorage.getItem('saved_username');
+      const savedPassword = localStorage.getItem('saved_password');
+      const savedRemember = localStorage.getItem('remember_credentials') === 'true';
+      
+      if (savedUsername && savedRemember) {
+        username = savedUsername;
+        if (savedPassword) {
+          password = savedPassword;
+        }
+        rememberCredentials = savedRemember;
+      } else {
+        username = '';
+        password = '';
+        rememberCredentials = false;
+      }
+    } else {
+      // Se si passa a registrazione, mantieni username ma resetta password
+      password = '';
+      confirmPassword = '';
+      rememberCredentials = false;
+    }
   }
   
   function handleKeydown(event) {
@@ -180,6 +295,28 @@
               disabled={isLoading}
               autocomplete="new-password"
             />
+          </div>
+        {/if}
+        
+        {#if isLogin}
+          <div class="form-group remember-credentials">
+            <label class="remember-label">
+              <input
+                type="checkbox"
+                bind:checked={rememberCredentials}
+                disabled={isLoading}
+              />
+              <span>Ricorda le credenziali</span>
+            </label>
+          </div>
+        {/if}
+        
+        {#if isRetrying && retryCount > 0}
+          <div class="retry-info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+            Tentativo {retryCount}/{MAX_RETRIES}...
           </div>
         {/if}
         
@@ -414,6 +551,63 @@
   .switch-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+  
+  .remember-credentials {
+    margin-bottom: 16px;
+  }
+  
+  .remember-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-secondary, #999);
+    user-select: none;
+  }
+  
+  .remember-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #3b82f6;
+  }
+  
+  .remember-label input[type="checkbox"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .remember-label:hover {
+    color: var(--text-primary, #ffffff);
+  }
+  
+  .retry-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    color: #60a5fa;
+    font-size: 14px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  
+  .retry-info svg {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
   
   @media (max-width: 768px) {
