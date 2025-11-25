@@ -5,7 +5,6 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
-import speakeasy from 'speakeasy';
 
 dotenv.config();
 
@@ -375,7 +374,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     // Trova l'utente
     const users = await sql`
-      SELECT id, email, username, password_hash, is_active, two_factor_enabled, two_factor_secret
+      SELECT id, email, username, password_hash, is_active
       FROM users
       WHERE username = ${usernameLower}
     `;
@@ -417,36 +416,7 @@ app.post('/api/auth/login', async (req, res) => {
         message: 'Credenziali non valide'
       });
     }
-
-    // Verifica 2FA se abilitato
-    if (user.two_factor_enabled) {
-      const { twoFactorCode } = req.body;
-      
-      if (!twoFactorCode) {
-        return res.status(200).json({
-          success: false,
-          requiresTwoFactor: true,
-          message: 'Codice 2FA richiesto'
-        });
-      }
-
-      // Verifica il codice 2FA
-      const verified = speakeasy.totp.verify({
-        secret: user.two_factor_secret,
-        encoding: 'base32',
-        token: twoFactorCode,
-        window: 2
-      });
-
-      if (!verified) {
-        return res.status(401).json({
-          success: false,
-          requiresTwoFactor: true,
-          message: 'Codice 2FA non valido'
-        });
-      }
-    }
-
+    
     // Crea sessione
     log('🎫 [SERVER LOGIN] Creazione sessione...');
     const sessionToken = jwt.sign(

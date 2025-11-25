@@ -14,11 +14,17 @@ import bcrypt from 'bcryptjs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-const connectionString = process.env.DATABASE_URL;
-const sql = neon(connectionString);
+// Inizializza la connessione al database solo se DATABASE_URL è disponibile
+function getDatabaseConnection() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+  return neon(connectionString);
+}
 
 // Helper per verificare autenticazione
-async function authenticateUser(req) {
+async function authenticateUser(req, sql) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -61,9 +67,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Inizializza la connessione al database
+    const sql = getDatabaseConnection();
+    
     // GET /api/auth/me - Verifica sessione e ottieni dati utente
     if (req.method === 'GET') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -117,7 +126,7 @@ export default async function handler(req, res) {
 
     // POST /api/auth/disconnect-all - Disconnetti da tutti i dispositivi
     if (req.method === 'POST' && req.query.action === 'disconnect-all') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -161,7 +170,7 @@ export default async function handler(req, res) {
 
     // DELETE /api/auth/delete-account - Elimina account
     if (req.method === 'DELETE' || (req.method === 'POST' && req.query.action === 'delete-account')) {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -192,7 +201,7 @@ export default async function handler(req, res) {
 
     // PUT/PATCH /api/auth/update-phone - Aggiorna numero di telefono
     if ((req.method === 'PUT' || req.method === 'PATCH') && req.query.action === 'update-phone') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -228,7 +237,7 @@ export default async function handler(req, res) {
 
     // PUT/PATCH /api/auth/update-username - Aggiorna username
     if ((req.method === 'PUT' || req.method === 'PATCH') && req.query.action === 'update-username') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -280,7 +289,7 @@ export default async function handler(req, res) {
 
     // PUT/PATCH /api/auth/update-password - Aggiorna password
     if ((req.method === 'PUT' || req.method === 'PATCH') && req.query.action === 'update-password') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -337,12 +346,20 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   } catch (error) {
-    console.error('❌ Errore auth:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Errore durante l\'operazione',
-      error: error.message
+    console.error('❌ Errore auth:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
     });
+    
+    // Assicurati che la risposta sia sempre JSON valido
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        message: 'Errore durante l\'operazione',
+        error: error.message || 'Unknown error'
+      });
+    }
   }
 }
 

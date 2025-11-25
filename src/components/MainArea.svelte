@@ -2112,8 +2112,7 @@
     }
     
     .privacy-card {
-      padding: 16px;
-      margin-top: 16px;
+      display: none;
     }
     
     .privacy-features {

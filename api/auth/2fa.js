@@ -12,11 +12,17 @@ import QRCode from 'qrcode';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-const connectionString = process.env.DATABASE_URL;
-const sql = neon(connectionString);
+// Inizializza la connessione al database solo se DATABASE_URL è disponibile
+function getDatabaseConnection() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+  return neon(connectionString);
+}
 
 // Helper per verificare autenticazione
-async function authenticateUser(req) {
+async function authenticateUser(req, sql) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -61,9 +67,12 @@ export default async function handler(req, res) {
   const action = req.query.action || req.body.action;
 
   try {
+    // Inizializza la connessione al database
+    const sql = getDatabaseConnection();
+    
     // GET /api/auth/2fa?action=status - Verifica stato 2FA
     if (req.method === 'GET' && action === 'status') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -77,7 +86,7 @@ export default async function handler(req, res) {
 
     // POST /api/auth/2fa?action=generate - Genera QR code
     if (req.method === 'POST' && action === 'generate') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -124,7 +133,7 @@ export default async function handler(req, res) {
 
     // POST /api/auth/2fa?action=verify - Verifica e abilita 2FA
     if (req.method === 'POST' && action === 'verify') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -170,7 +179,7 @@ export default async function handler(req, res) {
 
     // POST /api/auth/2fa?action=disable - Disabilita 2FA
     if (req.method === 'POST' && action === 'disable') {
-      const auth = await authenticateUser(req);
+      const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
       }
@@ -221,8 +230,20 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ success: false, message: 'Method not allowed or invalid action' });
   } catch (error) {
-    console.error('Errore 2FA:', error);
-    return res.status(500).json({ success: false, message: 'Errore durante l\'operazione 2FA', error: error.message });
+    console.error('Errore 2FA:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    // Assicurati che la risposta sia sempre JSON valido
+    if (!res.headersSent) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Errore durante l\'operazione 2FA', 
+        error: error.message || 'Unknown error'
+      });
+    }
   }
 }
 

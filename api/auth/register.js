@@ -9,8 +9,14 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
 
-const connectionString = process.env.DATABASE_URL;
-const sql = neon(connectionString);
+// Inizializza la connessione al database solo se DATABASE_URL è disponibile
+function getDatabaseConnection() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+  return neon(connectionString);
+}
 
 export default async function handler(req, res) {
   // Abilita CORS
@@ -36,6 +42,9 @@ export default async function handler(req, res) {
   });
 
   try {
+    // Inizializza la connessione al database
+    const sql = getDatabaseConnection();
+    
     const { username, password, referralCode } = req.body;
 
     console.log('📥 [VERCEL REGISTER] Body ricevuto:', {
@@ -183,12 +192,20 @@ export default async function handler(req, res) {
       token: sessionToken
     });
   } catch (error) {
-    console.error('❌ [VERCEL REGISTER] Errore:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore durante la registrazione',
-      error: error.message
+    console.error('❌ [VERCEL REGISTER] Errore:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
     });
+    
+    // Assicurati che la risposta sia sempre JSON valido
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Errore durante la registrazione',
+        error: error.message || 'Unknown error'
+      });
+    }
   }
 }
 
