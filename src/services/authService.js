@@ -94,6 +94,31 @@ export async function register(username, password, referralCode = null) {
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
+      // Carica l'abbonamento dal database (dovrebbe essere free di default)
+      if (data.user && data.user.id) {
+        try {
+          const { verifySession } = await import('./authService.js');
+          const sessionResult = await verifySession();
+          if (sessionResult.success && sessionResult.user?.subscription) {
+            // Sincronizza l'abbonamento con lo store utente
+            import('../stores/user.js').then(module => {
+              module.user.update(user => ({
+                ...user,
+                subscription: {
+                  active: sessionResult.user.subscription.active,
+                  plan: sessionResult.user.subscription.plan,
+                  expiresAt: sessionResult.user.subscription.expiresAt,
+                  key: user.subscription?.key || null // Mantieni la chiave locale se presente
+                }
+              }));
+            });
+          }
+        } catch (error) {
+          console.error('❌ [REGISTER] Errore caricamento abbonamento:', error);
+          // Non bloccare la registrazione se il caricamento abbonamento fallisce
+        }
+      }
+      
       // Inizializza la crittografia end-to-end per i messaggi
       if (data.user && data.user.id) {
         try {
@@ -201,6 +226,31 @@ export async function login(username, password) {
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
+      // Carica l'abbonamento dal database
+      if (data.user && data.user.id) {
+        try {
+          const { verifySession } = await import('./authService.js');
+          const sessionResult = await verifySession();
+          if (sessionResult.success && sessionResult.user?.subscription) {
+            // Sincronizza l'abbonamento con lo store utente
+            import('../stores/user.js').then(module => {
+              module.user.update(user => ({
+                ...user,
+                subscription: {
+                  active: sessionResult.user.subscription.active,
+                  plan: sessionResult.user.subscription.plan,
+                  expiresAt: sessionResult.user.subscription.expiresAt,
+                  key: user.subscription?.key || null // Mantieni la chiave locale se presente
+                }
+              }));
+            });
+          }
+        } catch (error) {
+          console.error('❌ [LOGIN] Errore caricamento abbonamento:', error);
+          // Non bloccare il login se il caricamento abbonamento fallisce
+        }
+      }
+      
       // Inizializza la crittografia end-to-end per i messaggi
       if (data.user && data.user.id) {
         try {
@@ -271,6 +321,21 @@ export async function verifySession() {
     
     if (data.success && data.user) {
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Sincronizza l'abbonamento con lo store utente
+      if (data.user.subscription) {
+        import('../stores/user.js').then(module => {
+          module.user.update(user => ({
+            ...user,
+            subscription: {
+              active: data.user.subscription.active,
+              plan: data.user.subscription.plan,
+              expiresAt: data.user.subscription.expiresAt,
+              key: user.subscription?.key || null // Mantieni la chiave locale se presente
+            }
+          }));
+        });
+      }
     } else {
       // Token non valido, rimuovilo e tutti i dati utente
       localStorage.removeItem('auth_token');

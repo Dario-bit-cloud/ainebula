@@ -608,5 +608,103 @@
     width: 18px;
     height: 18px;
   }
+
+  @media (max-width: 768px) {
+    .menu-container {
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      max-width: calc(100vw - 24px);
+    }
+
+    .main-menu,
+    .submenu {
+      min-width: auto;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .user-header {
+      padding: 10px;
+    }
+
+    .user-avatar-small {
+      width: 28px;
+      height: 28px;
+      font-size: 12px;
+    }
+
+    .user-email {
+      font-size: 12px;
+    }
+
+    .user-workspace {
+      font-size: 10px;
+    }
+
+    .menu-item {
+      padding: 10px;
+      font-size: 13px;
+    }
+
+    .submenu-item {
+      padding: 10px;
+      font-size: 13px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .menu-container {
+      bottom: 8px;
+      left: 8px;
+      right: 8px;
+      max-width: calc(100vw - 16px);
+    }
+
+    .main-menu,
+    .submenu {
+      padding: 6px;
+    }
+
+    .user-header {
+      padding: 8px;
+    }
+
+    .user-avatar-small {
+      width: 24px;
+      height: 24px;
+      font-size: 11px;
+    }
+
+    .user-email {
+      font-size: 11px;
+    }
+
+    .user-workspace {
+      font-size: 9px;
+    }
+
+    .menu-item {
+      padding: 8px 10px;
+      font-size: 12px;
+      gap: 10px;
+    }
+
+    .menu-item svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .submenu-item {
+      padding: 8px 10px;
+      font-size: 12px;
+      gap: 10px;
+    }
+
+    .submenu-item svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
 </style>
 

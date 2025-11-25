@@ -2,6 +2,7 @@
   import { isPremiumModalOpen } from '../stores/app.js';
   import { isMobile } from '../stores/app.js';
   import { user } from '../stores/user.js';
+  import { isAuthenticatedStore } from '../stores/auth.js';
   
   let selectedPlan = 'monthly'; // 'monthly' o 'yearly'
   let showPaymentForm = false;
@@ -236,6 +237,29 @@
     
     // Genera una chiave univoca per l'abbonamento
     const subscriptionKey = `NEBULA-${selectedPlan.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    
+    // Salva l'abbonamento nel database se l'utente è autenticato
+    if ($isAuthenticatedStore) {
+      try {
+        const { saveSubscription } = await import('../services/subscriptionService.js');
+        const subscriptionResult = await saveSubscription({
+          plan: planType,
+          expiresAt: expiresAt.toISOString(),
+          autoRenew: true,
+          billingCycle: selectedPlan === 'monthly' ? 'monthly' : 'yearly',
+          amount: parseFloat(calculateTotal()),
+          currency: 'EUR'
+        });
+        
+        if (!subscriptionResult.success) {
+          console.error('Errore salvataggio abbonamento nel database:', subscriptionResult.message);
+          // Continua comunque con il salvataggio locale
+        }
+      } catch (error) {
+        console.error('Errore durante il salvataggio dell\'abbonamento:', error);
+        // Continua comunque con il salvataggio locale
+      }
+    }
     
     user.update(u => ({
       ...u,

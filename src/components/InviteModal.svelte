@@ -192,7 +192,7 @@
   <div class="modal-backdrop" on:click={handleBackdropClick} on:keydown={(e) => e.key === 'Escape' && closeModal()}>
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Invita e guadagna 20€</h2>
+        <h2>Invita e guadagna fino a 500€</h2>
         <button class="close-button" on:click={closeModal}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>

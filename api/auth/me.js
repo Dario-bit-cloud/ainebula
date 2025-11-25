@@ -48,12 +48,47 @@ export default async function handler(req, res) {
       return res.status(401).json({ success: false, message: 'Sessione non valida' });
     }
 
+    const userId = sessions[0].user_id;
+
+    // Carica l'abbonamento attivo dell'utente
+    const subscriptions = await sql`
+      SELECT * FROM subscriptions 
+      WHERE user_id = ${userId} 
+        AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      ORDER BY started_at DESC
+      LIMIT 1
+    `;
+
+    let subscription = null;
+    if (subscriptions.length > 0) {
+      const sub = subscriptions[0];
+      subscription = {
+        active: true,
+        plan: sub.plan,
+        expiresAt: sub.expires_at ? sub.expires_at.toISOString() : null,
+        startedAt: sub.started_at ? sub.started_at.toISOString() : null,
+        autoRenew: sub.auto_renew || false,
+        status: sub.status
+      };
+    } else {
+      subscription = {
+        active: false,
+        plan: null,
+        expiresAt: null,
+        startedAt: null,
+        autoRenew: false,
+        status: 'inactive'
+      };
+    }
+
     res.json({
       success: true,
       user: {
-        id: sessions[0].user_id,
+        id: userId,
         email: sessions[0].email,
-        username: sessions[0].username
+        username: sessions[0].username,
+        subscription: subscription
       }
     });
   } catch (error) {

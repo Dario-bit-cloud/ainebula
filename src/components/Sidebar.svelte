@@ -752,7 +752,7 @@
         <path d="M23 21v-2a4 4 0 00-3-3.87"/>
         <path d="M16 3.13a4 4 0 010 7.75"/>
       </svg>
-      <span>Invita e guadagna 20€</span>
+      <span>Invita e guadagna fino a 500€</span>
     </button>
   </div>
 </aside>
@@ -873,6 +873,9 @@
       transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 2px 0 12px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     .sidebar.sidebar-open {
@@ -881,6 +884,18 @@
 
     .sidebar-header-mobile {
       display: flex;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      flex-shrink: 0;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .nav-item {
@@ -893,21 +908,39 @@
       font-size: 14px;
     }
 
+    .user-section {
+      flex-shrink: 0;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border-color);
+      background-color: var(--bg-secondary);
+    }
+
     .user-info {
-      padding: 12px 14px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
     }
 
     .username {
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .workspace {
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .invite-button {
-      padding: 10px 14px;
-      font-size: 13px;
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+
+    .invite-button span {
+      font-size: 12px;
     }
   }
 
@@ -915,6 +948,14 @@
     .sidebar {
       width: 260px;
       max-width: 90vw;
+    }
+
+    .sidebar-header {
+      padding: 16px 12px;
+    }
+
+    .sidebar-nav {
+      padding: 10px;
     }
 
     .nav-item {
@@ -926,15 +967,49 @@
       padding: 8px 10px;
       font-size: 13px;
     }
+
+    .user-section {
+      padding: 8px 10px;
+    }
+
+    .user-info {
+      padding: 6px;
+      margin-bottom: 8px;
+    }
+
+    .user-avatar {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+    }
+
+    .username {
+      font-size: 12px;
+    }
+
+    .workspace {
+      font-size: 10px;
+    }
+
+    .invite-button {
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+
+    .invite-button span {
+      font-size: 11px;
+    }
   }
 
   .sidebar-nav {
     flex: 1;
     padding: 12px;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-height: 0;
   }
   
   .new-chat-wrapper {
@@ -1498,6 +1573,9 @@
     padding: 12px;
     border-top: 1px solid var(--border-color);
     flex-shrink: 0;
+    background-color: var(--bg-secondary);
+    position: relative;
+    z-index: 10;
   }
 
   .user-info {
@@ -1512,6 +1590,7 @@
     width: 100%;
     cursor: pointer;
     transition: background-color 0.2s;
+    min-width: 0;
   }
 
   .user-info:hover {
@@ -1521,6 +1600,7 @@
   .user-avatar {
     width: 32px;
     height: 32px;
+    min-width: 32px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent-blue), #8b5cf6);
     display: flex;
@@ -1533,6 +1613,7 @@
   .user-details {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
   }
 
   .username {
@@ -1542,6 +1623,8 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block;
+    width: 100%;
   }
 
   .workspace {
@@ -1550,6 +1633,9 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block;
+    width: 100%;
+    margin-top: 2px;
   }
 
   .invite-button {
@@ -1566,6 +1652,7 @@
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     transform: translateY(0);
+    min-width: 0;
   }
 
   .invite-button:hover {
@@ -1581,5 +1668,13 @@
 
   .invite-button svg {
     flex-shrink: 0;
+  }
+
+  .invite-button span {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>

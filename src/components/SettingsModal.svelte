@@ -1,10 +1,12 @@
 <script>
-  import { isSettingsOpen } from '../stores/app.js';
+  import { isSettingsOpen, isPremiumModalOpen } from '../stores/app.js';
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
   import { deleteAccount } from '../services/authService.js';
   import { getCurrentAccount, removeAccount } from '../stores/accounts.js';
+  import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
+  import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
   import { onMount } from 'svelte';
   
   let activeSection = 'generale';
@@ -15,6 +17,7 @@
   const sections = [
     { id: 'generale', label: 'Generale', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
     { id: 'profilo', label: 'Profilo', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+    { id: 'abbonamento', label: 'Abbonamento', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
     { id: 'dati', label: 'Dati', icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4' },
     { id: 'informazioni', label: 'Informazioni', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }
   ];
@@ -284,6 +287,71 @@
   function handleManageSharedLinks() {
     alert('Gestione link condivisi - Funzionalità in arrivo');
   }
+  
+  let isLoadingSubscription = false;
+  let subscriptionData = null;
+  
+  async function loadSubscription() {
+    if (!$isAuthenticatedStore) return;
+    
+    isLoadingSubscription = true;
+    try {
+      const result = await getSubscription();
+      if (result.success && result.subscription) {
+        subscriptionData = result.subscription;
+        // Sincronizza con lo store utente
+        userStore.update(user => ({
+          ...user,
+          subscription: {
+            active: result.subscription.status === 'active',
+            plan: result.subscription.plan,
+            expiresAt: result.subscription.expires_at ? new Date(result.subscription.expires_at).toISOString() : null,
+            key: user.subscription?.key || null
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Errore caricamento abbonamento:', error);
+    } finally {
+      isLoadingSubscription = false;
+    }
+  }
+  
+  function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('it-IT', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (e) {
+      return dateString;
+    }
+  }
+  
+  function getPlanName(plan) {
+    if (!plan || plan === 'free') return 'Gratuito';
+    if (plan === 'pro') return 'Pro';
+    if (plan === 'max') return 'Massimo';
+    return plan;
+  }
+  
+  function handleUpgrade() {
+    isPremiumModalOpen.set(true);
+    isSettingsOpen.set(false);
+  }
+  
+  $: subscription = $userStore.subscription;
+  $: isActive = subscription?.active && hasActiveSubscription();
+  $: planName = getPlanName(subscription?.plan);
+  
+  onMount(() => {
+    if ($isAuthenticatedStore) {
+      loadSubscription();
+    }
+  });
 </script>
 
 {#if $isSettingsOpen}
@@ -378,6 +446,77 @@
                 <option value="de">Deutsch</option>
               </select>
             </div>
+          {/if}
+          
+          <!-- Abbonamento -->
+          {#if activeSection === 'abbonamento'}
+            {#if isLoadingSubscription}
+              <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
+                <div class="loading-state">Caricamento informazioni abbonamento...</div>
+              </div>
+            {:else}
+              <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
+                <h3 class="setting-title">Stato Abbonamento</h3>
+                
+                <div class="subscription-status">
+                  <div class="subscription-badge" class:active={isActive} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
+                    <span class="badge-label">{planName}</span>
+                    {#if isActive}
+                      <span class="badge-status">Attivo</span>
+                    {:else}
+                      <span class="badge-status">Non attivo</span>
+                    {/if}
+                  </div>
+                </div>
+                
+                <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                  <div class="setting-label">Piano corrente</div>
+                  <div class="setting-value">{planName}</div>
+                </div>
+                
+                {#if subscription?.expiresAt}
+                  <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                    <div class="setting-label">Scadenza</div>
+                    <div class="setting-value">{formatDate(subscription.expiresAt)}</div>
+                  </div>
+                {/if}
+                
+                {#if subscription?.startedAt}
+                  <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                    <div class="setting-label">Data attivazione</div>
+                    <div class="setting-value">{formatDate(subscription.startedAt)}</div>
+                  </div>
+                {/if}
+                
+                {#if !isActive || subscription?.plan === 'free'}
+                  <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                    <div class="setting-info">
+                      <div class="setting-label">Aggiorna piano</div>
+                      <div class="setting-description">Sblocca funzionalità premium con un abbonamento Pro o Massimo</div>
+                    </div>
+                    <button class="manage-button" on:click={handleUpgrade}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                      </svg>
+                      Aggiorna
+                    </button>
+                  </div>
+                {:else}
+                  <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                    <div class="setting-info">
+                      <div class="setting-label">Gestisci abbonamento</div>
+                      <div class="setting-description">Modifica o cancella il tuo abbonamento premium</div>
+                    </div>
+                    <button class="manage-button" on:click={handleUpgrade}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      </svg>
+                      Gestisci
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            {/if}
           {/if}
           
           <!-- Profilo -->
@@ -919,6 +1058,69 @@
 
   .danger-button:active {
     transform: translateY(0);
+  }
+
+  .loading-state {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  
+  .subscription-status {
+    margin-bottom: 24px;
+  }
+  
+  .subscription-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    background-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
+  }
+  
+  .subscription-badge.active {
+    border-color: #3b82f6;
+  }
+  
+  .subscription-badge.pro {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+    border-color: #667eea;
+  }
+  
+  .subscription-badge.max {
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
+    border-color: #f093fb;
+  }
+  
+  .badge-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+  
+  .badge-status {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+    font-weight: 500;
+  }
+  
+  .subscription-badge.active .badge-status {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+  }
+  
+  .manage-button.secondary {
+    background-color: transparent;
+    border: 1px solid #3a3a3a;
+  }
+  
+  .manage-button.secondary:hover {
+    background-color: #3a3a3a;
   }
 
   @media (max-width: 768px) {

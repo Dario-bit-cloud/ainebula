@@ -322,6 +322,44 @@
       }
     });
     
+    // Gestione tastiera virtuale su mobile
+    let initialViewportHeight = window.visualViewport?.height || window.innerHeight;
+    
+    function handleViewportResize() {
+      if (!$isMobile) return;
+      
+      const currentHeight = window.visualViewport?.height || window.innerHeight;
+      const heightDifference = initialViewportHeight - currentHeight;
+      
+      // Se l'altezza è diminuita significativamente, probabilmente si è aperta la tastiera
+      if (heightDifference > 150) {
+        handleKeyboardOpen();
+      } else if (heightDifference < 50 && currentHeight >= initialViewportHeight * 0.8) {
+        // La tastiera potrebbe essere stata chiusa
+        handleKeyboardClose();
+      }
+    }
+    
+    // Salva i riferimenti per il cleanup
+    keyboardHandlers.handleTextareaFocus = handleTextareaFocus;
+    keyboardHandlers.handleKeyboardClose = handleKeyboardClose;
+    keyboardHandlers.handleViewportResize = handleViewportResize;
+    
+    // Aggiungi listener per il focus sul textarea
+    tick().then(() => {
+      if (textareaRef) {
+        textareaRef.addEventListener('focus', handleTextareaFocus);
+        textareaRef.addEventListener('blur', handleKeyboardClose);
+      }
+    });
+    
+    // Listener per resize viewport
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+    } else {
+      window.addEventListener('resize', handleViewportResize);
+    }
+    
     // Cleanup
     // Cleanup function
     return () => {
@@ -340,6 +378,17 @@
         }
       }
       document.removeEventListener('click', handleClickOutside);
+      if (textareaRef && keyboardHandlers.handleTextareaFocus) {
+        textareaRef.removeEventListener('focus', keyboardHandlers.handleTextareaFocus);
+        textareaRef.removeEventListener('blur', keyboardHandlers.handleKeyboardClose);
+      }
+      if (keyboardHandlers.handleViewportResize) {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', keyboardHandlers.handleViewportResize);
+        } else {
+          window.removeEventListener('resize', keyboardHandlers.handleViewportResize);
+        }
+      }
       if (unsubscribe) unsubscribe();
     };
   });
@@ -365,6 +414,40 @@
         top: 0,
         behavior: 'smooth'
       });
+    }
+  }
+  
+  // Funzioni per gestione tastiera virtuale su mobile
+  let keyboardHandlers = {
+    handleTextareaFocus: null,
+    handleKeyboardClose: null,
+    handleViewportResize: null
+  };
+  
+  function handleKeyboardOpen() {
+    if (!$isMobile) return;
+    
+    // Scrolla per assicurarsi che l'input sia visibile
+    setTimeout(() => {
+      if (textareaRef) {
+        textareaRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+      // Scrolla anche i messaggi per mostrare l'input
+      scrollToBottom(false);
+    }, 300);
+  }
+  
+  function handleKeyboardClose() {
+    if (!$isMobile) return;
+    // Quando la tastiera si chiude, ripristina lo scroll
+    setTimeout(() => {
+      scrollToBottom(false);
+    }, 100);
+  }
+  
+  function handleTextareaFocus() {
+    if ($isMobile) {
+      handleKeyboardOpen();
     }
   }
   
@@ -2029,7 +2112,7 @@
 
     .messages-container {
       padding: 12px 8px;
-      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+      padding-bottom: calc(150px + env(safe-area-inset-bottom));
       gap: 12px;
     }
 
@@ -2063,6 +2146,10 @@
     .input-container {
       padding: 10px 12px;
       padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      position: sticky;
+      bottom: 0;
+      background-color: var(--bg-primary);
+      z-index: 100;
     }
 
     .input-wrapper {
@@ -2132,7 +2219,7 @@
 
     .messages-container {
       padding: 12px 8px;
-      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+      padding-bottom: calc(150px + env(safe-area-inset-bottom));
       gap: 12px;
     }
 
@@ -2145,6 +2232,10 @@
     .input-container {
       padding: 8px;
       padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      position: sticky;
+      bottom: 0;
+      background-color: var(--bg-primary);
+      z-index: 100;
     }
 
     .input-wrapper {
@@ -2413,6 +2504,7 @@
     background-color: var(--bg-primary);
     border-top: 1px solid var(--border-color);
     position: relative;
+    z-index: 10;
   }
 
   .attached-images {
