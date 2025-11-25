@@ -72,7 +72,7 @@
     }
   }
   
-  function handleDeleteSaved(id) {
+  async function handleDeleteSaved(id) {
     const confirmed = await showConfirm('Sei sicuro di voler eliminare questo prompt personalizzato?', 'Elimina prompt', 'Elimina', 'Annulla', 'danger');
     if (confirmed) {
       deletePrompt(id);
