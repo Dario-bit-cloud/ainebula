@@ -169,12 +169,9 @@ export async function register(username, password, referralCode = null) {
 /**
  * Effettua il login
  */
-export async function login(username, password, twoFactorCode = null) {
+export async function login(username, password) {
   const url = `${API_BASE_URL}/login`;
   const requestBody = { username, password };
-  if (twoFactorCode) {
-    requestBody.twoFactorCode = twoFactorCode;
-  }
   
   console.log('🔐 [LOGIN] Inizio login:', {
     url,
@@ -312,7 +309,7 @@ export async function verifySession() {
       return { success: false, message: 'Nessun token trovato' };
     }
     
-    const response = await fetch(`${API_BASE_URL}`, {
+    const response = await fetch(`${API_BASE_URL}/me`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -364,7 +361,7 @@ export async function logout() {
     const token = localStorage.getItem('auth_token');
     
     if (token) {
-      await fetch(`${API_BASE_URL}`, {
+      await fetch(`${API_BASE_URL}/logout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -410,10 +407,95 @@ export function isAuthenticated() {
 }
 
 /**
+ * Aggiorna lo username dell'utente corrente
+ */
+export async function updateUsername(username) {
+  const url = `${API_BASE_URL}/update-username`;
+  const token = getToken();
+  
+  if (!token) {
+    return {
+      success: false,
+      message: 'Nessun token di autenticazione trovato'
+    };
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Aggiorna i dati utente nel localStorage
+      const user = getCurrentUser();
+      if (user) {
+        user.username = data.username;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Errore durante aggiornamento username:', error);
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Aggiorna la password dell'utente corrente
+ */
+export async function updatePassword(currentPassword, newPassword) {
+  const url = `${API_BASE_URL}/update-password`;
+  const token = getToken();
+  
+  if (!token) {
+    return {
+      success: false,
+      message: 'Nessun token di autenticazione trovato'
+    };
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword
+      })
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Errore durante aggiornamento password:', error);
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message
+    };
+  }
+}
+
+/**
  * Elimina l'account dell'utente corrente e tutti i dati associati
  */
 export async function deleteAccount() {
-  const url = `${API_BASE_URL}?action=delete-account`;
+  const url = `${API_BASE_URL}/delete-account`;
   const token = getToken();
   
   if (!token) {
@@ -495,144 +577,6 @@ export async function deleteAccount() {
       error: error.message,
       errorType: error.name,
       url
-    };
-  }
-}
-
-/**
- * Genera QR code per 2FA
- */
-export async function generate2FA() {
-  const url = `${API_BASE_URL}/2fa?action=generate`;
-  const token = getToken();
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message
-    };
-  }
-}
-
-/**
- * Verifica e abilita 2FA
- */
-export async function verify2FA(code) {
-  const url = `${API_BASE_URL}/2fa?action=verify`;
-  const token = getToken();
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ code })
-    });
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message
-    };
-  }
-}
-
-/**
- * Disabilita 2FA
- */
-export async function disable2FA(code) {
-  const url = `${API_BASE_URL}/2fa?action=disable`;
-  const token = getToken();
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ code })
-    });
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message
-    };
-  }
-}
-
-/**
- * Verifica lo stato del 2FA
- */
-export async function get2FAStatus() {
-  const url = `${API_BASE_URL}/2fa?action=status`;
-  const token = getToken();
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message
     };
   }
 }

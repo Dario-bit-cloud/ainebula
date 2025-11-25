@@ -3,7 +3,7 @@
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
-  import { deleteAccount, getToken, generate2FA, verify2FA, disable2FA, get2FAStatus } from '../services/authService.js';
+  import { deleteAccount, getToken, updateUsername, updatePassword, getCurrentUser } from '../services/authService.js';
   import { getCurrentAccount, removeAccount } from '../stores/accounts.js';
   import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
@@ -21,6 +21,18 @@
   let phoneInput = '';
   let isSavingPhone = false;
   let isLoadingPhone = false;
+  
+  let username = '';
+  let isEditingUsername = false;
+  let usernameInput = '';
+  let isSavingUsername = false;
+  let isLoadingUsername = false;
+  
+  let isEditingPassword = false;
+  let currentPassword = '';
+  let newPassword = '';
+  let confirmPassword = '';
+  let isSavingPassword = false;
   
   const sections = [
     { id: 'generale', label: 'Generale', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
@@ -57,10 +69,10 @@
   
   function selectSection(sectionId) {
     activeSection = sectionId;
-    // Carica il numero di telefono e lo stato 2FA quando si apre la sezione profilo
+    // Carica i dati quando si apre la sezione profilo
     if (sectionId === 'profilo' && $isAuthenticatedStore) {
       loadPhoneNumber();
-      load2FAStatus();
+      loadUsername();
     }
   }
   
@@ -141,7 +153,7 @@
           return 'http://localhost:3001/api/auth';
         };
 
-        const response = await fetch(`${getApiBaseUrl()}?action=disconnect-all`, {
+        const response = await fetch(`${getApiBaseUrl()}/disconnect-all`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -211,6 +223,54 @@
     }
   }
   
+  async function loadUsername() {
+    if (!$isAuthenticatedStore || isLoadingUsername) return;
+    
+    isLoadingUsername = true;
+    try {
+      const token = getToken();
+      if (!token) {
+        isLoadingUsername = false;
+        return;
+      }
+
+      // Determina l'URL base dell'API
+      const getApiBaseUrl = () => {
+        if (typeof window !== 'undefined') {
+          const hostname = window.location.hostname;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3001/api/auth';
+          }
+          const backendUrl = import.meta.env.VITE_API_BASE_URL;
+          if (backendUrl) {
+            return `${backendUrl}/api/auth`;
+          }
+          return '/api/auth';
+        }
+        return 'http://localhost:3001/api/auth';
+      };
+
+      const response = await fetch(`${getApiBaseUrl()}/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        username = data.user.username || '';
+        usernameInput = username;
+      }
+    } catch (error) {
+      console.error('Errore durante caricamento username:', error);
+    } finally {
+      isLoadingUsername = false;
+    }
+  }
+  
   function startEditingPhone() {
     isEditingPhone = true;
     phoneInput = phoneNumber;
@@ -219,6 +279,30 @@
   function cancelEditingPhone() {
     isEditingPhone = false;
     phoneInput = phoneNumber;
+  }
+  
+  function startEditingUsername() {
+    isEditingUsername = true;
+    usernameInput = username;
+  }
+  
+  function cancelEditingUsername() {
+    isEditingUsername = false;
+    usernameInput = username;
+  }
+  
+  function startEditingPassword() {
+    isEditingPassword = true;
+    currentPassword = '';
+    newPassword = '';
+    confirmPassword = '';
+  }
+  
+  function cancelEditingPassword() {
+    isEditingPassword = false;
+    currentPassword = '';
+    newPassword = '';
+    confirmPassword = '';
   }
   
   async function savePhoneNumber() {
@@ -249,7 +333,7 @@
         return 'http://localhost:3001/api/auth';
       };
 
-      const response = await fetch(`${getApiBaseUrl()}?action=update-phone`, {
+      const response = await fetch(`${getApiBaseUrl()}/update-phone`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -277,20 +361,83 @@
     }
   }
   
-  let isDeletingAccount = false;
+  async function saveUsername() {
+    if (isSavingUsername) return;
+    
+    if (!usernameInput || usernameInput.trim().length < 3) {
+      await showAlert('Lo username deve essere di almeno 3 caratteri', 'Errore', 'OK', 'error');
+      return;
+    }
+    
+    isSavingUsername = true;
+    try {
+      const result = await updateUsername(usernameInput.trim());
+      
+      if (result.success) {
+        username = result.username || usernameInput.trim();
+        isEditingUsername = false;
+        // Aggiorna anche lo store auth
+        if ($authUser) {
+          authUser.update(u => ({ ...u, username: result.username }));
+        }
+        // Aggiorna anche il localStorage
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+          currentUser.username = result.username;
+          localStorage.setItem('user', JSON.stringify(currentUser));
+        }
+        await showAlert('Username aggiornato con successo', 'Successo', 'OK', 'success');
+      } else {
+        await showAlert(result.message || 'Errore durante l\'aggiornamento dello username', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      console.error('Errore durante aggiornamento username:', error);
+      await showAlert('Errore durante l\'aggiornamento dello username', 'Errore', 'OK', 'error');
+    } finally {
+      isSavingUsername = false;
+    }
+  }
   
-  // 2FA state
-  let twoFactorEnabled = false;
-  let isLoading2FA = false;
-  let isGeneratingQR = false;
-  let isVerifying2FA = false;
-  let isDisabling2FA = false;
-  let qrCodeDataUrl = '';
-  let manualEntryKey = '';
-  let twoFactorCode = '';
-  let showQRCode = false;
-  let showDisable2FA = false;
-  let disable2FACode = '';
+  async function savePassword() {
+    if (isSavingPassword) return;
+    
+    if (!currentPassword) {
+      await showAlert('Inserisci la password attuale', 'Errore', 'OK', 'error');
+      return;
+    }
+    
+    if (!newPassword || newPassword.length < 6) {
+      await showAlert('La nuova password deve essere di almeno 6 caratteri', 'Errore', 'OK', 'error');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      await showAlert('Le password non corrispondono', 'Errore', 'OK', 'error');
+      return;
+    }
+    
+    isSavingPassword = true;
+    try {
+      const result = await updatePassword(currentPassword, newPassword);
+      
+      if (result.success) {
+        isEditingPassword = false;
+        currentPassword = '';
+        newPassword = '';
+        confirmPassword = '';
+        await showAlert('Password aggiornata con successo', 'Successo', 'OK', 'success');
+      } else {
+        await showAlert(result.message || 'Errore durante l\'aggiornamento della password', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      console.error('Errore durante aggiornamento password:', error);
+      await showAlert('Errore durante l\'aggiornamento della password', 'Errore', 'OK', 'error');
+    } finally {
+      isSavingPassword = false;
+    }
+  }
+  
+  let isDeletingAccount = false;
   
   async function handleDeleteAccount() {
     // Prima conferma: richiedi di digitare "ELIMINA" o equivalente
@@ -605,119 +752,13 @@
   $: isActive = subscription?.active && hasActiveSubscription();
   $: planName = getPlanName(subscription?.plan);
   
-  async function load2FAStatus() {
-    if (!$isAuthenticatedStore || isLoading2FA) return;
-    
-    isLoading2FA = true;
-    try {
-      const result = await get2FAStatus();
-      if (result.success) {
-        twoFactorEnabled = result.twoFactorEnabled || false;
-      }
-    } catch (error) {
-      console.error('Errore caricamento stato 2FA:', error);
-    } finally {
-      isLoading2FA = false;
-    }
-  }
-  
-  async function handleGenerate2FA() {
-    if (isGeneratingQR) return;
-    
-    isGeneratingQR = true;
-    try {
-      const result = await generate2FA();
-      if (result.success) {
-        qrCodeDataUrl = result.qrCode;
-        manualEntryKey = result.manualEntryKey;
-        showQRCode = true;
-        twoFactorCode = '';
-      } else {
-        await showAlert(result.message || 'Errore durante la generazione del QR code', 'Errore', 'OK', 'error');
-      }
-    } catch (error) {
-      console.error('Errore generazione 2FA:', error);
-      await showAlert('Errore durante la generazione del QR code', 'Errore', 'OK', 'error');
-    } finally {
-      isGeneratingQR = false;
-    }
-  }
-  
-  async function handleVerify2FA() {
-    if (!twoFactorCode || twoFactorCode.length !== 6) {
-      await showAlert('Inserisci un codice 2FA valido (6 cifre)', 'Errore', 'OK', 'error');
-      return;
-    }
-    
-    if (isVerifying2FA) return;
-    
-    isVerifying2FA = true;
-    try {
-      const result = await verify2FA(twoFactorCode);
-      if (result.success) {
-        twoFactorEnabled = true;
-        showQRCode = false;
-        twoFactorCode = '';
-        qrCodeDataUrl = '';
-        manualEntryKey = '';
-        await showAlert('2FA abilitato con successo!', 'Successo', 'OK', 'success');
-      } else {
-        await showAlert(result.message || 'Codice 2FA non valido', 'Errore', 'OK', 'error');
-      }
-    } catch (error) {
-      console.error('Errore verifica 2FA:', error);
-      await showAlert('Errore durante la verifica del codice', 'Errore', 'OK', 'error');
-    } finally {
-      isVerifying2FA = false;
-    }
-  }
-  
-  async function handleDisable2FA() {
-    if (!disable2FACode || disable2FACode.length !== 6) {
-      await showAlert('Inserisci un codice 2FA valido (6 cifre)', 'Errore', 'OK', 'error');
-      return;
-    }
-    
-    if (isDisabling2FA) return;
-    
-    isDisabling2FA = true;
-    try {
-      const result = await disable2FA(disable2FACode);
-      if (result.success) {
-        twoFactorEnabled = false;
-        showDisable2FA = false;
-        disable2FACode = '';
-        await showAlert('2FA disabilitato con successo', 'Successo', 'OK', 'success');
-      } else {
-        await showAlert(result.message || 'Codice 2FA non valido', 'Errore', 'OK', 'error');
-      }
-    } catch (error) {
-      console.error('Errore disabilitazione 2FA:', error);
-      await showAlert('Errore durante la disabilitazione del 2FA', 'Errore', 'OK', 'error');
-    } finally {
-      isDisabling2FA = false;
-    }
-  }
-  
-  function cancel2FASetup() {
-    showQRCode = false;
-    twoFactorCode = '';
-    qrCodeDataUrl = '';
-    manualEntryKey = '';
-  }
-  
-  function cancelDisable2FA() {
-    showDisable2FA = false;
-    disable2FACode = '';
-  }
-  
   onMount(() => {
     if ($isAuthenticatedStore) {
       loadSubscription();
-      load2FAStatus();
-      // Carica il numero di telefono se la sezione profilo è già attiva
+      // Carica i dati se la sezione profilo è già attiva
       if (activeSection === 'profilo') {
         loadPhoneNumber();
+        loadUsername();
       }
     }
   });
@@ -890,12 +931,57 @@
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
               <div class="setting-label">{$t('username')}</div>
               <div class="setting-value">
-                {#if $isAuthenticatedStore && $authUser?.username}
-                  {$authUser.username}
-                {:else if $userStore.name}
-                  {$userStore.name}
+                {#if isEditingUsername}
+                  <div class="phone-edit-container">
+                    <input 
+                      type="text" 
+                      class="phone-input" 
+                      bind:value={usernameInput} 
+                      placeholder={$t('username')}
+                      disabled={isSavingUsername}
+                    />
+                    <div class="phone-edit-actions">
+                      <button 
+                        class="phone-save-button" 
+                        on:click={saveUsername} 
+                        disabled={isSavingUsername}
+                      >
+                        {isSavingUsername ? get(t)('save') + '...' : get(t)('save')}
+                      </button>
+                      <button 
+                        class="phone-cancel-button" 
+                        on:click={cancelEditingUsername}
+                        disabled={isSavingUsername}
+                      >
+                        {$t('cancel')}
+                      </button>
+                    </div>
+                  </div>
                 {:else}
-                  -
+                  <div class="phone-display-container">
+                    <span>
+                      {#if $isAuthenticatedStore && $authUser?.username}
+                        {$authUser.username}
+                      {:else if username}
+                        {username}
+                      {:else if $userStore.name}
+                        {$userStore.name}
+                      {:else}
+                        -
+                      {/if}
+                    </span>
+                    {#if $isAuthenticatedStore}
+                      <button 
+                        class="phone-edit-button" 
+                        on:click={startEditingUsername}
+                        title={$t('edit') + ' ' + get(t)('username')}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                      </button>
+                    {/if}
+                  </div>
                 {/if}
               </div>
             </div>
@@ -947,104 +1033,61 @@
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-info">
-                <div class="setting-label">Autenticazione a due fattori (2FA)</div>
-                <div class="setting-description">
-                  {#if twoFactorEnabled}
-                    Il 2FA è attualmente abilitato. Aggiunge un ulteriore livello di sicurezza al tuo account.
-                  {:else}
-                    Aggiungi un ulteriore livello di sicurezza al tuo account con l'autenticazione a due fattori.
-                  {/if}
-                </div>
-              </div>
-              <div class="setting-actions">
-                {#if twoFactorEnabled}
-                  {#if !showDisable2FA}
-                    <button class="danger-button" on:click={() => showDisable2FA = true}>
-                      Disabilita 2FA
-                    </button>
-                  {:else}
-                    <div class="two-factor-setup">
-                      <p class="two-factor-description">Inserisci il codice 2FA per disabilitare:</p>
-                      <input 
-                        type="text" 
-                        class="two-factor-input" 
-                        bind:value={disable2FACode} 
-                        placeholder="000000"
-                        maxlength="6"
-                        disabled={isDisabling2FA}
-                      />
-                      <div class="two-factor-actions">
-                        <button 
-                          class="manage-button" 
-                          on:click={handleDisable2FA} 
-                          disabled={isDisabling2FA || disable2FACode.length !== 6}
-                        >
-                          {isDisabling2FA ? 'Disabilitazione...' : 'Disabilita'}
-                        </button>
-                        <button 
-                          class="phone-cancel-button" 
-                          on:click={cancelDisable2FA}
-                          disabled={isDisabling2FA}
-                        >
-                          Annulla
-                        </button>
-                      </div>
+              <div class="setting-label">Password</div>
+              <div class="setting-value">
+                {#if isEditingPassword}
+                  <div class="phone-edit-container">
+                    <input 
+                      type="password" 
+                      class="phone-input" 
+                      bind:value={currentPassword} 
+                      placeholder="Password attuale"
+                      disabled={isSavingPassword}
+                    />
+                    <input 
+                      type="password" 
+                      class="phone-input" 
+                      bind:value={newPassword} 
+                      placeholder="Nuova password"
+                      disabled={isSavingPassword}
+                    />
+                    <input 
+                      type="password" 
+                      class="phone-input" 
+                      bind:value={confirmPassword} 
+                      placeholder="Conferma nuova password"
+                      disabled={isSavingPassword}
+                    />
+                    <div class="phone-edit-actions">
+                      <button 
+                        class="phone-save-button" 
+                        on:click={savePassword} 
+                        disabled={isSavingPassword}
+                      >
+                        {isSavingPassword ? get(t)('save') + '...' : get(t)('save')}
+                      </button>
+                      <button 
+                        class="phone-cancel-button" 
+                        on:click={cancelEditingPassword}
+                        disabled={isSavingPassword}
+                      >
+                        {$t('cancel')}
+                      </button>
                     </div>
-                  {/if}
+                  </div>
                 {:else}
-                  {#if !showQRCode}
-                    <button class="manage-button" on:click={handleGenerate2FA} disabled={isGeneratingQR}>
-                      {isGeneratingQR ? 'Generazione...' : 'Abilita 2FA'}
+                  <div class="phone-display-container">
+                    <span>••••••••</span>
+                    <button 
+                      class="phone-edit-button" 
+                      on:click={startEditingPassword}
+                      title="Modifica password"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      </svg>
                     </button>
-                  {:else}
-                    <div class="two-factor-setup">
-                      <p class="two-factor-description">Scansiona questo QR code con la tua app di autenticazione (es. Google Authenticator, Authy):</p>
-                      {#if qrCodeDataUrl}
-                        <div class="qr-code-container">
-                          <img src={qrCodeDataUrl} alt="QR Code 2FA" class="qr-code-image" />
-                        </div>
-                        <p class="two-factor-description">Oppure inserisci manualmente questa chiave:</p>
-                        <div class="manual-key-container">
-                          <code class="manual-key">{manualEntryKey}</code>
-                          <button 
-                            class="copy-key-button" 
-                            on:click={() => {
-                              navigator.clipboard.writeText(manualEntryKey);
-                              showAlert('Chiave copiata negli appunti!', 'Successo', 'OK', 'success');
-                            }}
-                          >
-                            Copia
-                          </button>
-                        </div>
-                        <p class="two-factor-description">Inserisci il codice di verifica dalla tua app:</p>
-                        <input 
-                          type="text" 
-                          class="two-factor-input" 
-                          bind:value={twoFactorCode} 
-                          placeholder="000000"
-                          maxlength="6"
-                          disabled={isVerifying2FA}
-                        />
-                        <div class="two-factor-actions">
-                          <button 
-                            class="manage-button" 
-                            on:click={handleVerify2FA} 
-                            disabled={isVerifying2FA || twoFactorCode.length !== 6}
-                          >
-                            {isVerifying2FA ? 'Verifica...' : 'Verifica e abilita'}
-                          </button>
-                          <button 
-                            class="phone-cancel-button" 
-                            on:click={cancel2FASetup}
-                            disabled={isVerifying2FA}
-                          >
-                            Annulla
-                          </button>
-                        </div>
-                      {/if}
-                    </div>
-                  {/if}
+                  </div>
                 {/if}
               </div>
             </div>
@@ -1813,101 +1856,6 @@
     cursor: not-allowed;
   }
 
-  .two-factor-setup {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    min-width: 300px;
-  }
-
-  .two-factor-description {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 0;
-    line-height: 1.5;
-  }
-
-  .qr-code-container {
-    display: flex;
-    justify-content: center;
-    padding: 16px;
-    background-color: var(--bg-tertiary);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-  }
-
-  .qr-code-image {
-    width: 200px;
-    height: 200px;
-    border-radius: 4px;
-  }
-
-  .manual-key-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px;
-    background-color: var(--bg-tertiary);
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-  }
-
-  .manual-key {
-    flex: 1;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    color: var(--text-primary);
-    word-break: break-all;
-    padding: 4px 0;
-  }
-
-  .copy-key-button {
-    padding: 6px 12px;
-    background-color: var(--accent-blue);
-    color: #ffffff;
-    border: none;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-
-  .copy-key-button:hover {
-    background-color: #2563eb;
-  }
-
-  .two-factor-input {
-    width: 100%;
-    padding: 12px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-primary);
-    font-size: 18px;
-    font-family: 'Courier New', monospace;
-    text-align: center;
-    letter-spacing: 8px;
-    outline: none;
-    transition: all 0.3s;
-  }
-
-  .two-factor-input:focus {
-    border-color: var(--accent-blue);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-  }
-
-  .two-factor-input:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .two-factor-actions {
-    display: flex;
-    gap: 8px;
-  }
-
   @media (max-width: 768px) {
     .modal-backdrop {
       padding: 0;
@@ -1930,15 +1878,6 @@
 
     .theme-buttons {
       flex-direction: column;
-    }
-
-    .two-factor-setup {
-      min-width: 100%;
-    }
-
-    .qr-code-image {
-      width: 150px;
-      height: 150px;
     }
   }
 </style>

@@ -5,9 +5,12 @@
 // POST /api/auth/disconnect-all - Disconnetti da tutti i dispositivi
 // DELETE /api/auth/delete-account - Elimina account
 // PUT/PATCH /api/auth/update-phone - Aggiorna numero di telefono
+// PUT/PATCH /api/auth/update-username - Aggiorna username
+// PUT/PATCH /api/auth/update-password - Aggiorna password
 
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -219,6 +222,115 @@ export default async function handler(req, res) {
         success: true,
         message: 'Numero di telefono aggiornato con successo',
         phone_number: phone_number || null
+      });
+      return;
+    }
+
+    // PUT/PATCH /api/auth/update-username - Aggiorna username
+    if ((req.method === 'PUT' || req.method === 'PATCH') && req.query.action === 'update-username') {
+      const auth = await authenticateUser(req);
+      if (auth.error) {
+        return res.status(auth.status).json({ success: false, message: auth.error });
+      }
+
+      const userId = auth.user.user_id;
+      const { username } = req.body;
+
+      // Validazione
+      if (!username || username.trim().length === 0) {
+        return res.status(400).json({ success: false, message: 'Lo username è obbligatorio' });
+      }
+
+      const trimmedUsername = username.trim().toLowerCase();
+
+      if (trimmedUsername.length < 3) {
+        return res.status(400).json({ success: false, message: 'Lo username deve essere di almeno 3 caratteri' });
+      }
+
+      if (trimmedUsername.length > 100) {
+        return res.status(400).json({ success: false, message: 'Lo username è troppo lungo (max 100 caratteri)' });
+      }
+
+      // Verifica se lo username esiste già (escludendo l'utente corrente)
+      const existing = await sql`
+        SELECT id FROM users 
+        WHERE username = ${trimmedUsername} AND id != ${userId}
+      `;
+
+      if (existing.length > 0) {
+        return res.status(400).json({ success: false, message: 'Username già in uso' });
+      }
+
+      // Aggiorna lo username
+      await sql`
+        UPDATE users 
+        SET username = ${trimmedUsername}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+
+      console.log(`✓ Username aggiornato per userId=${userId}`);
+
+      res.json({
+        success: true,
+        message: 'Username aggiornato con successo',
+        username: trimmedUsername
+      });
+      return;
+    }
+
+    // PUT/PATCH /api/auth/update-password - Aggiorna password
+    if ((req.method === 'PUT' || req.method === 'PATCH') && req.query.action === 'update-password') {
+      const auth = await authenticateUser(req);
+      if (auth.error) {
+        return res.status(auth.status).json({ success: false, message: auth.error });
+      }
+
+      const userId = auth.user.user_id;
+      const { current_password, new_password } = req.body;
+
+      // Validazione
+      if (!current_password) {
+        return res.status(400).json({ success: false, message: 'La password attuale è obbligatoria' });
+      }
+
+      if (!new_password) {
+        return res.status(400).json({ success: false, message: 'La nuova password è obbligatoria' });
+      }
+
+      if (new_password.length < 6) {
+        return res.status(400).json({ success: false, message: 'La nuova password deve essere di almeno 6 caratteri' });
+      }
+
+      // Verifica la password attuale
+      const [user] = await sql`
+        SELECT password_hash FROM users WHERE id = ${userId}
+      `;
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'Utente non trovato' });
+      }
+
+      const isValidPassword = await bcrypt.compare(current_password, user.password_hash);
+
+      if (!isValidPassword) {
+        return res.status(400).json({ success: false, message: 'Password attuale non corretta' });
+      }
+
+      // Hash della nuova password
+      const passwordHash = await bcrypt.hash(new_password, 10);
+
+      // Aggiorna la password
+      await sql`
+        UPDATE users 
+        SET password_hash = ${passwordHash}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+
+      console.log(`✓ Password aggiornata per userId=${userId}`);
+
+      res.json({
+        success: true,
+        message: 'Password aggiornata con successo'
       });
       return;
     }
