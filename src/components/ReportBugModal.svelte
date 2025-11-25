@@ -1,5 +1,6 @@
 <script>
   import { isReportBugModalOpen } from '../stores/app.js';
+  import { showAlert } from '../services/dialogService.js';
   import { onMount } from 'svelte';
   
   let problemDescription = '';
@@ -54,7 +55,7 @@
   
   async function handleSubmit() {
     if (!problemDescription.trim()) {
-      alert('Per favore, descrivi il problema che hai riscontrato.');
+      await showAlert('Per favore, descrivi il problema che hai riscontrato.', 'Descrizione mancante', 'OK', 'warning');
       return;
     }
     
@@ -73,7 +74,7 @@
     
     console.log('Bug report:', reportData);
     
-    alert('Grazie per la segnalazione! Il tuo report è stato inviato.');
+    await showAlert('Grazie per la segnalazione! Il tuo report è stato inviato.', 'Report inviato', 'OK', 'success');
     closeModal();
     isSubmitting = false;
   }

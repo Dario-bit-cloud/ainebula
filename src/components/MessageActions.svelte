@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { showConfirm } from '../services/dialogService.js';
   
   export let messageIndex;
   export let messageType; // 'user' o 'ai'
@@ -23,8 +24,9 @@
     showMenu = false;
   }
   
-  function handleDelete() {
-    if (confirm('Sei sicuro di voler eliminare questo messaggio? Verranno eliminati anche tutti i messaggi successivi.')) {
+  async function handleDelete() {
+    const confirmed = await showConfirm('Sei sicuro di voler eliminare questo messaggio? Verranno eliminati anche tutti i messaggi successivi.', 'Elimina messaggio', 'Elimina', 'Annulla', 'danger');
+    if (confirmed) {
       dispatch('delete');
       showMenu = false;
     }
@@ -199,6 +201,8 @@
     justify-content: center;
     border-radius: 6px;
     transition: all 0.2s ease;
+    min-width: 32px;
+    min-height: 32px;
   }
   
   .action-button:hover {
@@ -219,6 +223,54 @@
     z-index: 100;
     min-width: 160px;
     animation: menuSlideDown 0.2s ease;
+  }
+  
+  @media (max-width: 768px) {
+    .action-button {
+      padding: 8px;
+      min-width: 40px;
+      min-height: 40px;
+    }
+    
+    .action-button svg {
+      width: 18px;
+      height: 18px;
+    }
+    
+    .message-actions {
+      opacity: 1; /* Sempre visibile su mobile */
+      gap: 6px;
+    }
+    
+    .menu-dropdown {
+      right: -8px;
+      min-width: 180px;
+      max-width: calc(100vw - 32px);
+    }
+    
+    .menu-item {
+      padding: 12px 14px;
+      font-size: 15px;
+      min-height: 44px; /* Touch target più grande */
+    }
+    
+    .menu-item svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .action-button {
+      padding: 10px;
+      min-width: 44px;
+      min-height: 44px;
+    }
+    
+    .menu-dropdown {
+      right: -12px;
+      min-width: 200px;
+    }
   }
   
   @keyframes menuSlideDown {
@@ -263,6 +315,17 @@
     height: 1px;
     background-color: var(--border-color);
     margin: 4px 0;
+  }
+  
+  @media (max-width: 768px) {
+    .message-actions-container {
+      position: relative;
+    }
+    
+    /* Su mobile, mostra sempre le azioni quando il messaggio è visibile */
+    .message-actions {
+      opacity: 1;
+    }
   }
 </style>
 

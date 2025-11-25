@@ -3,6 +3,7 @@
   import { isMobile } from '../stores/app.js';
   import { user } from '../stores/user.js';
   import { isAuthenticatedStore } from '../stores/auth.js';
+  import { showAlert } from '../services/dialogService.js';
   
   let selectedPlan = 'monthly'; // 'monthly' o 'yearly'
   let showPaymentForm = false;
@@ -100,7 +101,7 @@
       couponApplied = true;
       couponDiscount = discount;
     } else {
-      alert('Codice coupon non valido');
+      showAlert('Codice coupon non valido', 'Coupon non valido', 'OK', 'error');
       couponCode = '';
     }
   }
@@ -189,19 +190,19 @@
     // Validazione form solo se NON è gratuito
     if (!isCurrentlyFree && requiresPaymentData) {
       if (!paymentData.cardNumber || paymentData.cardNumber.replace(/\s/g, '').length < 16) {
-        alert('Inserisci un numero di carta valido');
+        await showAlert('Inserisci un numero di carta valido', 'Dati mancanti', 'OK', 'warning');
         return;
       }
       if (!paymentData.cardHolder || paymentData.cardHolder.trim().length < 3) {
-        alert('Inserisci il nome del titolare della carta');
+        await showAlert('Inserisci il nome del titolare della carta', 'Dati mancanti', 'OK', 'warning');
         return;
       }
       if (!paymentData.expiryMonth || !paymentData.expiryYear) {
-        alert('Inserisci la data di scadenza');
+        await showAlert('Inserisci la data di scadenza', 'Dati mancanti', 'OK', 'warning');
         return;
       }
       if (!paymentData.cvv || paymentData.cvv.length < 3) {
-        alert('Inserisci il CVV');
+        await showAlert('Inserisci il CVV', 'Dati mancanti', 'OK', 'warning');
         return;
       }
     }
@@ -277,7 +278,7 @@
     // Chiudi modal dopo conferma
     setTimeout(() => {
       closeModal();
-      alert(`Abbonamento ${plans[selectedPlan].name} attivato con successo! Benvenuto in Premium!`);
+      await showAlert(`Abbonamento ${plans[selectedPlan].name} attivato con successo! Benvenuto in Premium!`, 'Abbonamento attivato', 'OK', 'success');
     }, 500);
   }
   

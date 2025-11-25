@@ -5,6 +5,7 @@
   import { clearUser, setUser as setAuthUser } from '../stores/auth.js';
   import { accounts, currentAccountId, getCurrentAccount, getOtherAccounts, switchAccount, removeAccount } from '../stores/accounts.js';
   import { isAuthModalOpen } from '../stores/app.js';
+  import { showConfirm, showAlert } from '../services/dialogService.js';
   
   let hoveredItem = null;
   let activeSubmenu = null;
@@ -55,8 +56,11 @@
     }
   ];
   
+  import { showConfirm } from '../services/dialogService.js';
+  
   async function handleLogout() {
-    if (confirm('Sei sicuro di voler uscire?')) {
+    const confirmed = await showConfirm('Sei sicuro di voler uscire?', 'Esci', 'Esci', 'Annulla');
+    if (confirmed) {
       await logout();
       clearUser();
       isUserMenuOpen.set(false);
@@ -85,7 +89,7 @@
       });
       isUserMenuOpen.set(false);
     } else {
-      alert(`${item.label} - Funzionalità in arrivo`);
+      showAlert(`${item.label} - Funzionalità in arrivo`, 'Info', 'OK', 'info');
       if (!item.hasSubmenu) {
         isUserMenuOpen.set(false);
       }
@@ -125,7 +129,7 @@
       });
       closeMenu();
     } else {
-      alert(`${submenuItem.label} - Funzionalità in arrivo`);
+      showAlert(`${submenuItem.label} - Funzionalità in arrivo`, 'Info', 'OK', 'info');
       closeMenu();
     }
   }
@@ -154,10 +158,11 @@
     window.location.reload();
   }
   
-  function handleRemoveAccount(event, accountId) {
+  async function handleRemoveAccount(event, accountId) {
     event.stopPropagation();
     
-    if (confirm('Sei sicuro di voler rimuovere questo account?')) {
+    const confirmed = await showConfirm('Sei sicuro di voler rimuovere questo account?', 'Rimuovi account', 'Rimuovi', 'Annulla', 'danger');
+    if (confirmed) {
       removeAccount(accountId);
       
       // Se era l'account corrente, ricarica
@@ -625,31 +630,59 @@
     }
 
     .user-header {
-      padding: 10px;
+      padding: 12px;
     }
 
     .user-avatar-small {
-      width: 28px;
-      height: 28px;
-      font-size: 12px;
+      width: 32px;
+      height: 32px;
+      font-size: 13px;
     }
 
     .user-email {
-      font-size: 12px;
+      font-size: 13px;
     }
 
     .user-workspace {
-      font-size: 10px;
+      font-size: 11px;
     }
 
     .menu-item {
-      padding: 10px;
-      font-size: 13px;
+      padding: 12px 14px;
+      font-size: 14px;
+      min-height: 48px; /* Touch target più grande */
+    }
+    
+    .menu-item svg {
+      width: 20px;
+      height: 20px;
     }
 
     .submenu-item {
-      padding: 10px;
-      font-size: 13px;
+      padding: 12px 14px;
+      font-size: 14px;
+      min-height: 48px;
+    }
+    
+    .submenu-item svg {
+      width: 20px;
+      height: 20px;
+    }
+    
+    .add-account-btn {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px;
+    }
+    
+    .account-item {
+      min-height: 56px;
+      padding: 12px;
+    }
+    
+    .remove-account-btn {
+      min-width: 44px;
+      min-height: 44px;
     }
   }
 

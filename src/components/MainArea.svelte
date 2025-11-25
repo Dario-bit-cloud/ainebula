@@ -12,6 +12,7 @@
   import MessageActions from './MessageActions.svelte';
   import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
   import PrivacyModal from './PrivacyModal.svelte';
+  import { showAlert, showPrompt } from '../services/dialogService.js';
   
   let inputValue = '';
   let inputRef;
@@ -809,15 +810,23 @@
         
         window.speechSynthesis.speak(utterance);
       } else {
-        alert('La sintesi vocale non è disponibile nel tuo browser.');
+        showAlert('La sintesi vocale non è disponibile nel tuo browser.', 'Sintesi vocale non disponibile', 'OK', 'warning');
       }
     }
   }
   
-  function handleReportMessage(messageIndex) {
+  async function handleReportMessage(messageIndex) {
     const message = messages[messageIndex];
     if (message && message.type === 'ai') {
-      const reason = prompt('Perché vuoi segnalare questo messaggio?\n\n1. Contenuto inappropriato\n2. Informazioni errate\n3. Altro\n\nInserisci il motivo:');
+      const reason = await showPrompt(
+        'Perché vuoi segnalare questo messaggio?\n\n1. Contenuto inappropriato\n2. Informazioni errate\n3. Altro\n\nInserisci il motivo:',
+        'Segnala messaggio',
+        '',
+        'Inserisci il motivo della segnalazione',
+        'Segnala',
+        'Annulla',
+        'textarea'
+      );
       if (reason) {
         // Qui potresti inviare la segnalazione a un server
         console.log('Messaggio segnalato:', {
@@ -826,7 +835,7 @@
           content: message.content,
           reason: reason
         });
-        alert('Grazie per la segnalazione. Il messaggio è stato segnalato.');
+        await showAlert('Grazie per la segnalazione. Il messaggio è stato segnalato.', 'Segnalazione inviata', 'OK', 'success');
       }
     }
   }
@@ -853,36 +862,36 @@
         showAttachMenu = false;
         break;
       case 'business-info':
-        alert('Informazioni aziendali - Funzionalità in arrivo');
+        showAlert('Informazioni aziendali - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         break;
       case 'deep-research':
-        alert('Deep Research - Funzionalità in arrivo');
+        showAlert('Deep Research - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         break;
       case 'agent-mode':
-        alert('Modalità agente - Funzionalità in arrivo');
+        showAlert('Modalità agente - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         break;
       case 'create-image':
-        alert('Crea immagine - Funzionalità in arrivo');
+        showAlert('Crea immagine - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         break;
       case 'more-options':
         showMoreOptions = !showMoreOptions;
         break;
       case 'web-search':
-        alert('Ricerca sul web - Funzionalità in arrivo');
+        showAlert('Ricerca sul web - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         showMoreOptions = false;
         break;
       case 'canvas':
-        alert('Canvas - Funzionalità in arrivo');
+        showAlert('Canvas - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         showMoreOptions = false;
         break;
       case 'study-learn':
-        alert('Studia e impara - Funzionalità in arrivo');
+        showAlert('Studia e impara - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         showMoreOptions = false;
         break;
@@ -983,9 +992,9 @@
           style: image.style,
           description: image.description || imageDescription
         });
-        alert(`Immagine modificata con stile: ${imageStyles.find(s => s.id === image.style)?.name}`);
+        showAlert(`Immagine modificata con stile: ${imageStyles.find(s => s.id === image.style)?.name}`, 'Immagine modificata', 'OK', 'success');
       } else {
-        alert('Seleziona uno stile prima di creare');
+        showAlert('Seleziona uno stile prima di creare', 'Stile non selezionato', 'OK', 'warning');
         showImageStyles = true;
         if (selectedImageIndex === null && attachedImages.length > 0) {
           selectedImageIndex = 0;
@@ -2102,7 +2111,21 @@
     }
     
     .privacy-card {
-      display: none;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    
+    .privacy-features {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    
+    .privacy-feature {
+      text-align: center;
+    }
+    
+    .privacy-icon {
+      margin: 0 auto 8px;
     }
 
     .welcome-text {
@@ -2178,13 +2201,63 @@
     }
 
     .attached-images {
-      gap: 6px;
-      margin-bottom: 6px;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 0 4px;
     }
 
     .image-preview {
+      width: 100px;
+      height: 100px;
+    }
+    
+    .image-actions-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .image-action-button {
+      width: 100%;
+      justify-content: center;
+      min-height: 44px;
+      font-size: 14px;
+    }
+    
+    .styles-menu {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: auto;
+      margin: 0;
+      border-radius: 16px 16px 0 0;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    
+    .styles-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding: 8px;
+    }
+    
+    .style-option {
+      padding: 12px;
+    }
+    
+    .style-option img {
       width: 80px;
       height: 80px;
+    }
+    
+    .image-description-input {
+      min-width: 100%;
+      width: 100%;
+    }
+    
+    .image-description-input input {
+      min-height: 44px;
+      font-size: 16px; /* Previene zoom su iOS */
     }
 
     .disclaimer {
@@ -2196,19 +2269,13 @@
 
     .message-input {
       font-size: 16px; /* Previene zoom su iOS */
+      padding: 10px 16px;
+      min-height: 24px;
     }
-
-    .send-button,
-    .attach-button {
-      padding: 6px;
-      min-width: 36px;
-      min-height: 36px;
-    }
-
-    .send-button svg,
-    .attach-button svg {
-      width: 16px;
-      height: 16px;
+    
+    .input-wrapper.input-empty .message-input {
+      font-size: 16px;
+      padding: 10px 16px;
     }
   }
 
@@ -2740,20 +2807,62 @@
     transform: scale(1.1);
   }
 
-  .attach-menu {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    margin-bottom: 8px;
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    z-index: 1000;
-    min-width: 240px;
-    animation: menuSlideUp 0.2s ease;
-  }
+    .attach-menu {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      margin-bottom: 8px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      min-width: 240px;
+      animation: menuSlideUp 0.2s ease;
+    }
+    
+    @media (max-width: 768px) {
+      .attach-menu {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: auto;
+        margin: 0;
+        border-radius: 16px 16px 0 0;
+        max-height: 70vh;
+        overflow-y: auto;
+        min-width: auto;
+        width: 100%;
+      }
+      
+      .menu-item {
+        min-height: 48px;
+        padding: 12px 16px;
+        font-size: 15px;
+      }
+      
+      .menu-item svg {
+        width: 20px;
+        height: 20px;
+      }
+      
+      .more-options-menu {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: auto;
+        margin: 0;
+        border-radius: 16px 16px 0 0;
+        max-height: 60vh;
+        overflow-y: auto;
+        min-width: auto;
+        width: 100%;
+        animation: menuSlideUp 0.3s ease;
+      }
+    }
 
   @keyframes menuSlideUp {
     from {
@@ -2873,14 +2982,16 @@
 
   @media (max-width: 768px) {
     .message-input {
-      font-size: 14px;
-      min-height: 22px;
+      font-size: 16px; /* Previene zoom su iOS */
+      padding: 10px 16px;
+      min-height: 24px;
     }
 
     .input-wrapper.input-empty .message-input {
-      min-height: 18px;
-      font-size: 13px;
-      height: 18px;
+      font-size: 16px;
+      padding: 10px 16px;
+      min-height: 24px;
+      height: auto;
     }
   }
 

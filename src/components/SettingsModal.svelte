@@ -8,6 +8,7 @@
   import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
   import { onMount } from 'svelte';
+  import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
   
   let activeSection = 'generale';
   let theme = 'system';
@@ -99,12 +100,13 @@
     // Qui potresti implementare il cambio lingua dell'app
   }
   
-  function handleDisconnect() {
-    if (confirm('Sei sicuro di voler disconnetterti da tutti i dispositivi?')) {
+  async function handleDisconnect() {
+    const confirmed = await showConfirm('Sei sicuro di voler disconnetterti da tutti i dispositivi?', 'Disconnetti', 'Disconnetti', 'Annulla');
+    if (confirmed) {
       // Rimuovi token di autenticazione
       localStorage.removeItem('nebula-auth-token');
       localStorage.removeItem('nebula-session');
-      alert('Disconnessione completata. Ricarica la pagina.');
+      await showAlert('Disconnessione completata. Ricarica la pagina.', 'Disconnessione completata', 'OK', 'success');
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -115,17 +117,31 @@
   
   async function handleDeleteAccount() {
     // Prima conferma: richiedi di digitare "ELIMINA"
-    const firstConfirmation = prompt('⚠️ ATTENZIONE: Questa azione è IRREVERSIBILE!\n\nTutti i tuoi dati verranno eliminati permanentemente:\n- Account e profilo\n- Tutte le chat e messaggi\n- Tutti i progetti\n- Tutte le impostazioni\n- Tutti gli abbonamenti\n\nPer confermare, digita "ELIMINA" in maiuscolo:');
+    const firstConfirmation = await showPrompt(
+      '⚠️ ATTENZIONE: Questa azione è IRREVERSIBILE!\n\nTutti i tuoi dati verranno eliminati permanentemente:\n- Account e profilo\n- Tutte le chat e messaggi\n- Tutti i progetti\n- Tutte le impostazioni\n- Tutti gli abbonamenti\n\nPer confermare, digita "ELIMINA" in maiuscolo:',
+      'Elimina Account',
+      '',
+      'Digita "ELIMINA"',
+      'Continua',
+      'Annulla',
+      'text'
+    );
     
     if (firstConfirmation !== 'ELIMINA') {
       if (firstConfirmation !== null) {
-        alert('Conferma non valida. Operazione annullata.');
+        await showAlert('Conferma non valida. Operazione annullata.', 'Operazione annullata', 'OK', 'error');
       }
       return;
     }
     
     // Seconda conferma: dialog di conferma finale
-    const secondConfirmation = confirm('⚠️ ULTIMA CONFERMA ⚠️\n\nSei ASSOLUTAMENTE SICURO di voler eliminare il tuo account?\n\nQuesta azione NON può essere annullata.\n\nTutti i tuoi dati verranno eliminati permanentemente dal database.');
+    const secondConfirmation = await showConfirm(
+      '⚠️ ULTIMA CONFERMA ⚠️\n\nSei ASSOLUTAMENTE SICURO di voler eliminare il tuo account?\n\nQuesta azione NON può essere annullata.\n\nTutti i tuoi dati verranno eliminati permanentemente dal database.',
+      'Elimina Account',
+      'Elimina definitivamente',
+      'Annulla',
+      'danger'
+    );
     
     if (!secondConfirmation) {
       return;
@@ -151,7 +167,7 @@
         // Pulisci tutto il localStorage
         localStorage.clear();
         
-        alert('✅ Account eliminato con successo. Tutti i dati sono stati rimossi permanentemente.\n\nLa pagina verrà ricaricata.');
+        await showAlert('✅ Account eliminato con successo. Tutti i dati sono stati rimossi permanentemente.\n\nLa pagina verrà ricaricata.', 'Account eliminato', 'OK', 'success');
         
         // Ricarica la pagina dopo un breve delay
         setTimeout(() => {
@@ -159,12 +175,12 @@
         }, 1500);
       } else {
         isDeletingAccount = false;
-        alert(`❌ Errore durante l'eliminazione dell'account: ${result.message || 'Errore sconosciuto'}`);
+        await showAlert(`❌ Errore durante l'eliminazione dell'account: ${result.message || 'Errore sconosciuto'}`, 'Errore', 'OK', 'error');
       }
     } catch (error) {
       isDeletingAccount = false;
       console.error('Errore durante eliminazione account:', error);
-      alert(`❌ Errore durante l'eliminazione dell'account: ${error.message}`);
+      await showAlert(`❌ Errore durante l'eliminazione dell'account: ${error.message}`, 'Errore', 'OK', 'error');
     }
   }
   
@@ -189,13 +205,13 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    alert('Dati esportati con successo! Il file sarà valido per 7 giorni.');
+    await showAlert('Dati esportati con successo! Il file sarà valido per 7 giorni.', 'Esportazione completata', 'OK', 'success');
   }
   
-  function handleDownloadSubscriptionKey() {
+  async function handleDownloadSubscriptionKey() {
     const userData = $userStore;
     if (!userData.subscription?.key) {
-      alert('Nessuna chiave di abbonamento disponibile. Attiva un abbonamento per ottenere una chiave.');
+      await showAlert('Nessuna chiave di abbonamento disponibile. Attiva un abbonamento per ottenere una chiave.', 'Chiave non disponibile', 'OK', 'warning');
       return;
     }
     
@@ -217,7 +233,7 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    alert('Chiave di abbonamento scaricata con successo! Conservala in un luogo sicuro per ripristinare l\'abbonamento su altri dispositivi.');
+    await showAlert('Chiave di abbonamento scaricata con successo! Conservala in un luogo sicuro per ripristinare l\'abbonamento su altri dispositivi.', 'Chiave scaricata', 'OK', 'success');
   }
   
   function handleImportSubscriptionKey() {
@@ -244,12 +260,12 @@
                 active: true
               }
             }));
-            alert('Chiave di abbonamento importata con successo!');
+            showAlert('Chiave di abbonamento importata con successo!', 'Chiave importata', 'OK', 'success');
           } else {
-            alert('File non valido. Il file deve contenere una chiave di abbonamento.');
+            showAlert('File non valido. Il file deve contenere una chiave di abbonamento.', 'File non valido', 'OK', 'error');
           }
         } catch (error) {
-          alert('Errore durante l\'importazione della chiave. Verifica che il file sia valido.');
+          showAlert('Errore durante l\'importazione della chiave. Verifica che il file sia valido.', 'Errore', 'OK', 'error');
           console.error('Import error:', error);
         }
       };
@@ -258,11 +274,12 @@
     input.click();
   }
   
-  function handleDeleteAllChats() {
-    if (confirm('Sei sicuro di voler eliminare tutte le chat? Questa azione è irreversibile.')) {
+  async function handleDeleteAllChats() {
+    const confirmed = await showConfirm('Sei sicuro di voler eliminare tutte le chat? Questa azione è irreversibile.', 'Elimina tutte le chat', 'Elimina', 'Annulla', 'danger');
+    if (confirmed) {
       chats.set([]);
       localStorage.removeItem('nebula-ai-chats');
-      alert('Tutte le chat sono state eliminate.');
+      await showAlert('Tutte le chat sono state eliminate.', 'Chat eliminate', 'OK', 'success');
     }
   }
   
@@ -284,8 +301,8 @@
     window.open('https://nebula-ai.com/privacy', '_blank');
   }
   
-  function handleManageSharedLinks() {
-    alert('Gestione link condivisi - Funzionalità in arrivo');
+  async function handleManageSharedLinks() {
+    await showAlert('Gestione link condivisi - Funzionalità in arrivo', 'Info', 'OK', 'info');
   }
   
   let isLoadingSubscription = false;
@@ -634,6 +651,13 @@
     padding: 20px;
     animation: backdropFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  
+  @media (max-width: 768px) {
+    .modal-backdrop {
+      padding: 0;
+      align-items: stretch;
+    }
+  }
 
   @keyframes backdropFadeIn {
     from {
@@ -656,6 +680,15 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  
+  @media (max-width: 768px) {
+    .modal-content {
+      max-width: 100%;
+      max-height: 100vh;
+      height: 100vh;
+      border-radius: 0;
+    }
+  }
 
   @keyframes modalSlideIn {
     from {
@@ -675,6 +708,22 @@
     padding: 20px 24px;
     border-bottom: 1px solid #3a3a3a;
     animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
+  }
+  
+  @media (max-width: 768px) {
+    .modal-header {
+      padding: 16px;
+    }
+    
+    .modal-title {
+      font-size: 18px;
+    }
+    
+    .close-button {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px;
+    }
   }
 
   @keyframes slideDown {
@@ -728,6 +777,24 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+  
+  @media (max-width: 768px) {
+    .settings-sidebar {
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid #3a3a3a;
+      padding: 8px;
+      flex-direction: row;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .sidebar-item {
+      padding: 10px 16px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
   }
 
   .sidebar-item {
@@ -785,6 +852,34 @@
     flex: 1;
     padding: 32px;
     overflow-y: auto;
+  }
+  
+  @media (max-width: 768px) {
+    .settings-content {
+      padding: 16px;
+    }
+    
+    .setting-section {
+      margin-bottom: 24px;
+    }
+    
+    .setting-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    
+    .setting-actions {
+      width: 100%;
+      flex-direction: column;
+    }
+    
+    .manage-button,
+    .danger-button,
+    .view-button {
+      width: 100%;
+      min-height: 44px;
+    }
   }
 
   .content-visible {

@@ -1,5 +1,6 @@
 <script>
   import { isProjectModalOpen } from '../stores/app.js';
+  import { showAlert } from '../services/dialogService.js';
   import { projects, createProject } from '../stores/projects.js';
   
   let projectName = '';
@@ -40,7 +41,7 @@
   
   function handleCreateProject() {
     if (!projectName.trim()) {
-      alert('Inserisci un nome per la cartella');
+      await showAlert('Inserisci un nome per la cartella', 'Nome mancante', 'OK', 'warning');
       return;
     }
     

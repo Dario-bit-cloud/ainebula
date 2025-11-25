@@ -6,6 +6,7 @@
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { projects, updateProject, deleteProject } from '../stores/projects.js';
+  import { showConfirm } from '../services/dialogService.js';
   
   let activeItem = 'new-chat';
   let searchInput = '';
@@ -210,7 +211,8 @@
   
   async function handleDeleteChat(event, chatId) {
     event.stopPropagation();
-    if (confirm('Sei sicuro di voler eliminare questa chat?')) {
+    const confirmed = await showConfirm('Sei sicuro di voler eliminare questa chat?', 'Elimina chat', 'Elimina', 'Annulla', 'danger');
+    if (confirmed) {
       await deleteChat(chatId);
     }
   }
@@ -276,9 +278,10 @@
     toggleProject(projectId);
   }
   
-  function handleProjectDelete(event, projectId) {
+  async function handleProjectDelete(event, projectId) {
     event.stopPropagation();
-    if (confirm('Sei sicuro di voler eliminare questa cartella? Le chat non verranno eliminate.')) {
+    const confirmed = await showConfirm('Sei sicuro di voler eliminare questa cartella? Le chat non verranno eliminate.', 'Elimina cartella', 'Elimina', 'Annulla', 'danger');
+    if (confirmed) {
       // Rimuovi projectId dalle chat prima di eliminare la cartella
       $chats.forEach(chat => {
         if (chat.projectId === projectId) {
