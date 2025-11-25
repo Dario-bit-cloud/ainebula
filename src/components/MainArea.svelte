@@ -3104,8 +3104,13 @@
   .message-content :global(h3) { font-size: 1.1em; }
   
   .message-content :global(p) {
-    margin: 8px 0;
+    margin: 4px 0;
     line-height: 1.6;
+  }
+  
+  /* Riduci ulteriormente lo spazio tra paragrafi consecutivi */
+  .message-content :global(p + p) {
+    margin-top: 2px;
   }
   
   .message-content :global(ul),

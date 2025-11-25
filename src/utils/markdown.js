@@ -24,6 +24,16 @@ export function renderMarkdown(markdown) {
   try {
     let html = marked.parse(markdown);
     
+    // Rimuovi paragrafi vuoti o con solo spazi
+    html = html.replace(/<p[^>]*>\s*<\/p>/g, '');
+    
+    // Normalizza spazi multipli consecutivi nei paragrafi (ma non nel codice)
+    html = html.replace(/(<p[^>]*>)([^<]*?)(<\/p>)/g, (match, openTag, content, closeTag) => {
+      // Rimuovi spazi multipli e newline multiple, ma mantieni almeno uno spazio
+      const normalized = content.replace(/\s+/g, ' ').trim();
+      return normalized ? `${openTag}${normalized}${closeTag}` : '';
+    });
+    
     // Aggiungi pulsanti di copia ai blocchi di codice
     // Regex migliorata per catturare pre><code con qualsiasi attributo
     html = html.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/g, (match, codeContent) => {
@@ -226,11 +236,13 @@ export function initCodeCopyButtons(container) {
           }, 2000);
         } else {
           console.error('execCommand copy fallito');
-          alert('Impossibile copiare il codice. Seleziona manualmente il testo.');
+          // Non possiamo usare showAlert qui perché è un file utils, usiamo console.error
+          console.error('Impossibile copiare il codice. Seleziona manualmente il testo.');
         }
       } catch (fallbackErr) {
         console.error('Errore fallback copia:', fallbackErr);
-        alert('Impossibile copiare il codice. Seleziona manualmente il testo.');
+        // Non possiamo usare showAlert qui perché è un file utils, usiamo console.error
+        console.error('Impossibile copiare il codice. Seleziona manualmente il testo.');
       } finally {
         document.body.removeChild(textarea);
       }
