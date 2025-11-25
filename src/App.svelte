@@ -125,12 +125,12 @@
       return;
     }
     
-    // Ctrl+Shift+I: Istruzioni personalizzate
-    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
-      event.preventDefault();
-      isAISettingsModalOpen.set(true);
-      return;
-    }
+    // Ctrl+Shift+I: Istruzioni personalizzate (disabilitato)
+    // if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
+    //   event.preventDefault();
+    //   isAISettingsModalOpen.set(true);
+    //   return;
+    // }
   }
   
   function copyLastCodeBlock() {
