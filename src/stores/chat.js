@@ -219,17 +219,32 @@ export function loadChatsFromStorage() {
 
 // Carica le chat dal database se autenticato, altrimenti da localStorage
 export async function loadChats() {
-  if (get(isAuthenticatedStore)) {
-    // Carica dal database
-    const result = await getChatsFromDatabase();
-    if (result.success && result.chats) {
-      chats.set(result.chats);
+  // Evita caricamenti multipli simultanei
+  if (isLoadingChats) {
+    console.log('Caricamento chat già in corso, skip loadChats');
+    return;
+  }
+  
+  isLoadingChats = true;
+  
+  try {
+    if (get(isAuthenticatedStore)) {
+      // Carica dal database
+      const result = await getChatsFromDatabase();
+      if (result.success && result.chats) {
+        chats.set(result.chats);
+      }
+    } else {
+      // Carica da localStorage
+      loadChatsFromStorage();
     }
-  } else {
-    // Carica da localStorage
-    loadChatsFromStorage();
+  } finally {
+    isLoadingChats = false;
   }
 }
+
+// Flag per evitare caricamenti multipli simultanei
+let isLoadingChats = false;
 
 // Sincronizza le chat quando l'utente fa login
 export async function syncChatsOnLogin() {
@@ -237,6 +252,14 @@ export async function syncChatsOnLogin() {
     console.log('Utente non autenticato, skip syncChatsOnLogin');
     return;
   }
+  
+  // Evita caricamenti multipli simultanei
+  if (isLoadingChats) {
+    console.log('Caricamento chat già in corso, skip');
+    return;
+  }
+  
+  isLoadingChats = true;
   
   try {
     // Prima pulisci le chat esistenti (potrebbero essere chat locali)
@@ -261,6 +284,8 @@ export async function syncChatsOnLogin() {
     console.error('Errore in syncChatsOnLogin:', error);
     // In caso di errore, prova comunque a migrare da localStorage
     await migrateChatsFromLocalStorage();
+  } finally {
+    isLoadingChats = false;
   }
 }
 

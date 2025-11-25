@@ -22,7 +22,7 @@ export function initAuth() {
       if (result.success) {
         user.set(result.user);
         isAuthenticatedStore.set(true);
-        // Carica le chat dal database
+        // Carica le chat dal database (solo una volta qui)
         await syncChatsOnLogin();
       } else {
         // Sessione non valida, pulisci tutto

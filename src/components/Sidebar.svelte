@@ -20,25 +20,28 @@
   
   // Carica le chat quando l'utente si autentica
   let lastAuthState = false;
+  let hasLoadedChats = false;
+  
   $: {
     if ($isAuthenticatedStore && !lastAuthState) {
       // L'utente si è appena autenticato
       lastAuthState = true;
-      syncChatsOnLogin().catch(err => {
-        console.error('Errore caricamento chat:', err);
-      });
+      if (!hasLoadedChats) {
+        hasLoadedChats = true;
+        syncChatsOnLogin().catch(err => {
+          console.error('Errore caricamento chat:', err);
+        });
+      }
     } else if (!$isAuthenticatedStore && lastAuthState) {
       // L'utente si è disconnesso
       lastAuthState = false;
+      hasLoadedChats = false;
     }
   }
   
   onMount(() => {
     lastAuthState = $isAuthenticatedStore;
-    // Carica le chat all'avvio se autenticato
-    if ($isAuthenticatedStore) {
-      loadChats();
-    }
+    // Non caricare qui - syncChatsOnLogin viene chiamato da auth.js o dalla reactive statement
   });
   
   // Organizza le chat per progetto
