@@ -169,9 +169,12 @@ export async function register(username, password, referralCode = null) {
 /**
  * Effettua il login
  */
-export async function login(username, password) {
+export async function login(username, password, twoFactorCode = null) {
   const url = `${API_BASE_URL}/login`;
   const requestBody = { username, password };
+  if (twoFactorCode) {
+    requestBody.twoFactorCode = twoFactorCode;
+  }
   
   console.log('🔐 [LOGIN] Inizio login:', {
     url,
@@ -492,6 +495,144 @@ export async function deleteAccount() {
       error: error.message,
       errorType: error.name,
       url
+    };
+  }
+}
+
+/**
+ * Genera QR code per 2FA
+ */
+export async function generate2FA() {
+  const url = `${API_BASE_URL}/2fa/generate`;
+  const token = getToken();
+  
+  if (!token) {
+    return {
+      success: false,
+      message: 'Nessun token di autenticazione trovato'
+    };
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Verifica e abilita 2FA
+ */
+export async function verify2FA(code) {
+  const url = `${API_BASE_URL}/2fa/verify`;
+  const token = getToken();
+  
+  if (!token) {
+    return {
+      success: false,
+      message: 'Nessun token di autenticazione trovato'
+    };
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ code })
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Disabilita 2FA
+ */
+export async function disable2FA(code) {
+  const url = `${API_BASE_URL}/2fa/disable`;
+  const token = getToken();
+  
+  if (!token) {
+    return {
+      success: false,
+      message: 'Nessun token di autenticazione trovato'
+    };
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ code })
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Verifica lo stato del 2FA
+ */
+export async function get2FAStatus() {
+  const url = `${API_BASE_URL}/2fa/status`;
+  const token = getToken();
+  
+  if (!token) {
+    return {
+      success: false,
+      message: 'Nessun token di autenticazione trovato'
+    };
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message
     };
   }
 }

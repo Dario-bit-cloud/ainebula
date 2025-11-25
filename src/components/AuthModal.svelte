@@ -20,6 +20,8 @@
   let retryCount = 0;
   const MAX_RETRIES = 3;
   let isRetrying = false;
+  let requiresTwoFactor = false;
+  let twoFactorCode = '';
   
   // Carica credenziali salvate al mount e referral code dall'URL
   onMount(() => {
@@ -50,6 +52,14 @@
     error = '';
     successMessage = '';
     retryCount = 0;
+    
+    // Se richiede 2FA, valida il codice
+    if (requiresTwoFactor) {
+      if (!twoFactorCode || twoFactorCode.length !== 6) {
+        error = 'Inserisci un codice 2FA valido (6 cifre)';
+        return;
+      }
+    }
     
     await attemptLogin();
   }
@@ -83,7 +93,7 @@
       let result;
       
       if (isLogin) {
-        result = await login(username, password);
+        result = await login(username, password, requiresTwoFactor ? twoFactorCode : null);
       } else {
         // Leggi referral code dal localStorage se presente
         const referralCode = localStorage.getItem('pending_referral_code');
@@ -92,6 +102,15 @@
         if (referralCode) {
           localStorage.removeItem('pending_referral_code');
         }
+      }
+      
+      // Se il login richiede 2FA
+      if (result.requiresTwoFactor && !result.success) {
+        requiresTwoFactor = true;
+        error = result.message || 'Codice 2FA richiesto';
+        isLoading = false;
+        isRetrying = false;
+        return;
       }
       
       if (result.success) {
@@ -202,6 +221,8 @@
     confirmPassword = '';
     retryCount = 0;
     isRetrying = false;
+    requiresTwoFactor = false;
+    twoFactorCode = '';
     
     // Se si passa a login, carica le credenziali salvate
     if (isLogin) {
@@ -311,6 +332,24 @@
               disabled={isLoading}
               autocomplete="new-password"
             />
+          </div>
+        {/if}
+        
+        {#if isLogin && requiresTwoFactor}
+          <div class="form-group">
+            <label for="twoFactorCode">Codice 2FA</label>
+            <input
+              id="twoFactorCode"
+              type="text"
+              bind:value={twoFactorCode}
+              placeholder="000000"
+              required
+              disabled={isLoading}
+              autocomplete="one-time-code"
+              maxlength="6"
+              pattern="[0-9]{6}"
+            />
+            <small class="form-hint" style="display: block; margin-top: 4px; font-size: 12px; color: var(--text-secondary);">Inserisci il codice a 6 cifre dalla tua app di autenticazione</small>
           </div>
         {/if}
         

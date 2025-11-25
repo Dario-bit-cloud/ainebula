@@ -3,7 +3,7 @@
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
-  import { deleteAccount, getToken } from '../services/authService.js';
+  import { deleteAccount, getToken, generate2FA, verify2FA, disable2FA, get2FAStatus } from '../services/authService.js';
   import { getCurrentAccount, removeAccount } from '../stores/accounts.js';
   import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
@@ -57,9 +57,10 @@
   
   function selectSection(sectionId) {
     activeSection = sectionId;
-    // Carica il numero di telefono quando si apre la sezione profilo
+    // Carica il numero di telefono e lo stato 2FA quando si apre la sezione profilo
     if (sectionId === 'profilo' && $isAuthenticatedStore) {
       loadPhoneNumber();
+      load2FAStatus();
     }
   }
   
@@ -277,6 +278,19 @@
   }
   
   let isDeletingAccount = false;
+  
+  // 2FA state
+  let twoFactorEnabled = false;
+  let isLoading2FA = false;
+  let isGeneratingQR = false;
+  let isVerifying2FA = false;
+  let isDisabling2FA = false;
+  let qrCodeDataUrl = '';
+  let manualEntryKey = '';
+  let twoFactorCode = '';
+  let showQRCode = false;
+  let showDisable2FA = false;
+  let disable2FACode = '';
   
   async function handleDeleteAccount() {
     // Prima conferma: richiedi di digitare "ELIMINA" o equivalente
@@ -591,9 +605,116 @@
   $: isActive = subscription?.active && hasActiveSubscription();
   $: planName = getPlanName(subscription?.plan);
   
+  async function load2FAStatus() {
+    if (!$isAuthenticatedStore || isLoading2FA) return;
+    
+    isLoading2FA = true;
+    try {
+      const result = await get2FAStatus();
+      if (result.success) {
+        twoFactorEnabled = result.twoFactorEnabled || false;
+      }
+    } catch (error) {
+      console.error('Errore caricamento stato 2FA:', error);
+    } finally {
+      isLoading2FA = false;
+    }
+  }
+  
+  async function handleGenerate2FA() {
+    if (isGeneratingQR) return;
+    
+    isGeneratingQR = true;
+    try {
+      const result = await generate2FA();
+      if (result.success) {
+        qrCodeDataUrl = result.qrCode;
+        manualEntryKey = result.manualEntryKey;
+        showQRCode = true;
+        twoFactorCode = '';
+      } else {
+        await showAlert(result.message || 'Errore durante la generazione del QR code', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      console.error('Errore generazione 2FA:', error);
+      await showAlert('Errore durante la generazione del QR code', 'Errore', 'OK', 'error');
+    } finally {
+      isGeneratingQR = false;
+    }
+  }
+  
+  async function handleVerify2FA() {
+    if (!twoFactorCode || twoFactorCode.length !== 6) {
+      await showAlert('Inserisci un codice 2FA valido (6 cifre)', 'Errore', 'OK', 'error');
+      return;
+    }
+    
+    if (isVerifying2FA) return;
+    
+    isVerifying2FA = true;
+    try {
+      const result = await verify2FA(twoFactorCode);
+      if (result.success) {
+        twoFactorEnabled = true;
+        showQRCode = false;
+        twoFactorCode = '';
+        qrCodeDataUrl = '';
+        manualEntryKey = '';
+        await showAlert('2FA abilitato con successo!', 'Successo', 'OK', 'success');
+      } else {
+        await showAlert(result.message || 'Codice 2FA non valido', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      console.error('Errore verifica 2FA:', error);
+      await showAlert('Errore durante la verifica del codice', 'Errore', 'OK', 'error');
+    } finally {
+      isVerifying2FA = false;
+    }
+  }
+  
+  async function handleDisable2FA() {
+    if (!disable2FACode || disable2FACode.length !== 6) {
+      await showAlert('Inserisci un codice 2FA valido (6 cifre)', 'Errore', 'OK', 'error');
+      return;
+    }
+    
+    if (isDisabling2FA) return;
+    
+    isDisabling2FA = true;
+    try {
+      const result = await disable2FA(disable2FACode);
+      if (result.success) {
+        twoFactorEnabled = false;
+        showDisable2FA = false;
+        disable2FACode = '';
+        await showAlert('2FA disabilitato con successo', 'Successo', 'OK', 'success');
+      } else {
+        await showAlert(result.message || 'Codice 2FA non valido', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      console.error('Errore disabilitazione 2FA:', error);
+      await showAlert('Errore durante la disabilitazione del 2FA', 'Errore', 'OK', 'error');
+    } finally {
+      isDisabling2FA = false;
+    }
+  }
+  
+  function cancel2FASetup() {
+    showQRCode = false;
+    twoFactorCode = '';
+    qrCodeDataUrl = '';
+    manualEntryKey = '';
+  }
+  
+  function cancelDisable2FA() {
+    showDisable2FA = false;
+    disable2FACode = '';
+  }
+  
   onMount(() => {
     if ($isAuthenticatedStore) {
       loadSubscription();
+      load2FAStatus();
       // Carica il numero di telefono se la sezione profilo è già attiva
       if (activeSection === 'profilo') {
         loadPhoneNumber();
@@ -821,6 +942,109 @@
                       </svg>
                     </button>
                   </div>
+                {/if}
+              </div>
+            </div>
+            
+            <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
+              <div class="setting-info">
+                <div class="setting-label">Autenticazione a due fattori (2FA)</div>
+                <div class="setting-description">
+                  {#if twoFactorEnabled}
+                    Il 2FA è attualmente abilitato. Aggiunge un ulteriore livello di sicurezza al tuo account.
+                  {:else}
+                    Aggiungi un ulteriore livello di sicurezza al tuo account con l'autenticazione a due fattori.
+                  {/if}
+                </div>
+              </div>
+              <div class="setting-actions">
+                {#if twoFactorEnabled}
+                  {#if !showDisable2FA}
+                    <button class="danger-button" on:click={() => showDisable2FA = true}>
+                      Disabilita 2FA
+                    </button>
+                  {:else}
+                    <div class="two-factor-setup">
+                      <p class="two-factor-description">Inserisci il codice 2FA per disabilitare:</p>
+                      <input 
+                        type="text" 
+                        class="two-factor-input" 
+                        bind:value={disable2FACode} 
+                        placeholder="000000"
+                        maxlength="6"
+                        disabled={isDisabling2FA}
+                      />
+                      <div class="two-factor-actions">
+                        <button 
+                          class="manage-button" 
+                          on:click={handleDisable2FA} 
+                          disabled={isDisabling2FA || disable2FACode.length !== 6}
+                        >
+                          {isDisabling2FA ? 'Disabilitazione...' : 'Disabilita'}
+                        </button>
+                        <button 
+                          class="phone-cancel-button" 
+                          on:click={cancelDisable2FA}
+                          disabled={isDisabling2FA}
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
+                  {/if}
+                {:else}
+                  {#if !showQRCode}
+                    <button class="manage-button" on:click={handleGenerate2FA} disabled={isGeneratingQR}>
+                      {isGeneratingQR ? 'Generazione...' : 'Abilita 2FA'}
+                    </button>
+                  {:else}
+                    <div class="two-factor-setup">
+                      <p class="two-factor-description">Scansiona questo QR code con la tua app di autenticazione (es. Google Authenticator, Authy):</p>
+                      {#if qrCodeDataUrl}
+                        <div class="qr-code-container">
+                          <img src={qrCodeDataUrl} alt="QR Code 2FA" class="qr-code-image" />
+                        </div>
+                        <p class="two-factor-description">Oppure inserisci manualmente questa chiave:</p>
+                        <div class="manual-key-container">
+                          <code class="manual-key">{manualEntryKey}</code>
+                          <button 
+                            class="copy-key-button" 
+                            on:click={() => {
+                              navigator.clipboard.writeText(manualEntryKey);
+                              showAlert('Chiave copiata negli appunti!', 'Successo', 'OK', 'success');
+                            }}
+                          >
+                            Copia
+                          </button>
+                        </div>
+                        <p class="two-factor-description">Inserisci il codice di verifica dalla tua app:</p>
+                        <input 
+                          type="text" 
+                          class="two-factor-input" 
+                          bind:value={twoFactorCode} 
+                          placeholder="000000"
+                          maxlength="6"
+                          disabled={isVerifying2FA}
+                        />
+                        <div class="two-factor-actions">
+                          <button 
+                            class="manage-button" 
+                            on:click={handleVerify2FA} 
+                            disabled={isVerifying2FA || twoFactorCode.length !== 6}
+                          >
+                            {isVerifying2FA ? 'Verifica...' : 'Verifica e abilita'}
+                          </button>
+                          <button 
+                            class="phone-cancel-button" 
+                            on:click={cancel2FASetup}
+                            disabled={isVerifying2FA}
+                          >
+                            Annulla
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
                 {/if}
               </div>
             </div>
@@ -1589,6 +1813,101 @@
     cursor: not-allowed;
   }
 
+  .two-factor-setup {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 300px;
+  }
+
+  .two-factor-description {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .qr-code-container {
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+    background-color: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  .qr-code-image {
+    width: 200px;
+    height: 200px;
+    border-radius: 4px;
+  }
+
+  .manual-key-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+  }
+
+  .manual-key {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--text-primary);
+    word-break: break-all;
+    padding: 4px 0;
+  }
+
+  .copy-key-button {
+    padding: 6px 12px;
+    background-color: var(--accent-blue);
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .copy-key-button:hover {
+    background-color: #2563eb;
+  }
+
+  .two-factor-input {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    letter-spacing: 8px;
+    outline: none;
+    transition: all 0.3s;
+  }
+
+  .two-factor-input:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  }
+
+  .two-factor-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .two-factor-actions {
+    display: flex;
+    gap: 8px;
+  }
+
   @media (max-width: 768px) {
     .modal-backdrop {
       padding: 0;
@@ -1611,6 +1930,15 @@
 
     .theme-buttons {
       flex-direction: column;
+    }
+
+    .two-factor-setup {
+      min-width: 100%;
+    }
+
+    .qr-code-image {
+      width: 150px;
+      height: 150px;
     }
   }
 </style>

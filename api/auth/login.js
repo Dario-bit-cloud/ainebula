@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
+import speakeasy from 'speakeasy';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
@@ -53,7 +54,7 @@ export default async function handler(req, res) {
 
     // Trova l'utente
     const users = await sql`
-      SELECT id, email, username, password_hash, is_active
+      SELECT id, email, username, password_hash, is_active, two_factor_enabled, two_factor_secret
       FROM users
       WHERE username = ${usernameLower}
     `;
@@ -94,6 +95,35 @@ export default async function handler(req, res) {
         success: false,
         message: 'Credenziali non valide'
       });
+    }
+
+    // Verifica 2FA se abilitato
+    if (user.two_factor_enabled) {
+      const { twoFactorCode } = req.body;
+      
+      if (!twoFactorCode) {
+        return res.status(200).json({
+          success: false,
+          requiresTwoFactor: true,
+          message: 'Codice 2FA richiesto'
+        });
+      }
+
+      // Verifica il codice 2FA
+      const verified = speakeasy.totp.verify({
+        secret: user.two_factor_secret,
+        encoding: 'base32',
+        token: twoFactorCode,
+        window: 2
+      });
+
+      if (!verified) {
+        return res.status(401).json({
+          success: false,
+          requiresTwoFactor: true,
+          message: 'Codice 2FA non valido'
+        });
+      }
     }
 
     // Crea sessione
