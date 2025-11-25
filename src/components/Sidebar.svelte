@@ -163,11 +163,6 @@
         sidebarView.set('projects');
         activeItem = 'projects';
         break;
-        isProjectModalOpen.set(true);
-        if ($isMobile) {
-          isSidebarOpen.set(false);
-        }
-        break;
     }
   }
   
