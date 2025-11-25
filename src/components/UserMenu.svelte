@@ -56,8 +56,6 @@
     }
   ];
   
-  import { showConfirm } from '../services/dialogService.js';
-  
   async function handleLogout() {
     const confirmed = await showConfirm('Sei sicuro di voler uscire?', 'Esci', 'Esci', 'Annulla');
     if (confirmed) {
