@@ -916,6 +916,7 @@
       padding: 10px 12px;
       border-top: 1px solid var(--border-color);
       background-color: var(--bg-secondary);
+      margin-top: -20px;
     }
 
     .user-info {
@@ -973,6 +974,7 @@
 
     .user-section {
       padding: 8px 10px;
+      margin-top: -20px;
     }
 
     .user-info {
