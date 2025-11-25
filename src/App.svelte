@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import TopBar from './components/TopBar.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import MainArea from './components/MainArea.svelte';
@@ -28,6 +28,7 @@
     if (!SettingsModal) {
       const module = await import('./components/SettingsModal.svelte');
       SettingsModal = module.default;
+      await tick(); // Assicura che Svelte rilevi il cambiamento
     }
   }
   
@@ -102,17 +103,39 @@
   }
   
   // Precarica modals quando vengono aperti
-  $: if ($isSettingsOpen) loadSettingsModal();
-  $: if ($isInviteModalOpen) loadInviteModal();
-  $: if ($isSharedLinksModalOpen) loadSharedLinksModal();
-  $: if ($isProjectModalOpen) loadProjectModal();
-  $: if ($isPremiumModalOpen) loadPremiumModal();
-  $: if ($isShortcutsModalOpen) loadShortcutsModal();
-  $: if ($isAISettingsModalOpen) loadAISettingsModal();
-  $: if ($isPromptLibraryModalOpen) loadPromptLibraryModal();
-  $: if ($isReportBugModalOpen) loadReportBugModal();
-  $: if ($isPersonalizationModalOpen) loadPersonalizationModal();
-  $: if ($isAuthModalOpen) loadAuthModal();
+  $: if ($isSettingsOpen && !SettingsModal) {
+    loadSettingsModal();
+  }
+  $: if ($isInviteModalOpen && !InviteModal) {
+    loadInviteModal();
+  }
+  $: if ($isSharedLinksModalOpen && !SharedLinksModal) {
+    loadSharedLinksModal();
+  }
+  $: if ($isProjectModalOpen && !ProjectModal) {
+    loadProjectModal();
+  }
+  $: if ($isPremiumModalOpen && !PremiumModal) {
+    loadPremiumModal();
+  }
+  $: if ($isShortcutsModalOpen && !ShortcutsModal) {
+    loadShortcutsModal();
+  }
+  $: if ($isAISettingsModalOpen && !AISettingsModal) {
+    loadAISettingsModal();
+  }
+  $: if ($isPromptLibraryModalOpen && !PromptLibraryModal) {
+    loadPromptLibraryModal();
+  }
+  $: if ($isReportBugModalOpen && !ReportBugModal) {
+    loadReportBugModal();
+  }
+  $: if ($isPersonalizationModalOpen && !PersonalizationModal) {
+    loadPersonalizationModal();
+  }
+  $: if ($isAuthModalOpen && !AuthModal) {
+    loadAuthModal();
+  }
   
   function handlePromptSelect(event) {
     selectedPrompt.set(event.detail);
@@ -279,6 +302,8 @@
   onMount(() => {
     window.addEventListener('keydown', handleKeyboardShortcuts);
     initAuth();
+    // Precarica SettingsModal dato che è un componente importante
+    loadSettingsModal();
   });
   
   function handleOpenAuth(event) {

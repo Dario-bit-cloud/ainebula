@@ -9,6 +9,8 @@
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
   import { onMount } from 'svelte';
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
+  import { t, availableLanguages } from '../utils/i18n.js';
+  import { currentLanguage } from '../stores/language.js';
   
   let activeSection = 'generale';
   let theme = 'system';
