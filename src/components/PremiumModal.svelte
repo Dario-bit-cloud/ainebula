@@ -34,7 +34,7 @@
       description: 'Accesso completo a Nebula AI Premium Pro e tutte le funzionalità avanzate.',
       features: [
         'Accesso a Nebula AI Premium Pro (modello premium avanzato)',
-        'Accesso a tutti i modelli standard (Nebula AI 1.0, Pro, Coder)',
+        'Accesso a tutti i modelli standard (Nebula AI 1.5, Pro, Coder)',
         'Token illimitati per chat',
         'Caricamenti illimitati di file e immagini',
         'Esportazione chat avanzata (Markdown, PDF, JSON)',
@@ -51,7 +51,7 @@
       features: [
         'Accesso a Nebula AI Premium Max (il modello più avanzato)',
         'Accesso a Nebula AI Premium Pro incluso',
-        'Accesso a tutti i modelli standard (Nebula AI 1.0, Pro, Coder)',
+        'Accesso a tutti i modelli standard (Nebula AI 1.5, Pro, Coder)',
         'Token illimitati per chat',
         'Caricamenti illimitati di file e immagini',
         'Esportazione chat avanzata (Markdown, PDF, JSON)',

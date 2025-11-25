@@ -4,8 +4,8 @@ import { writable } from 'svelte/store';
 export const availableModels = writable([
   { 
     id: 'nebula-1.0', 
-    name: 'Nebula AI 1.0', 
-    description: 'Modello base versatile per conversazioni',
+    name: 'Nebula AI 1.5', 
+    description: 'Modello base versatile e intelligente per conversazioni',
     group: 'Nebula AI',
     premium: false
   },

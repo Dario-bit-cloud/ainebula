@@ -134,7 +134,7 @@
             {@const selected = $availableModels.find(m => m.id === $selectedModel)}
             {selected.name}
           {:else}
-            Nebula AI 1.0
+            Nebula AI 1.5
           {/if}
         </span>
         <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
