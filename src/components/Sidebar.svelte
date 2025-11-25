@@ -1,7 +1,7 @@
 <script>
   import { user as userStore } from '../stores/user.js';
   import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, loadChats, syncChatsOnLogin } from '../stores/chat.js';
-  import { isAuthenticatedStore } from '../stores/auth.js';
+  import { isAuthenticatedStore, user as authUser } from '../stores/auth.js';
   import { onMount } from 'svelte';
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
