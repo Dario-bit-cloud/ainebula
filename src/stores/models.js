@@ -38,14 +38,6 @@ export const availableModels = writable([
     group: 'Nebula AI Premium',
     premium: true,
     requiredPlan: 'max' // Piano minimo richiesto
-  },
-  { 
-    id: 'nano-banana-pro-live', 
-    name: 'Nano Banana Pro Live', 
-    description: 'Modello sperimentale ad alte prestazioni - Provalo ora!',
-    group: 'Sperimentali',
-    premium: false,
-    experimental: true // Flag per indicare che è un modello sperimentale
   }
 ]);
 

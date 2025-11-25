@@ -162,9 +162,6 @@
                         {model.requiredPlan === 'pro' ? 'PRO' : 'MAX'}
                       </span>
                     {/if}
-                    {#if model.experimental}
-                      <span class="experimental-badge">SPERIMENTALE</span>
-                    {/if}
                   </div>
                   {#if model.description}
                     <div class="model-description">{model.description}</div>
@@ -518,20 +515,13 @@
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
   }
-
-  .experimental-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1;
-    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
-    color: #000;
-    margin-left: 6px;
+  
+  @media (max-width: 768px) {
+    .premium-badge {
+      display: inline-flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
   }
 
   .model-description {

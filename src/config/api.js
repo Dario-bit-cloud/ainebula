@@ -12,19 +12,6 @@ export const LLM7_CONFIG = {
   timeout: 30000 // 30 secondi
 };
 
-// Configurazione API - AIML API per modelli sperimentali
-export const AIML_API_CONFIG = {
-  baseURL: 'https://api.aimlapi.com/v1',
-  apiKey: '75c8604a80b645cb8d9560d03dc20dfc',
-  timeout: 30000 // 30 secondi
-};
-
-// Configurazione API - GitHub Models API per modelli sperimentali
-export const GITHUB_API_CONFIG = {
-  baseURL: 'https://api.github.com',
-  apiKey: import.meta.env.VITE_GITHUB_API_KEY || '', // Usa variabile d'ambiente
-  timeout: 30000 // 30 secondi
-};
 
 
 // Mappatura modelli locali ai modelli API e provider
@@ -33,8 +20,7 @@ export const MODEL_MAPPING = {
   'nebula-pro': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Pro con LLM7.io
   'nebula-coder': { model: 'gpt-4', provider: 'llm7' }, // Nebula Coder con LLM7.io (specializzato in coding)
   'nebula-premium-pro': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Premium Pro - Richiede abbonamento Pro
-  'nebula-premium-max': { model: 'gpt-4', provider: 'llm7' }, // Nebula AI Premium Max - Richiede abbonamento Massimo
-  'nano-banana-pro-live': { model: 'nano-banana-pro-live', provider: 'github' } // Nano Banana Pro Live - Modello sperimentale GitHub Models API
+  'nebula-premium-max': { model: 'gpt-4', provider: 'llm7' } // Nebula AI Premium Max - Richiede abbonamento Massimo
 };
 
 
