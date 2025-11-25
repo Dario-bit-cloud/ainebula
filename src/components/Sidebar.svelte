@@ -749,8 +749,16 @@
         </svg>
       </div>
       <div class="user-details">
-        <div class="username">{$userStore.name || 'Utente'}</div>
-        <div class="workspace">{$userStore.email || 'Nessun workspace'}</div>
+        <div class="username">{$userStore.name || $isAuthenticatedStore ? ($authUser?.username || 'Utente') : 'Utente'}</div>
+        <div class="workspace">
+          {#if $isAuthenticatedStore && $authUser?.email}
+            {$authUser.email}
+          {:else if $userStore.email}
+            {$userStore.email}
+          {:else}
+            Nessun workspace
+          {/if}
+        </div>
       </div>
     </button>
     <button class="invite-button" on:click={handleInviteClick}>

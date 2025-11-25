@@ -88,6 +88,18 @@ export async function register(username, password) {
       console.log('✅ [REGISTER] Registrazione riuscita, salvataggio token');
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Salva l'account nel sistema account multipli
+      if (typeof window !== 'undefined' && data.user) {
+        import('../stores/accounts.js').then(module => {
+          module.addAccount({
+            username: data.user.username,
+            email: data.user.email || '',
+            token: data.token,
+            userId: data.user.id
+          });
+        });
+      }
     } else {
       console.warn('⚠️ [REGISTER] Registrazione fallita:', data);
     }
@@ -171,6 +183,18 @@ export async function login(username, password) {
       // Salva il token nel localStorage
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Salva l'account nel sistema account multipli
+      if (typeof window !== 'undefined' && data.user) {
+        import('../stores/accounts.js').then(module => {
+          module.addAccount({
+            username: data.user.username,
+            email: data.user.email || '',
+            token: data.token,
+            userId: data.user.id
+          });
+        });
+      }
     } else {
       console.warn('⚠️ [LOGIN] Login fallito:', data);
     }

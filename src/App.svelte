@@ -14,7 +14,7 @@
   import ReportBugModal from './components/ReportBugModal.svelte';
   import PersonalizationModal from './components/PersonalizationModal.svelte';
   import AuthModal from './components/AuthModal.svelte';
-  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile } from './stores/app.js';
+  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen } from './stores/app.js';
   import { initAuth, user, isAuthenticatedStore, isLoading } from './stores/auth.js';
   import { logout } from './services/authService.js';
   import { clearUser } from './stores/auth.js';
@@ -178,7 +178,6 @@
     }
   }
   
-  let showAuthModal = false;
   let authModalMode = 'login'; // 'login' o 'register'
   
   // Inizializza autenticazione
@@ -189,7 +188,12 @@
   
   function handleOpenAuth(event) {
     authModalMode = event.detail.mode || 'login';
-    showAuthModal = true;
+    isAuthModalOpen.set(true);
+  }
+  
+  // Sincronizza authModalMode con isAuthModalOpen
+  $: if ($isAuthModalOpen && !authModalMode) {
+    authModalMode = 'login';
   }
   
   onDestroy(() => {
@@ -213,8 +217,8 @@
   <ShortcutsModal />
   <ReportBugModal />
   <PersonalizationModal />
-  {#if showAuthModal}
-    <AuthModal initialMode={authModalMode} on:close={() => showAuthModal = false} />
+  {#if $isAuthModalOpen}
+    <AuthModal initialMode={authModalMode} on:close={() => isAuthModalOpen.set(false)} />
   {/if}
 </div>
 

@@ -2,10 +2,16 @@
   import { user as authUser } from '../stores/auth.js';
   import { isUserMenuOpen } from '../stores/app.js';
   import { logout } from '../services/authService.js';
-  import { clearUser } from '../stores/auth.js';
+  import { clearUser, setUser as setAuthUser } from '../stores/auth.js';
+  import { accounts, currentAccountId, getCurrentAccount, getOtherAccounts, switchAccount, removeAccount } from '../stores/accounts.js';
+  import { isAuthModalOpen } from '../stores/app.js';
   
   let hoveredItem = null;
   let activeSubmenu = null;
+  let showAccountList = false;
+  
+  $: currentAccount = getCurrentAccount();
+  $: otherAccounts = getOtherAccounts();
   
   const menuItems = [
     {
@@ -124,8 +130,45 @@
     }
   }
   
-  function handleAddAccount() {
-    alert('Aggiungi account - Funzionalità in arrivo');
+  async function handleAddAccount() {
+    // Apri modal di login/registrazione
+    isAuthModalOpen.set(true);
+    isUserMenuOpen.set(false);
+  }
+  
+  async function handleSwitchAccount(account) {
+    // Cambia account
+    switchAccount(account.id);
+    
+    // Imposta il token nel localStorage
+    localStorage.setItem('auth_token', account.token);
+    
+    // Aggiorna lo store auth
+    setAuthUser({
+      id: account.userId,
+      username: account.username,
+      email: account.email
+    });
+    
+    // Ricarica la pagina per applicare il cambio account
+    window.location.reload();
+  }
+  
+  function handleRemoveAccount(event, accountId) {
+    event.stopPropagation();
+    
+    if (confirm('Sei sicuro di voler rimuovere questo account?')) {
+      removeAccount(accountId);
+      
+      // Se era l'account corrente, ricarica
+      if (get(currentAccountId) === accountId) {
+        window.location.reload();
+      }
+    }
+  }
+  
+  function toggleAccountList() {
+    showAccountList = !showAccountList;
   }
 </script>
 
@@ -136,7 +179,7 @@
       <div class="main-menu">
         <!-- Header utente -->
         <div class="user-header">
-          <div class="user-info">
+          <div class="user-info" on:click={toggleAccountList} style="cursor: pointer;">
             <div class="user-avatar-small">
               {#if $authUser?.username}
                 {$authUser.username.charAt(0).toUpperCase()}
@@ -144,8 +187,13 @@
                 U
               {/if}
             </div>
-            <div class="user-email">
-              {$authUser?.username || 'Non autenticato'}
+            <div class="user-details-col">
+              <div class="user-email">
+                {$authUser?.username || 'Non autenticato'}
+              </div>
+              {#if currentAccount}
+                <div class="user-workspace">{currentAccount.email || 'Nessun workspace'}</div>
+              {/if}
             </div>
           </div>
           <button class="add-account-btn" on:click={handleAddAccount} title="Aggiungi account">
@@ -155,6 +203,44 @@
             </svg>
           </button>
         </div>
+        
+        <!-- Lista account (se ci sono altri account) -->
+        {#if showAccountList && $accounts.length > 1}
+          <div class="accounts-section">
+            <div class="accounts-header">Account disponibili</div>
+            {#each $accounts as account}
+              <button 
+                class="account-item"
+                class:active={account.id === $currentAccountId}
+                on:click={() => handleSwitchAccount(account)}
+              >
+                <div class="account-avatar-small">
+                  {account.username.charAt(0).toUpperCase()}
+                </div>
+                <div class="account-details">
+                  <div class="account-username">{account.username}</div>
+                  <div class="account-email">{account.email}</div>
+                </div>
+                {#if account.id === $currentAccountId}
+                  <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                {:else if $accounts.length > 1}
+                  <button 
+                    class="remove-account-btn"
+                    on:click={(e) => handleRemoveAccount(e, account.id)}
+                    title="Rimuovi account"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
         
         <!-- Menu items -->
         {#each menuItems as item}
@@ -299,6 +385,14 @@
     flex-shrink: 0;
   }
 
+  .user-details-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+  }
+
   .user-email {
     font-size: 13px;
     color: var(--text-primary);
@@ -306,6 +400,121 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  
+  .user-workspace {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .accounts-section {
+    border-top: 1px solid var(--border-color);
+    padding: 8px 0;
+    margin-top: 4px;
+  }
+  
+  .accounts-header {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 12px 4px;
+  }
+  
+  .account-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    position: relative;
+  }
+  
+  .account-item:hover {
+    background-color: var(--hover-bg);
+  }
+  
+  .account-item.active {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  .account-avatar-small {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-blue), #8b5cf6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  
+  .account-details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .account-username {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .account-email {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .check-icon {
+    color: var(--accent-blue);
+    flex-shrink: 0;
+  }
+  
+  .remove-account-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  
+  .account-item:hover .remove-account-btn {
+    opacity: 1;
+  }
+  
+  .remove-account-btn:hover {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
   }
 
   .add-account-btn {
