@@ -18,6 +18,38 @@ export const isReportBugModalOpen = writable(false);
 export const isPersonalizationModalOpen = writable(false);
 export const isAuthModalOpen = writable(false);
 
+// Stores per i dialoghi personalizzati
+export const confirmDialogState = writable({
+  isOpen: false,
+  title: 'Conferma',
+  message: '',
+  confirmText: 'Conferma',
+  cancelText: 'Annulla',
+  type: 'default',
+  resolve: null
+});
+
+export const alertDialogState = writable({
+  isOpen: false,
+  title: 'Avviso',
+  message: '',
+  buttonText: 'OK',
+  type: 'info',
+  resolve: null
+});
+
+export const promptDialogState = writable({
+  isOpen: false,
+  title: 'Input',
+  message: '',
+  defaultValue: '',
+  placeholder: '',
+  confirmText: 'Conferma',
+  cancelText: 'Annulla',
+  type: 'text',
+  resolve: null
+});
+
 // Store per rilevare la dimensione dello schermo
 function createMediaQuery(query) {
   if (typeof window === 'undefined') {
