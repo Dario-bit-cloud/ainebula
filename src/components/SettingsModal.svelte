@@ -3,7 +3,7 @@
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
-  import { deleteAccount } from '../services/authService.js';
+  import { deleteAccount, getToken } from '../services/authService.js';
   import { getCurrentAccount, removeAccount } from '../stores/accounts.js';
   import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
@@ -14,6 +14,10 @@
   let theme = 'system';
   let language = 'system';
   let phoneNumber = '';
+  let isEditingPhone = false;
+  let phoneInput = '';
+  let isSavingPhone = false;
+  let isLoadingPhone = false;
   
   const sections = [
     { id: 'generale', label: 'Generale', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
@@ -50,6 +54,10 @@
   
   function selectSection(sectionId) {
     activeSection = sectionId;
+    // Carica il numero di telefono quando si apre la sezione profilo
+    if (sectionId === 'profilo' && $isAuthenticatedStore) {
+      loadPhoneNumber();
+    }
   }
   
   function applyTheme(newTheme) {
@@ -96,50 +104,206 @@
   }
   
   function handleLanguageChange() {
-    localStorage.setItem('nebula-language', language);
-    // Qui potresti implementare il cambio lingua dell'app
+    setLanguage(language);
+    // Ricarica la pagina per applicare le traduzioni
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
   }
   
   async function handleDisconnect() {
     const confirmed = await showConfirm('Sei sicuro di voler disconnetterti da tutti i dispositivi?', 'Disconnetti', 'Disconnetti', 'Annulla');
     if (confirmed) {
-      // Rimuovi token di autenticazione
-      localStorage.removeItem('nebula-auth-token');
-      localStorage.removeItem('nebula-session');
-      await showAlert('Disconnessione completata. Ricarica la pagina.', 'Disconnessione completata', 'OK', 'success');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      try {
+        const token = getToken();
+        if (!token) {
+          await showAlert('Errore: token di autenticazione non trovato', 'Errore', 'OK', 'error');
+          return;
+        }
+
+        // Determina l'URL base dell'API
+        const getApiBaseUrl = () => {
+          if (typeof window !== 'undefined') {
+            const hostname = window.location.hostname;
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+              return 'http://localhost:3001/api/auth';
+            }
+            const backendUrl = import.meta.env.VITE_API_BASE_URL;
+            if (backendUrl) {
+              return `${backendUrl}/api/auth`;
+            }
+            return '/api/auth';
+          }
+          return 'http://localhost:3001/api/auth';
+        };
+
+        const response = await fetch(`${getApiBaseUrl()}/disconnect-all`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          await showAlert('Disconnessione da tutti i dispositivi completata. La sessione corrente è stata mantenuta.', 'Disconnessione completata', 'OK', 'success');
+        } else {
+          await showAlert(data.message || 'Errore durante la disconnessione', 'Errore', 'OK', 'error');
+        }
+      } catch (error) {
+        console.error('Errore durante disconnessione:', error);
+        await showAlert('Errore durante la disconnessione da tutti i dispositivi', 'Errore', 'OK', 'error');
+      }
+    }
+  }
+  
+  async function loadPhoneNumber() {
+    if (!$isAuthenticatedStore || isLoadingPhone) return;
+    
+    isLoadingPhone = true;
+    try {
+      const token = getToken();
+      if (!token) {
+        isLoadingPhone = false;
+        return;
+      }
+
+      // Determina l'URL base dell'API
+      const getApiBaseUrl = () => {
+        if (typeof window !== 'undefined') {
+          const hostname = window.location.hostname;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3001/api/auth';
+          }
+          const backendUrl = import.meta.env.VITE_API_BASE_URL;
+          if (backendUrl) {
+            return `${backendUrl}/api/auth`;
+          }
+          return '/api/auth';
+        }
+        return 'http://localhost:3001/api/auth';
+      };
+
+      const response = await fetch(`${getApiBaseUrl()}/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        phoneNumber = data.user.phone_number || '';
+        phoneInput = phoneNumber;
+      }
+    } catch (error) {
+      console.error('Errore durante caricamento numero di telefono:', error);
+    } finally {
+      isLoadingPhone = false;
+    }
+  }
+  
+  function startEditingPhone() {
+    isEditingPhone = true;
+    phoneInput = phoneNumber;
+  }
+  
+  function cancelEditingPhone() {
+    isEditingPhone = false;
+    phoneInput = phoneNumber;
+  }
+  
+  async function savePhoneNumber() {
+    if (isSavingPhone) return;
+    
+    isSavingPhone = true;
+    try {
+      const token = getToken();
+      if (!token) {
+        await showAlert('Errore: token di autenticazione non trovato', 'Errore', 'OK', 'error');
+        isSavingPhone = false;
+        return;
+      }
+
+      // Determina l'URL base dell'API
+      const getApiBaseUrl = () => {
+        if (typeof window !== 'undefined') {
+          const hostname = window.location.hostname;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3001/api/auth';
+          }
+          const backendUrl = import.meta.env.VITE_API_BASE_URL;
+          if (backendUrl) {
+            return `${backendUrl}/api/auth`;
+          }
+          return '/api/auth';
+        }
+        return 'http://localhost:3001/api/auth';
+      };
+
+      const response = await fetch(`${getApiBaseUrl()}/update-phone`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          phone_number: phoneInput.trim() || null
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        phoneNumber = data.phone_number || '';
+        isEditingPhone = false;
+        await showAlert('Numero di telefono aggiornato con successo', 'Successo', 'OK', 'success');
+      } else {
+        await showAlert(data.message || 'Errore durante l\'aggiornamento del numero di telefono', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      console.error('Errore durante aggiornamento numero di telefono:', error);
+      await showAlert('Errore durante l\'aggiornamento del numero di telefono', 'Errore', 'OK', 'error');
+    } finally {
+      isSavingPhone = false;
     }
   }
   
   let isDeletingAccount = false;
   
   async function handleDeleteAccount() {
-    // Prima conferma: richiedi di digitare "ELIMINA"
+    // Prima conferma: richiedi di digitare "ELIMINA" o equivalente
+    const deleteWords = { it: 'ELIMINA', en: 'DELETE', es: 'ELIMINAR', fr: 'SUPPRIMER', de: 'LÖSCHEN' };
+    const currentLang = $currentLanguage || 'it';
+    const deleteWord = deleteWords[currentLang] || deleteWords['it'];
+    
     const firstConfirmation = await showPrompt(
-      '⚠️ ATTENZIONE: Questa azione è IRREVERSIBILE!\n\nTutti i tuoi dati verranno eliminati permanentemente:\n- Account e profilo\n- Tutte le chat e messaggi\n- Tutti i progetti\n- Tutte le impostazioni\n- Tutti gli abbonamenti\n\nPer confermare, digita "ELIMINA" in maiuscolo:',
-      'Elimina Account',
+      t('deleteAccountConfirm1'),
+      t('deleteAccount'),
       '',
-      'Digita "ELIMINA"',
-      'Continua',
-      'Annulla',
+      `Digita "${deleteWord}"`,
+      t('confirm'),
+      t('cancel'),
       'text'
     );
     
-    if (firstConfirmation !== 'ELIMINA') {
+    if (firstConfirmation !== deleteWord) {
       if (firstConfirmation !== null) {
-        await showAlert('Conferma non valida. Operazione annullata.', 'Operazione annullata', 'OK', 'error');
+        await showAlert(t('deleteAccountInvalid'), t('operationCancelled'), t('ok'), 'error');
       }
       return;
     }
     
     // Seconda conferma: dialog di conferma finale
     const secondConfirmation = await showConfirm(
-      '⚠️ ULTIMA CONFERMA ⚠️\n\nSei ASSOLUTAMENTE SICURO di voler eliminare il tuo account?\n\nQuesta azione NON può essere annullata.\n\nTutti i tuoi dati verranno eliminati permanentemente dal database.',
-      'Elimina Account',
-      'Elimina definitivamente',
-      'Annulla',
+      t('deleteAccountConfirm2'),
+      t('deleteAccount'),
+      t('deleteAccountFinal'),
+      t('cancel'),
       'danger'
     );
     
@@ -167,7 +331,7 @@
         // Pulisci tutto il localStorage
         localStorage.clear();
         
-        await showAlert('✅ Account eliminato con successo. Tutti i dati sono stati rimossi permanentemente.\n\nLa pagina verrà ricaricata.', 'Account eliminato', 'OK', 'success');
+        await showAlert(t('deleteAccountSuccess'), t('deleteAccount'), t('ok'), 'success');
         
         // Ricarica la pagina dopo un breve delay
         setTimeout(() => {
@@ -175,43 +339,73 @@
         }, 1500);
       } else {
         isDeletingAccount = false;
-        await showAlert(`❌ Errore durante l'eliminazione dell'account: ${result.message || 'Errore sconosciuto'}`, 'Errore', 'OK', 'error');
+        await showAlert(t('deleteAccountError', { error: result.message || t('error') }), t('error'), t('ok'), 'error');
       }
     } catch (error) {
       isDeletingAccount = false;
       console.error('Errore durante eliminazione account:', error);
-      await showAlert(`❌ Errore durante l'eliminazione dell'account: ${error.message}`, 'Errore', 'OK', 'error');
+      await showAlert(t('deleteAccountError', { error: error.message }), t('error'), t('ok'), 'error');
     }
   }
   
+  let isExporting = false;
+  
   async function handleExportData() {
-    const exportData = {
-      user: $userStore,
-      chats: $chats,
-      settings: {
-        theme,
-        language
-      },
-      exportDate: new Date().toISOString()
-    };
+    if (!$isAuthenticatedStore) {
+      // Se non autenticato, esporta solo dati locali
+      const exportData = {
+        user: $userStore,
+        chats: $chats,
+        settings: {
+          theme,
+          language
+        },
+        exportDate: new Date().toISOString()
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nebula-ai-export-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      await showAlert('Dati esportati con successo!', 'Esportazione completata', 'OK', 'success');
+      return;
+    }
     
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nebula-ai-export-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    await showAlert('Dati esportati con successo! Il file sarà valido per 7 giorni.', 'Esportazione completata', 'OK', 'success');
+    isExporting = true;
+    try {
+      // Crea la richiesta di export
+      const result = await createDataExport();
+      
+      if (result.success) {
+        // Scarica i dati
+        const downloadResult = await downloadDataExport(result.exportToken);
+        
+        if (downloadResult.success) {
+          await showAlert('Dati esportati con successo! Il link per il download sarà valido per 7 giorni.', 'Esportazione completata', 'OK', 'success');
+        } else {
+          await showAlert(downloadResult.message || 'Errore nel download dei dati', 'Errore', 'OK', 'error');
+        }
+      } else {
+        await showAlert(result.message || 'Errore nella creazione dell\'export', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      await showAlert('Errore durante l\'esportazione dei dati', 'Errore', 'OK', 'error');
+      console.error('Errore export:', error);
+    } finally {
+      isExporting = false;
+    }
   }
   
   async function handleDownloadSubscriptionKey() {
     const userData = $userStore;
     if (!userData.subscription?.key) {
-      await showAlert('Nessuna chiave di abbonamento disponibile. Attiva un abbonamento per ottenere una chiave.', 'Chiave non disponibile', 'OK', 'warning');
+      await showAlert(t('noKeyAvailable'), t('keyNotAvailable'), t('ok'), 'warning');
       return;
     }
     
@@ -233,7 +427,7 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    await showAlert('Chiave di abbonamento scaricata con successo! Conservala in un luogo sicuro per ripristinare l\'abbonamento su altri dispositivi.', 'Chiave scaricata', 'OK', 'success');
+    await showAlert(t('downloadKeySuccess'), t('keyDownloaded'), t('ok'), 'success');
   }
   
   function handleImportSubscriptionKey() {
@@ -260,12 +454,12 @@
                 active: true
               }
             }));
-            showAlert('Chiave di abbonamento importata con successo!', 'Chiave importata', 'OK', 'success');
+            showAlert(t('importKeySuccess'), t('keyImported'), t('ok'), 'success');
           } else {
-            showAlert('File non valido. Il file deve contenere una chiave di abbonamento.', 'File non valido', 'OK', 'error');
+            showAlert(t('invalidFile'), t('error'), t('ok'), 'error');
           }
         } catch (error) {
-          showAlert('Errore durante l\'importazione della chiave. Verifica che il file sia valido.', 'Errore', 'OK', 'error');
+          showAlert(t('importError'), t('error'), t('ok'), 'error');
           console.error('Import error:', error);
         }
       };
@@ -274,12 +468,42 @@
     input.click();
   }
   
+  let isDeletingAllChats = false;
+  
   async function handleDeleteAllChats() {
-    const confirmed = await showConfirm('Sei sicuro di voler eliminare tutte le chat? Questa azione è irreversibile.', 'Elimina tutte le chat', 'Elimina', 'Annulla', 'danger');
-    if (confirmed) {
-      chats.set([]);
-      localStorage.removeItem('nebula-ai-chats');
-      await showAlert('Tutte le chat sono state eliminate.', 'Chat eliminate', 'OK', 'success');
+    const confirmed = await showConfirm(
+      'Sei sicuro di voler eliminare tutte le chat? Questa azione è irreversibile.',
+      'Elimina tutte le chat',
+      'Elimina',
+      'Annulla',
+      'danger'
+    );
+    
+    if (!confirmed) return;
+    
+    isDeletingAllChats = true;
+    try {
+      if ($isAuthenticatedStore) {
+        // Elimina dal database se autenticato
+        const result = await deleteAllChatsFromDatabase();
+        if (result.success) {
+          chats.set([]);
+          localStorage.removeItem('nebula-ai-chats');
+          await showAlert('Tutte le chat sono state eliminate dal database.', 'Chat eliminate', 'OK', 'success');
+        } else {
+          await showAlert(result.message || 'Errore nell\'eliminazione delle chat', 'Errore', 'OK', 'error');
+        }
+      } else {
+        // Elimina solo da localStorage se non autenticato
+        chats.set([]);
+        localStorage.removeItem('nebula-ai-chats');
+        await showAlert('Tutte le chat sono state eliminate.', 'Chat eliminate', 'OK', 'success');
+      }
+    } catch (error) {
+      await showAlert('Errore durante l\'eliminazione delle chat', 'Errore', 'OK', 'error');
+      console.error('Errore eliminazione chat:', error);
+    } finally {
+      isDeletingAllChats = false;
     }
   }
   
@@ -349,9 +573,9 @@
   }
   
   function getPlanName(plan) {
-    if (!plan || plan === 'free') return 'Gratuito';
-    if (plan === 'pro') return 'Pro';
-    if (plan === 'max') return 'Massimo';
+    if (!plan || plan === 'free') return t('free');
+    if (plan === 'pro') return t('pro');
+    if (plan === 'max') return t('max');
     return plan;
   }
   
@@ -367,6 +591,10 @@
   onMount(() => {
     if ($isAuthenticatedStore) {
       loadSubscription();
+      // Carica il numero di telefono se la sezione profilo è già attiva
+      if (activeSection === 'profilo') {
+        loadPhoneNumber();
+      }
     }
   });
 </script>
@@ -376,7 +604,7 @@
     <div class="modal-content">
       <!-- Header -->
       <div class="modal-header">
-        <h2 class="modal-title">Impostazioni</h2>
+        <h2 class="modal-title">{t('settings')}</h2>
         <button class="close-button" on:click={closeModal}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -407,7 +635,7 @@
           <!-- Generale -->
           {#if activeSection === 'generale'}
             <div class="setting-section" class:section-visible={activeSection === 'generale'}>
-              <h3 class="setting-title">Tema</h3>
+              <h3 class="setting-title">{t('theme')}</h3>
               <div class="theme-buttons">
                 <button 
                   class="theme-button" 
@@ -425,7 +653,7 @@
                     <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                   </svg>
-                  <span>Chiaro</span>
+                  <span>{t('light')}</span>
                 </button>
                 <button 
                   class="theme-button" 
@@ -435,7 +663,7 @@
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
                   </svg>
-                  <span>Scuro</span>
+                  <span>{t('dark')}</span>
                 </button>
                 <button 
                   class="theme-button" 
@@ -447,20 +675,17 @@
                     <line x1="8" y1="21" x2="16" y2="21"/>
                     <line x1="12" y1="17" x2="12" y2="21"/>
                   </svg>
-                  <span>Sistema</span>
+                  <span>{t('system')}</span>
                 </button>
               </div>
             </div>
             
             <div class="setting-section" class:section-visible={activeSection === 'generale'}>
-              <h3 class="setting-title">Lingua</h3>
+              <h3 class="setting-title">{t('language')}</h3>
               <select class="setting-select" bind:value={language} on:change={handleLanguageChange}>
-                <option value="system">Sistema</option>
-                <option value="it">Italiano</option>
-                <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
+                {#each availableLanguages as lang}
+                  <option value={lang.code}>{lang.nativeName[$currentLanguage] || lang.name}</option>
+                {/each}
               </select>
             </div>
           {/if}
@@ -469,38 +694,38 @@
           {#if activeSection === 'abbonamento'}
             {#if isLoadingSubscription}
               <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
-                <div class="loading-state">Caricamento informazioni abbonamento...</div>
+                <div class="loading-state">{t('loadingSubscription')}</div>
               </div>
             {:else}
               <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
-                <h3 class="setting-title">Stato Abbonamento</h3>
+                <h3 class="setting-title">{t('subscriptionStatus')}</h3>
                 
                 <div class="subscription-status">
                   <div class="subscription-badge" class:active={isActive} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
                     <span class="badge-label">{planName}</span>
                     {#if isActive}
-                      <span class="badge-status">Attivo</span>
+                      <span class="badge-status">{t('active')}</span>
                     {:else}
-                      <span class="badge-status">Non attivo</span>
+                      <span class="badge-status">{t('inactive')}</span>
                     {/if}
                   </div>
                 </div>
                 
                 <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
-                  <div class="setting-label">Piano corrente</div>
+                  <div class="setting-label">{t('currentPlan')}</div>
                   <div class="setting-value">{planName}</div>
                 </div>
                 
                 {#if subscription?.expiresAt}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
-                    <div class="setting-label">Scadenza</div>
+                    <div class="setting-label">{t('expiration')}</div>
                     <div class="setting-value">{formatDate(subscription.expiresAt)}</div>
                   </div>
                 {/if}
                 
                 {#if subscription?.startedAt}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
-                    <div class="setting-label">Data attivazione</div>
+                    <div class="setting-label">{t('activationDate')}</div>
                     <div class="setting-value">{formatDate(subscription.startedAt)}</div>
                   </div>
                 {/if}
@@ -508,27 +733,27 @@
                 {#if !isActive || subscription?.plan === 'free'}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                     <div class="setting-info">
-                      <div class="setting-label">Aggiorna piano</div>
-                      <div class="setting-description">Sblocca funzionalità premium con un abbonamento Pro o Massimo</div>
+                      <div class="setting-label">{t('upgradePlan')}</div>
+                      <div class="setting-description">{t('upgradeDescription')}</div>
                     </div>
                     <button class="manage-button" on:click={handleUpgrade}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
                       </svg>
-                      Aggiorna
+                      {t('upgrade')}
                     </button>
                   </div>
                 {:else}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                     <div class="setting-info">
-                      <div class="setting-label">Gestisci abbonamento</div>
-                      <div class="setting-description">Modifica o cancella il tuo abbonamento premium</div>
+                      <div class="setting-label">{t('manageSubscription')}</div>
+                      <div class="setting-description">{t('manageDescription')}</div>
                     </div>
                     <button class="manage-button" on:click={handleUpgrade}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
                       </svg>
-                      Gestisci
+                      {t('manage')}
                     </button>
                   </div>
                 {/if}
@@ -539,7 +764,7 @@
           <!-- Profilo -->
           {#if activeSection === 'profilo'}
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">Username</div>
+              <div class="setting-label">{t('username')}</div>
               <div class="setting-value">
                 {#if $isAuthenticatedStore && $authUser?.username}
                   {$authUser.username}
@@ -552,19 +777,60 @@
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">Numero di telefono</div>
-              <div class="setting-value">{phoneNumber || '-'}</div>
+              <div class="setting-label">{t('phoneNumber')}</div>
+              <div class="setting-value">
+                {#if isEditingPhone}
+                  <div class="phone-edit-container">
+                    <input 
+                      type="tel" 
+                      class="phone-input" 
+                      bind:value={phoneInput} 
+                      placeholder={t('phoneNumber')}
+                      disabled={isSavingPhone}
+                    />
+                    <div class="phone-edit-actions">
+                      <button 
+                        class="phone-save-button" 
+                        on:click={savePhoneNumber} 
+                        disabled={isSavingPhone}
+                      >
+                        {isSavingPhone ? t('save') + '...' : t('save')}
+                      </button>
+                      <button 
+                        class="phone-cancel-button" 
+                        on:click={cancelEditingPhone}
+                        disabled={isSavingPhone}
+                      >
+                        {t('cancel')}
+                      </button>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="phone-display-container">
+                    <span>{phoneNumber || '-'}</span>
+                    <button 
+                      class="phone-edit-button" 
+                      on:click={startEditingPhone}
+                      title={t('edit') + ' ' + t('phoneNumber')}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      </svg>
+                    </button>
+                  </div>
+                {/if}
+              </div>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">Disconnetti da tutti i dispositivi</div>
-              <button class="danger-button" on:click={handleDisconnect}>Disconnetti</button>
+              <div class="setting-label">{t('disconnectAllDevices')}</div>
+              <button class="danger-button" on:click={handleDisconnect}>{t('disconnect')}</button>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">Elimina account</div>
+              <div class="setting-label">{t('deleteAccount')}</div>
               <button class="danger-button" on:click={handleDeleteAccount} disabled={isDeletingAccount}>
-                {isDeletingAccount ? 'Eliminazione in corso...' : 'Elimina'}
+                {isDeletingAccount ? t('deletingAccount') : t('delete')}
               </button>
             </div>
           {/if}
@@ -572,23 +838,25 @@
           <!-- Dati -->
           {#if activeSection === 'dati'}
             <div class="setting-row" class:row-visible={activeSection === 'dati'}>
-              <div class="setting-label">Link condivisi</div>
-              <button class="manage-button" on:click={handleManageSharedLinks}>Gestisci</button>
+              <div class="setting-label">{t('sharedLinks')}</div>
+              <button class="manage-button" on:click={handleManageSharedLinks}>{t('manage')}</button>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'dati'}>
               <div class="setting-info">
-                <div class="setting-label">Esporta dati</div>
-                <div class="setting-description">Questi dati includono le informazioni del tuo account e tutta la cronologia delle chat. L'esportazione potrebbe richiedere del tempo. Il link per il download sarà valido per 7 giorni.</div>
+                <div class="setting-label">{t('exportData')}</div>
+                <div class="setting-description">{t('exportDescription')}</div>
               </div>
-              <button class="manage-button" on:click={handleExportData}>Esporta</button>
+              <button class="manage-button" on:click={handleExportData} disabled={isExporting}>
+                {isExporting ? t('exportCompleted') + '...' : t('exportData')}
+              </button>
             </div>
             
             {#if $userStore.subscription?.active && $userStore.subscription?.key}
               <div class="setting-row" class:row-visible={activeSection === 'dati'}>
                 <div class="setting-info">
-                  <div class="setting-label">Chiave abbonamento</div>
-                  <div class="setting-description">Scarica la chiave del tuo abbonamento per ripristinarlo su altri dispositivi. Conserva questa chiave in un luogo sicuro.</div>
+                  <div class="setting-label">{t('subscriptionKey')}</div>
+                  <div class="setting-description">{t('subscriptionKeyDescription')}</div>
                 </div>
                 <div class="setting-actions">
                   <button class="manage-button" on:click={handleDownloadSubscriptionKey}>
@@ -597,7 +865,7 @@
                       <polyline points="7 10 12 15 17 10"/>
                       <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    Scarica chiave
+                    {t('downloadKey')}
                   </button>
                   <button class="manage-button secondary" on:click={handleImportSubscriptionKey}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -605,28 +873,30 @@
                       <polyline points="17 8 12 3 7 8"/>
                       <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
-                    Importa chiave
+                    {t('importKey')}
                   </button>
                 </div>
               </div>
             {/if}
             
             <div class="setting-row" class:row-visible={activeSection === 'dati'}>
-              <div class="setting-label">Elimina tutte le chat</div>
-              <button class="danger-button" on:click={handleDeleteAllChats}>Cancella tutto</button>
+              <div class="setting-label">{t('deleteAllChats')}</div>
+              <button class="danger-button" on:click={handleDeleteAllChats} disabled={isDeletingAllChats}>
+                {isDeletingAllChats ? t('deletingAccount') + '...' : t('clearAll')}
+              </button>
             </div>
           {/if}
           
           <!-- Informazioni -->
           {#if activeSection === 'informazioni'}
             <div class="setting-row" class:row-visible={activeSection === 'informazioni'}>
-              <div class="setting-label">Termini di utilizzo</div>
-              <button class="view-button" on:click={handleViewTerms}>Visualizza</button>
+              <div class="setting-label">{t('termsOfService')}</div>
+              <button class="view-button" on:click={handleViewTerms}>{t('view')}</button>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'informazioni'}>
-              <div class="setting-label">Informativa sulla privacy</div>
-              <button class="view-button" on:click={handleViewPrivacy}>Visualizza</button>
+              <div class="setting-label">{t('privacyPolicy')}</div>
+              <button class="view-button" on:click={handleViewPrivacy}>{t('view')}</button>
             </div>
           {/if}
         </div>
@@ -669,7 +939,7 @@
   }
 
   .modal-content {
-    background-color: #2d2d2d;
+    background-color: var(--bg-secondary);
     border-radius: 12px;
     max-width: 800px;
     width: 100%;
@@ -740,14 +1010,14 @@
   .modal-title {
     font-size: 20px;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--text-primary);
     margin: 0;
   }
 
   .close-button {
     background: none;
     border: none;
-    color: #ffffff;
+    color: var(--text-primary);
     cursor: pointer;
     padding: 4px;
     display: flex;
@@ -1216,6 +1486,104 @@
   
   .manage-button.secondary:hover {
     background-color: #3a3a3a;
+  }
+
+  .phone-display-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .phone-edit-button {
+    background: none;
+    border: none;
+    color: #a0a0a0;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .phone-edit-button:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .phone-edit-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 250px;
+  }
+
+  .phone-input {
+    padding: 8px 12px;
+    background-color: #3a3a3a;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.3s;
+  }
+
+  .phone-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  }
+
+  .phone-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .phone-edit-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .phone-save-button,
+  .phone-cancel-button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .phone-save-button {
+    background-color: #3b82f6;
+    color: #ffffff;
+  }
+
+  .phone-save-button:hover:not(:disabled) {
+    background-color: #2563eb;
+    transform: translateY(-1px);
+  }
+
+  .phone-save-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .phone-cancel-button {
+    background-color: #3a3a3a;
+    color: #ffffff;
+  }
+
+  .phone-cancel-button:hover:not(:disabled) {
+    background-color: #454545;
+  }
+
+  .phone-cancel-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   @media (max-width: 768px) {

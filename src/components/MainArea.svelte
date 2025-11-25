@@ -13,6 +13,8 @@
   import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
   import PrivacyModal from './PrivacyModal.svelte';
   import { showAlert, showPrompt } from '../services/dialogService.js';
+  import { t } from '../utils/i18n.js';
+  import { currentLanguage } from '../stores/language.js';
   
   let inputValue = '';
   let inputRef;
@@ -545,7 +547,7 @@
             await deleteMessage(chatId, currentChatData.messages.length - 1);
           }
         } else {
-          const errorMsg = error?.message || 'Si è verificato un errore sconosciuto.';
+          const errorMsg = error?.message || t('errorOccurred');
           if (currentChatData && currentChatData.messages.length > 0) {
             updateMessage(chatId, currentChatData.messages.length - 1, { 
               content: `❌ Errore: ${errorMsg}`
@@ -1097,7 +1099,7 @@
       <input
         type="text"
         class="chat-search-input"
-        placeholder="Cerca nella chat corrente..."
+        placeholder={t('searchInChat')}
         bind:value={searchQuery}
         on:input={(e) => handleSearchInput(e.target.value)}
       />
@@ -1114,7 +1116,7 @@
     <div class="token-counter" class:token-warning={tokenWarning}>
       <div class="token-info">
         <span class="token-label">
-          Token: {currentChatTokens.toLocaleString()} / {maxTokens === Infinity ? 'Illimitati' : maxTokens.toLocaleString()}
+          {t('tokens')}: {currentChatTokens.toLocaleString()} / {maxTokens === Infinity ? t('unlimited') : maxTokens.toLocaleString()}
         </span>
         {#if maxTokens !== Infinity}
           <div class="token-bar">
@@ -1122,7 +1124,7 @@
           </div>
         {/if}
       </div>
-      <button class="token-counter-toggle" on:click={() => showTokenCounter = false} title="Nascondi">
+      <button class="token-counter-toggle" on:click={() => showTokenCounter = false} title={t('close')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/>
           <line x1="6" y1="6" x2="18" y2="18"/>
@@ -1130,7 +1132,7 @@
       </button>
     </div>
   {:else if visibleMessages.length > 0}
-    <button class="token-counter-show" on:click={() => showTokenCounter = true} title="Mostra token counter">
+    <button class="token-counter-show" on:click={() => showTokenCounter = true} title={t('tokens')}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" y1="8" x2="12" y2="12"/>
@@ -1145,8 +1147,8 @@
         <div class="welcome-content">
           <div class="welcome-header">
             <div class="welcome-text-section">
-              <h1 class="welcome-title">Ciao, sono Nebula AI.</h1>
-              <p class="welcome-subtitle">Chiedimi qualsiasi cosa.<br />La nostra conversazione rimarrà riservata.</p>
+              <h1 class="welcome-title">{t('welcomeTitle')}</h1>
+              <p class="welcome-subtitle">{@html t('welcomeSubtitle')}</p>
             </div>
             <div class="welcome-logo">
               <img src="/logo.png" alt="Nebula AI" />
@@ -1377,7 +1379,7 @@
             <div class="image-preview" class:selected={selectedImageIndex === index}>
               <img src={imageItem.preview} alt={imageItem.file.name} />
               <div class="image-overlay">
-                <button class="image-edit" on:click={() => openImageStyles(index)} title="Modifica immagine">
+                <button class="image-edit" on:click={() => openImageStyles(index)} title={t('editImage')}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                     <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -1442,7 +1444,7 @@
             <div class="image-description-input">
               <input
                 type="text"
-                placeholder="Descrivi un'immagine"
+                placeholder={t('describeImage')}
                 bind:value={imageDescription}
                 on:input={(e) => {
                   if (selectedImageIndex !== null) {
@@ -1477,7 +1479,7 @@
       {/if}
       
       <div class="attach-button-wrapper" bind:this={attachMenuRef}>
-        <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title="Allega file">
+        <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title={t('attachFile')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
           </svg>
@@ -1591,14 +1593,14 @@
       />
       {#if editingMessageIndex !== null}
         <div class="edit-mode">
-          <span class="edit-label">Modifica messaggio</span>
-          <button class="edit-cancel" on:click={handleEditCancel}>Annulla</button>
+          <span class="edit-label">{t('editMessage')}</span>
+          <button class="edit-cancel" on:click={handleEditCancel}>{t('cancel')}</button>
         </div>
       {/if}
       <textarea
         class="message-input"
         class:textarea-input={isTextarea}
-        placeholder={editingMessageIndex !== null ? "Modifica il messaggio..." : ($isMobile ? "" : "Messaggio a Nebula AI")}
+        placeholder={editingMessageIndex !== null ? t('editMessagePlaceholder') : ($isMobile ? "" : t('messageToNebula'))}
         bind:value={inputValue}
         bind:this={textareaRef}
         on:keydown={handleKeyPress}
@@ -1614,7 +1616,7 @@
         {#if $isGenerating && editingMessageIndex === null}
           <button 
             class="stop-button" 
-            title="Ferma generazione"
+            title={t('stopGeneration')}
             on:click={handleStop}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -1624,7 +1626,7 @@
         {:else}
           <button 
             class="send-button" 
-            title={editingMessageIndex !== null ? "Salva modifica" : "Invia messaggio"}
+            title={editingMessageIndex !== null ? t('saveEdit') : t('sendMessage')}
             on:click={handleSubmit}
             disabled={!inputValue.trim() && attachedImages.length === 0}
           >

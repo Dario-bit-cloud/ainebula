@@ -202,3 +202,37 @@ CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(50) UNIQUE;
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
 
+-- Tabella per i link condivisi
+CREATE TABLE IF NOT EXISTS shared_links (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chat_id VARCHAR(255) NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    share_token VARCHAR(255) UNIQUE NOT NULL,
+    title VARCHAR(500),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    access_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_shared_links_user_id ON shared_links(user_id);
+CREATE INDEX IF NOT EXISTS idx_shared_links_chat_id ON shared_links(chat_id);
+CREATE INDEX IF NOT EXISTS idx_shared_links_token ON shared_links(share_token);
+
+-- Tabella per le esportazioni dati
+CREATE TABLE IF NOT EXISTS data_exports (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    export_token VARCHAR(255) UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'ready', 'expired'
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_data_exports_user_id ON data_exports(user_id);
+CREATE INDEX IF NOT EXISTS idx_data_exports_token ON data_exports(export_token);
+
+-- Aggiungi colonna phone_number alla tabella users
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);
+

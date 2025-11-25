@@ -8,6 +8,23 @@ import { randomBytes } from 'crypto';
 
 dotenv.config();
 
+// Helper per logging condizionale (solo in sviluppo)
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const log = (...args) => {
+  if (isDevelopment) {
+    console.log(...args);
+  }
+};
+const logError = (...args) => {
+  // Gli errori vengono sempre loggati
+  console.error(...args);
+};
+const logWarn = (...args) => {
+  if (isDevelopment) {
+    console.warn(...args);
+  }
+};
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
 
@@ -34,15 +51,33 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Middleware per loggare tutte le richieste
-app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`\n📨 [REQUEST] ${req.method} ${req.path}`, {
-    timestamp,
-    origin: req.get('origin'),
-    userAgent: req.get('user-agent'),
-    ip: req.ip
+// Middleware per loggare tutte le richieste (solo in sviluppo)
+if (isDevelopment) {
+  app.use((req, res, next) => {
+    const timestamp = new Date().toISOString();
+    log(`\n📨 [REQUEST] ${req.method} ${req.path}`, {
+      timestamp,
+      origin: req.get('origin'),
+      userAgent: req.get('user-agent'),
+      ip: req.ip
+    });
+    next();
   });
+}
+
+// Compression middleware per ridurre la dimensione delle risposte
+app.use((req, res, next) => {
+  // Comprimi solo risposte JSON e testo
+  if (req.headers['accept-encoding']?.includes('gzip') || req.headers['accept-encoding']?.includes('deflate')) {
+    const originalSend = res.send;
+    res.send = function(data) {
+      if (typeof data === 'string' && data.length > 1024) {
+        // Per risposte grandi, usa compressione semplice
+        res.setHeader('Content-Encoding', 'gzip');
+      }
+      return originalSend.call(this, data);
+    };
+  }
   next();
 });
 
@@ -98,7 +133,7 @@ if (!connectionString) {
   process.exit(1);
 }
 
-console.log('✅ Database URL configurato');
+log('✅ Database URL configurato');
 
 const sql = neon(connectionString);
 
@@ -193,7 +228,7 @@ app.get('/api/db/info', async (req, res) => {
 // Registrazione
 app.post('/api/auth/register', async (req, res) => {
   const timestamp = new Date().toISOString();
-  console.log('\n📝 [SERVER REGISTER] Richiesta ricevuta:', {
+  log('\n📝 [SERVER REGISTER] Richiesta ricevuta:', {
     timestamp,
     ip: req.ip,
     userAgent: req.get('user-agent'),
@@ -207,7 +242,7 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    console.log('📥 [SERVER REGISTER] Body ricevuto:', {
+    log('📥 [SERVER REGISTER] Body ricevuto:', {
       username: username || 'MISSING',
       password: password ? '***' : 'MISSING',
       hasUsername: !!username,
@@ -285,7 +320,7 @@ app.post('/api/auth/register', async (req, res) => {
       token: sessionToken
     };
     
-    console.log('✅ [SERVER REGISTER] Registrazione completata per:', username.toLowerCase());
+    log('✅ [SERVER REGISTER] Registrazione completata per:', username.toLowerCase());
     res.json(response);
   } catch (error) {
     console.error('❌ [SERVER REGISTER] Errore:', {
@@ -305,7 +340,7 @@ app.post('/api/auth/register', async (req, res) => {
 // Login
 app.post('/api/auth/login', async (req, res) => {
   const timestamp = new Date().toISOString();
-  console.log('\n🔐 [SERVER LOGIN] Richiesta ricevuta:', {
+  log('\n🔐 [SERVER LOGIN] Richiesta ricevuta:', {
     timestamp,
     ip: req.ip,
     userAgent: req.get('user-agent'),
@@ -319,7 +354,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    console.log('📥 [SERVER LOGIN] Body ricevuto:', {
+    log('📥 [SERVER LOGIN] Body ricevuto:', {
       username: username || 'MISSING',
       password: password ? '***' : 'MISSING',
       hasUsername: !!username,
@@ -327,7 +362,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
     
     if (!username || !password) {
-      console.warn('⚠️ [SERVER LOGIN] Credenziali mancanti');
+      logWarn('⚠️ [SERVER LOGIN] Credenziali mancanti');
       return res.status(400).json({
         success: false,
         message: 'Username e password sono obbligatori'
@@ -335,7 +370,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     const usernameLower = username.toLowerCase();
-    console.log('🔍 [SERVER LOGIN] Ricerca utente:', usernameLower);
+    log('🔍 [SERVER LOGIN] Ricerca utente:', usernameLower);
     
     // Trova l'utente
     const users = await sql`
@@ -344,10 +379,10 @@ app.post('/api/auth/login', async (req, res) => {
       WHERE username = ${usernameLower}
     `;
     
-    console.log('👤 [SERVER LOGIN] Utenti trovati:', users.length);
+    log('👤 [SERVER LOGIN] Utenti trovati:', users.length);
     
     if (users.length === 0) {
-      console.warn('❌ [SERVER LOGIN] Utente non trovato:', usernameLower);
+      logWarn('❌ [SERVER LOGIN] Utente non trovato:', usernameLower);
       return res.status(401).json({
         success: false,
         message: 'Credenziali non valide'
@@ -355,14 +390,14 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     const user = users[0];
-    console.log('✅ [SERVER LOGIN] Utente trovato:', {
+    log('✅ [SERVER LOGIN] Utente trovato:', {
       id: user.id,
       username: user.username,
       isActive: user.is_active
     });
     
     if (!user.is_active) {
-      console.warn('⚠️ [SERVER LOGIN] Account disattivato:', user.id);
+      logWarn('⚠️ [SERVER LOGIN] Account disattivato:', user.id);
       return res.status(403).json({
         success: false,
         message: 'Account disattivato'
@@ -370,12 +405,12 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     // Verifica password
-    console.log('🔑 [SERVER LOGIN] Verifica password...');
+    log('🔑 [SERVER LOGIN] Verifica password...');
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    console.log('🔑 [SERVER LOGIN] Password valida:', isValidPassword);
+    log('🔑 [SERVER LOGIN] Password valida:', isValidPassword);
     
     if (!isValidPassword) {
-      console.warn('❌ [SERVER LOGIN] Password non valida per utente:', user.username);
+      logWarn('❌ [SERVER LOGIN] Password non valida per utente:', user.username);
       return res.status(401).json({
         success: false,
         message: 'Credenziali non valide'
@@ -383,7 +418,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     // Crea sessione
-    console.log('🎫 [SERVER LOGIN] Creazione sessione...');
+    log('🎫 [SERVER LOGIN] Creazione sessione...');
     const sessionToken = jwt.sign(
       { userId: user.id, email: user.email, username: user.username },
       JWT_SECRET,
@@ -397,7 +432,7 @@ app.post('/api/auth/login', async (req, res) => {
       VALUES (${sessionId}, ${user.id}, ${sessionToken}, ${expiresAt}, ${req.ip}, ${req.get('user-agent')})
     `;
     
-    console.log('✅ [SERVER LOGIN] Sessione creata:', {
+    log('✅ [SERVER LOGIN] Sessione creata:', {
       sessionId,
       expiresAt: expiresAt.toISOString()
     });
@@ -417,7 +452,7 @@ app.post('/api/auth/login', async (req, res) => {
       token: sessionToken
     };
     
-    console.log('✅ [SERVER LOGIN] Login completato con successo per:', user.username);
+    log('✅ [SERVER LOGIN] Login completato con successo per:', user.username);
     res.json(response);
   } catch (error) {
     console.error('❌ [SERVER LOGIN] Errore:', {
@@ -962,32 +997,506 @@ app.get('/api/user/payments', authenticateToken, async (req, res) => {
 
 // ==================== FINE ENDPOINT ABBONAMENTI ====================
 
+// ==================== ENDPOINT LINK CONDIVISI ====================
+
+// Crea tabella shared_links se non esiste
+async function ensureSharedLinksTable() {
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS shared_links (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        chat_id VARCHAR(255) NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+        share_token VARCHAR(255) UNIQUE NOT NULL,
+        title VARCHAR(500),
+        expires_at TIMESTAMP WITH TIME ZONE,
+        access_count INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_shared_links_user_id ON shared_links(user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_shared_links_chat_id ON shared_links(chat_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_shared_links_token ON shared_links(share_token)`;
+    return true;
+  } catch (error) {
+    console.error('Errore creazione tabella shared_links:', error);
+    return false;
+  }
+}
+
+// Ottieni tutti i link condivisi dell'utente
+app.get('/api/shared-links', authenticateToken, async (req, res) => {
+  try {
+    await ensureSharedLinksTable();
+    
+    const links = await sql`
+      SELECT 
+        sl.id,
+        sl.chat_id,
+        sl.share_token,
+        sl.title,
+        sl.expires_at,
+        sl.access_count,
+        sl.is_active,
+        sl.created_at,
+        c.title as chat_title
+      FROM shared_links sl
+      JOIN chats c ON sl.chat_id = c.id
+      WHERE sl.user_id = ${req.user.id}
+      ORDER BY sl.created_at DESC
+    `;
+    
+    res.json({
+      success: true,
+      links: links.map(link => ({
+        id: link.id,
+        chatId: link.chat_id,
+        shareToken: link.share_token,
+        title: link.title || link.chat_title,
+        expiresAt: link.expires_at,
+        accessCount: link.access_count,
+        isActive: link.is_active,
+        createdAt: link.created_at,
+        chatTitle: link.chat_title,
+        shareUrl: `${req.protocol}://${req.get('host')}/shared/${link.share_token}`
+      }))
+    });
+  } catch (error) {
+    console.error('Errore recupero link condivisi:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero dei link condivisi',
+      error: error.message
+    });
+  }
+});
+
+// Crea un nuovo link condiviso
+app.post('/api/shared-links', authenticateToken, async (req, res) => {
+  try {
+    await ensureSharedLinksTable();
+    
+    const { chatId, title, expiresInDays } = req.body;
+    
+    if (!chatId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chat ID obbligatorio'
+      });
+    }
+    
+    // Verifica che la chat appartenga all'utente
+    const chat = await sql`
+      SELECT id, title FROM chats WHERE id = ${chatId} AND user_id = ${req.user.id}
+    `;
+    
+    if (chat.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat non trovata'
+      });
+    }
+    
+    // Genera token unico
+    const shareToken = randomBytes(32).toString('hex');
+    const linkId = randomBytes(16).toString('hex');
+    
+    // Calcola data di scadenza
+    let expiresAt = null;
+    if (expiresInDays && expiresInDays > 0) {
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+    }
+    
+    await sql`
+      INSERT INTO shared_links (
+        id, user_id, chat_id, share_token, title, expires_at
+      )
+      VALUES (
+        ${linkId}, ${req.user.id}, ${chatId}, ${shareToken},
+        ${title || chat[0].title}, ${expiresAt}
+      )
+    `;
+    
+    const baseUrl = req.protocol + '://' + req.get('host');
+    
+    res.json({
+      success: true,
+      link: {
+        id: linkId,
+        chatId,
+        shareToken,
+        title: title || chat[0].title,
+        expiresAt,
+        shareUrl: `${baseUrl}/shared/${shareToken}`
+      }
+    });
+  } catch (error) {
+    console.error('Errore creazione link condiviso:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nella creazione del link condiviso',
+      error: error.message
+    });
+  }
+});
+
+// Elimina un link condiviso
+app.delete('/api/shared-links/:linkId', authenticateToken, async (req, res) => {
+  try {
+    const { linkId } = req.params;
+    
+    // Verifica che il link appartenga all'utente
+    const link = await sql`
+      SELECT id FROM shared_links WHERE id = ${linkId} AND user_id = ${req.user.id}
+    `;
+    
+    if (link.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Link non trovato'
+      });
+    }
+    
+    await sql`DELETE FROM shared_links WHERE id = ${linkId}`;
+    
+    res.json({
+      success: true,
+      message: 'Link eliminato con successo'
+    });
+  } catch (error) {
+    console.error('Errore eliminazione link:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'eliminazione del link',
+      error: error.message
+    });
+  }
+});
+
+// Ottieni una chat condivisa tramite token (pubblico, non richiede autenticazione)
+app.get('/api/shared/:token', async (req, res) => {
+  try {
+    await ensureSharedLinksTable();
+    
+    const { token } = req.params;
+    
+    const link = await sql`
+      SELECT 
+        sl.*,
+        c.title as chat_title,
+        c.id as chat_id
+      FROM shared_links sl
+      JOIN chats c ON sl.chat_id = c.id
+      WHERE sl.share_token = ${token}
+        AND sl.is_active = TRUE
+        AND (sl.expires_at IS NULL OR sl.expires_at > NOW())
+    `;
+    
+    if (link.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Link non valido o scaduto'
+      });
+    }
+    
+    // Incrementa contatore accessi
+    await sql`
+      UPDATE shared_links 
+      SET access_count = access_count + 1
+      WHERE id = ${link[0].id}
+    `;
+    
+    // Ottieni i messaggi della chat
+    const messages = await sql`
+      SELECT id, type, content, hidden, timestamp
+      FROM messages
+      WHERE chat_id = ${link[0].chat_id}
+        AND hidden = FALSE
+      ORDER BY timestamp ASC
+    `;
+    
+    res.json({
+      success: true,
+      chat: {
+        id: link[0].chat_id,
+        title: link[0].title || link[0].chat_title,
+        messages: messages.map(m => ({
+          id: m.id,
+          type: m.type,
+          content: m.content,
+          timestamp: m.timestamp
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Errore recupero chat condivisa:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero della chat condivisa',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT LINK CONDIVISI ====================
+
+// ==================== ENDPOINT ESPORTAZIONE DATI ====================
+
+// Crea tabella data_exports se non esiste
+async function ensureDataExportsTable() {
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS data_exports (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        export_token VARCHAR(255) UNIQUE NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'ready', 'expired'
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_data_exports_user_id ON data_exports(user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_data_exports_token ON data_exports(export_token)`;
+    return true;
+  } catch (error) {
+    console.error('Errore creazione tabella data_exports:', error);
+    return false;
+  }
+}
+
+// Crea una richiesta di esportazione dati
+app.post('/api/data/export', authenticateToken, async (req, res) => {
+  try {
+    await ensureDataExportsTable();
+    
+    // Genera token unico per l'export
+    const exportToken = randomBytes(32).toString('hex');
+    const exportId = randomBytes(16).toString('hex');
+    
+    // Il link sarà valido per 7 giorni
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    
+    await sql`
+      INSERT INTO data_exports (id, user_id, export_token, expires_at, status)
+      VALUES (${exportId}, ${req.user.id}, ${exportToken}, ${expiresAt}, 'ready')
+    `;
+    
+    const baseUrl = req.protocol + '://' + req.get('host');
+    
+    res.json({
+      success: true,
+      exportToken,
+      downloadUrl: `${baseUrl}/api/data/export/${exportToken}`,
+      expiresAt: expiresAt.toISOString()
+    });
+  } catch (error) {
+    console.error('Errore creazione export:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nella creazione dell\'export',
+      error: error.message
+    });
+  }
+});
+
+// Scarica i dati esportati
+app.get('/api/data/export/:token', async (req, res) => {
+  try {
+    await ensureDataExportsTable();
+    
+    const { token } = req.params;
+    const authHeader = req.headers['authorization'];
+    const authToken = authHeader && authHeader.split(' ')[1];
+    
+    if (!authToken) {
+      return res.status(401).json({ success: false, message: 'Token di autenticazione richiesto' });
+    }
+    
+    // Verifica il token JWT
+    let userId;
+    try {
+      const decoded = jwt.verify(authToken, JWT_SECRET);
+      const sessions = await sql`
+        SELECT s.user_id FROM sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.token = ${authToken}
+          AND s.expires_at > NOW()
+          AND u.is_active = true
+      `;
+      if (sessions.length === 0) {
+        return res.status(401).json({ success: false, message: 'Sessione non valida' });
+      }
+      userId = sessions[0].user_id;
+    } catch (error) {
+      return res.status(401).json({ success: false, message: 'Token non valido' });
+    }
+    
+    // Verifica che l'export appartenga all'utente e sia valido
+    const exportRecord = await sql`
+      SELECT * FROM data_exports
+      WHERE export_token = ${token}
+        AND user_id = ${userId}
+        AND expires_at > NOW()
+        AND status = 'ready'
+    `;
+    
+    if (exportRecord.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Export non trovato o scaduto'
+      });
+    }
+    
+    // Recupera tutti i dati dell'utente
+    const [user] = await sql`SELECT id, email, username, created_at FROM users WHERE id = ${userId}`;
+    const [settings] = await sql`SELECT * FROM user_settings WHERE user_id = ${userId}`;
+    const [subscription] = await sql`
+      SELECT * FROM subscriptions 
+      WHERE user_id = ${userId} 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `;
+    
+    const chats = await sql`
+      SELECT 
+        c.id,
+        c.title,
+        c.project_id,
+        c.created_at,
+        c.updated_at,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', m.id,
+              'type', m.type,
+              'content', m.content,
+              'hidden', m.hidden,
+              'timestamp', m.timestamp
+            ) ORDER BY m.timestamp
+          ) FILTER (WHERE m.id IS NOT NULL),
+          '[]'::json
+        ) as messages
+      FROM chats c
+      LEFT JOIN messages m ON c.id = m.chat_id
+      WHERE c.user_id = ${userId}
+        AND c.is_temporary = false
+      GROUP BY c.id, c.title, c.project_id, c.created_at, c.updated_at
+      ORDER BY c.updated_at DESC
+    `;
+    
+    const projects = await sql`
+      SELECT * FROM projects WHERE user_id = ${userId} ORDER BY created_at DESC
+    `;
+    
+    const exportData = {
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        createdAt: user.created_at
+      },
+      settings: settings || null,
+      subscription: subscription || null,
+      chats: chats.map(chat => ({
+        id: chat.id,
+        title: chat.title,
+        projectId: chat.project_id,
+        messages: chat.messages || [],
+        createdAt: chat.created_at,
+        updatedAt: chat.updated_at
+      })),
+      projects: projects.map(project => ({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        color: project.color,
+        icon: project.icon,
+        createdAt: project.created_at,
+        updatedAt: project.updated_at
+      })),
+      exportDate: new Date().toISOString(),
+      exportToken: token
+    };
+    
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="nebula-ai-export-${Date.now()}.json"`);
+    res.json(exportData);
+  } catch (error) {
+    console.error('Errore download export:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel download dell\'export',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT ESPORTAZIONE DATI ====================
+
+// ==================== ENDPOINT ELIMINAZIONE CHAT ====================
+
+// Elimina tutte le chat dell'utente
+app.delete('/api/chat', authenticateToken, async (req, res) => {
+  try {
+    // Elimina tutte le chat dell'utente (i messaggi verranno eliminati automaticamente per CASCADE)
+    const result = await sql`
+      DELETE FROM chats 
+      WHERE user_id = ${req.user.id}
+        AND is_temporary = false
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Tutte le chat sono state eliminate con successo',
+      deletedCount: result.count || 0
+    });
+  } catch (error) {
+    console.error('Errore eliminazione chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'eliminazione delle chat',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT ELIMINAZIONE CHAT ====================
+
 app.listen(PORT, () => {
-  console.log('\n' + '='.repeat(60));
-  console.log(`🚀 Server API avviato su http://localhost:${PORT}`);
-  console.log(`📅 Data avvio: ${new Date().toISOString()}`);
-  console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Database: ${connectionString ? '✅ Configurato' : '❌ Non configurato'}`);
-  console.log('='.repeat(60));
-  console.log(`\n📊 Endpoint disponibili:`);
-  console.log(`   GET  /api/db/test - Test connessione`);
-  console.log(`   GET  /api/db/info - Informazioni database`);
-  console.log(`   POST /api/db/query - Esegui query SELECT`);
-  console.log(`   POST /api/auth/register - Registrazione`);
-  console.log(`   POST /api/auth/login - Login`);
-  console.log(`   GET  /api/auth/me - Verifica sessione`);
-  console.log(`   POST /api/auth/logout - Logout`);
-  console.log(`   GET  /api/chat - Ottieni chat utente`);
-  console.log(`   POST /api/chat - Salva chat`);
-  console.log(`   DELETE /api/chat/:id - Elimina chat`);
-  console.log(`   PATCH /api/chat/:id - Aggiorna chat`);
-  console.log(`   GET  /api/user/settings - Ottieni impostazioni utente`);
-  console.log(`   PATCH /api/user/settings - Aggiorna impostazioni utente`);
-  console.log(`   GET  /api/user/subscription - Ottieni abbonamento utente`);
-  console.log(`   POST /api/user/subscription - Crea/aggiorna abbonamento`);
-  console.log(`   DELETE /api/user/subscription/:id - Cancella abbonamento`);
-  console.log(`   GET  /api/user/payments - Ottieni storico pagamenti`);
-  console.log('\n' + '='.repeat(60));
-  console.log('✅ Server pronto a ricevere richieste\n');
+  if (isDevelopment) {
+    log('\n' + '='.repeat(60));
+    log(`🚀 Server API avviato su http://localhost:${PORT}`);
+    log(`📅 Data avvio: ${new Date().toISOString()}`);
+    log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    log(`📊 Database: ${connectionString ? '✅ Configurato' : '❌ Non configurato'}`);
+    log('='.repeat(60));
+    log(`\n📊 Endpoint disponibili:`);
+    log(`   GET  /api/db/test - Test connessione`);
+    log(`   GET  /api/db/info - Informazioni database`);
+    log(`   POST /api/db/query - Esegui query SELECT`);
+    log(`   POST /api/auth/register - Registrazione`);
+    log(`   POST /api/auth/login - Login`);
+    log(`   GET  /api/auth/me - Verifica sessione`);
+    log(`   POST /api/auth/logout - Logout`);
+    log(`   GET  /api/chat - Ottieni chat utente`);
+    log(`   POST /api/chat - Salva chat`);
+    log(`   DELETE /api/chat/:id - Elimina chat`);
+    log(`   PATCH /api/chat/:id - Aggiorna chat`);
+    log(`   GET  /api/user/settings - Ottieni impostazioni utente`);
+    log(`   PATCH /api/user/settings - Aggiorna impostazioni utente`);
+    log(`   GET  /api/user/subscription - Ottieni abbonamento utente`);
+    log(`   POST /api/user/subscription - Crea/aggiorna abbonamento`);
+    log(`   DELETE /api/user/subscription/:id - Cancella abbonamento`);
+    log(`   GET  /api/user/payments - Ottieni storico pagamenti`);
+    log('\n' + '='.repeat(60));
+    log('✅ Server pronto a ricevere richieste\n');
+  } else {
+    // In produzione, solo log essenziale
+    console.log(`🚀 Server API avviato su porta ${PORT}`);
+  }
 });
 

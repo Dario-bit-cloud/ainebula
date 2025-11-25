@@ -6,6 +6,7 @@ import {
   alertDialogState, 
   promptDialogState 
 } from '../stores/app.js';
+import { t } from '../utils/i18n.js';
 
 /**
  * Mostra un dialog di conferma personalizzato
@@ -16,7 +17,7 @@ import {
  * @param {string} type - Tipo: 'default', 'danger', 'warning' (opzionale)
  * @returns {Promise<boolean>} - true se confermato, false se annullato
  */
-export function showConfirm(message, title = 'Conferma', confirmText = 'Conferma', cancelText = 'Annulla', type = 'default') {
+export function showConfirm(message, title = t('confirm'), confirmText = t('confirm'), cancelText = t('cancel'), type = 'default') {
   return new Promise((resolve) => {
     confirmDialogState.set({
       isOpen: true,
@@ -38,7 +39,7 @@ export function showConfirm(message, title = 'Conferma', confirmText = 'Conferma
  * @param {string} type - Tipo: 'info', 'success', 'error', 'warning' (opzionale)
  * @returns {Promise<void>}
  */
-export function showAlert(message, title = 'Avviso', buttonText = 'OK', type = 'info') {
+export function showAlert(message, title = t('warning'), buttonText = t('ok'), type = 'info') {
   return new Promise((resolve) => {
     alertDialogState.set({
       isOpen: true,
@@ -62,7 +63,7 @@ export function showAlert(message, title = 'Avviso', buttonText = 'OK', type = '
  * @param {string} type - Tipo input: 'text', 'password', 'textarea' (opzionale)
  * @returns {Promise<string|null>} - Valore inserito o null se annullato
  */
-export function showPrompt(message, title = 'Input', defaultValue = '', placeholder = '', confirmText = 'Conferma', cancelText = 'Annulla', type = 'text') {
+export function showPrompt(message, title = t('confirm'), defaultValue = '', placeholder = '', confirmText = t('confirm'), cancelText = t('cancel'), type = 'text') {
   return new Promise((resolve) => {
     promptDialogState.set({
       isOpen: true,

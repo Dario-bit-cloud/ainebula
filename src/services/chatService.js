@@ -327,3 +327,33 @@ export async function updateChatInDatabase(chatId, updates) {
   }
 }
 
+/**
+ * Elimina tutte le chat dell'utente dal database
+ */
+export async function deleteAllChatsFromDatabase() {
+  try {
+    const token = localStorage.getItem('auth_token');
+    
+    if (!token) {
+      return { success: false, message: 'Non autenticato' };
+    }
+    
+    const response = await fetch(API_BASE_URL, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Errore nella comunicazione con il server',
+      error: error.message
+    };
+  }
+}
+

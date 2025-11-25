@@ -6,6 +6,7 @@
   import { isAuthenticatedStore, isLoading } from '../stores/auth.js';
   import { createEventDispatcher } from 'svelte';
   import { onMount } from 'svelte';
+  import { t } from '../utils/i18n.js';
   
   const dispatch = createEventDispatcher();
   
@@ -113,7 +114,7 @@
 <div class="top-bar">
   <div class="left-section">
     {#if $isMobile}
-      <button class="menu-toggle" on:click={toggleSidebar} title="Menu">
+      <button class="menu-toggle" on:click={toggleSidebar} title={t('menu')}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="3" y1="6" x2="21" y2="6"/>
           <line x1="3" y1="12" x2="21" y2="12"/>
@@ -152,7 +153,7 @@
                 class:premium={model.premium}
                 class:disabled={model.premium && !hasPlanOrHigher(model.requiredPlan)}
                 on:click={() => selectModel(model.id)}
-                title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? 'Richiede abbonamento ' + (model.requiredPlan === 'pro' ? 'Pro' : 'Massimo') : ''}
+                title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? t('requiresSubscription', { plan: model.requiredPlan === 'pro' ? t('pro') : t('max') }) : ''}
               >
                 <div class="model-info">
                   <div class="model-name">

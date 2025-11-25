@@ -3,18 +3,9 @@
   import TopBar from './components/TopBar.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import MainArea from './components/MainArea.svelte';
-  import SettingsModal from './components/SettingsModal.svelte';
-  import InviteModal from './components/InviteModal.svelte';
-  import ProjectModal from './components/ProjectModal.svelte';
   import UserMenu from './components/UserMenu.svelte';
-  import PremiumModal from './components/PremiumModal.svelte';
-  import AISettingsModal from './components/AISettingsModal.svelte';
-  import PromptLibraryModal from './components/PromptLibraryModal.svelte';
-  import ShortcutsModal from './components/ShortcutsModal.svelte';
-  import ReportBugModal from './components/ReportBugModal.svelte';
-  import PersonalizationModal from './components/PersonalizationModal.svelte';
-  import AuthModal from './components/AuthModal.svelte';
-  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen } from './stores/app.js';
+  // Lazy load modals per ridurre il bundle iniziale
+  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen } from './stores/app.js';
   import { initAuth, user, isAuthenticatedStore, isLoading } from './stores/auth.js';
   import { logout } from './services/authService.js';
   import { clearUser } from './stores/auth.js';
@@ -22,6 +13,106 @@
   import { get } from 'svelte/store';
   import { currentChatId } from './stores/chat.js';
   import { isInputElement } from './utils/shortcuts.js';
+  import { showConfirm } from './services/dialogService.js';
+  
+  // Lazy load modals
+  let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
+  let PromptLibraryModal, ShortcutsModal, ReportBugModal, PersonalizationModal, AuthModal, SharedLinksModal;
+  // Dialog components (always loaded)
+  import ConfirmDialog from './components/ConfirmDialog.svelte';
+  import AlertDialog from './components/AlertDialog.svelte';
+  import PromptDialog from './components/PromptDialog.svelte';
+  
+  // Carica modals solo quando necessario
+  async function loadSettingsModal() {
+    if (!SettingsModal) {
+      const module = await import('./components/SettingsModal.svelte');
+      SettingsModal = module.default;
+    }
+  }
+  
+  async function loadInviteModal() {
+    if (!InviteModal) {
+      const module = await import('./components/InviteModal.svelte');
+      InviteModal = module.default;
+    }
+  }
+  
+  async function loadProjectModal() {
+    if (!ProjectModal) {
+      const module = await import('./components/ProjectModal.svelte');
+      ProjectModal = module.default;
+    }
+  }
+  
+  async function loadPremiumModal() {
+    if (!PremiumModal) {
+      const module = await import('./components/PremiumModal.svelte');
+      PremiumModal = module.default;
+    }
+  }
+  
+  async function loadAISettingsModal() {
+    if (!AISettingsModal) {
+      const module = await import('./components/AISettingsModal.svelte');
+      AISettingsModal = module.default;
+    }
+  }
+  
+  async function loadPromptLibraryModal() {
+    if (!PromptLibraryModal) {
+      const module = await import('./components/PromptLibraryModal.svelte');
+      PromptLibraryModal = module.default;
+    }
+  }
+  
+  async function loadShortcutsModal() {
+    if (!ShortcutsModal) {
+      const module = await import('./components/ShortcutsModal.svelte');
+      ShortcutsModal = module.default;
+    }
+  }
+  
+  async function loadReportBugModal() {
+    if (!ReportBugModal) {
+      const module = await import('./components/ReportBugModal.svelte');
+      ReportBugModal = module.default;
+    }
+  }
+  
+  async function loadPersonalizationModal() {
+    if (!PersonalizationModal) {
+      const module = await import('./components/PersonalizationModal.svelte');
+      PersonalizationModal = module.default;
+    }
+  }
+  
+  async function loadAuthModal() {
+    if (!AuthModal) {
+      const module = await import('./components/AuthModal.svelte');
+      AuthModal = module.default;
+    }
+  }
+  
+  async function loadSharedLinksModal() {
+    if (!SharedLinksModal) {
+      const module = await import('./components/SharedLinksModal.svelte');
+      SharedLinksModal = module.default;
+    }
+  }
+  
+  // Precarica modals quando vengono aperti
+  $: if ($isSettingsOpen) loadSettingsModal();
+  $: if ($isInviteModalOpen) loadInviteModal();
+  $: if ($isSharedLinksModalOpen) loadSharedLinksModal();
+  $: if ($isProjectModalOpen) loadProjectModal();
+  $: if ($isPremiumModalOpen) loadPremiumModal();
+  $: if ($isShortcutsModalOpen) loadShortcutsModal();
+  $: if ($isAISettingsModalOpen) loadAISettingsModal();
+  $: if ($isPromptLibraryModalOpen) loadPromptLibraryModal();
+  $: if ($isReportBugModalOpen) loadReportBugModal();
+  $: if ($isPersonalizationModalOpen) loadPersonalizationModal();
+  $: if ($isAuthModalOpen) loadAuthModal();
   
   function handlePromptSelect(event) {
     selectedPrompt.set(event.detail);
@@ -90,8 +181,12 @@
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Backspace') {
       event.preventDefault();
       const chatId = get(currentChatId);
-      if (chatId && confirm('Sei sicuro di voler eliminare questa chat?')) {
-        deleteChat(chatId); // Non await per non bloccare
+      if (chatId) {
+        showConfirm('Sei sicuro di voler eliminare questa chat?', 'Elimina chat', 'Elimina', 'Annulla', 'danger').then(confirmed => {
+          if (confirmed) {
+            deleteChat(chatId); // Non await per non bloccare
+          }
+        });
       }
       return;
     }
@@ -207,19 +302,45 @@
     <Sidebar />
     <MainArea />
   </div>
-  <SettingsModal />
-  <InviteModal />
-  <ProjectModal />
   <UserMenu />
-  <PremiumModal />
-  <AISettingsModal />
-  <PromptLibraryModal on:select={handlePromptSelect} />
-  <ShortcutsModal />
-  <ReportBugModal />
-  <PersonalizationModal />
-  {#if $isAuthModalOpen}
-    <AuthModal initialMode={authModalMode} on:close={() => isAuthModalOpen.set(false)} />
+  {#if $isSettingsOpen && SettingsModal}
+    <svelte:component this={SettingsModal} />
   {/if}
+  {#if $isInviteModalOpen && InviteModal}
+    <svelte:component this={InviteModal} />
+  {/if}
+  {#if $isProjectModalOpen && ProjectModal}
+    <svelte:component this={ProjectModal} />
+  {/if}
+  {#if $isPremiumModalOpen && PremiumModal}
+    <svelte:component this={PremiumModal} />
+  {/if}
+  {#if $isAISettingsModalOpen && AISettingsModal}
+    <svelte:component this={AISettingsModal} />
+  {/if}
+  {#if $isPromptLibraryModalOpen && PromptLibraryModal}
+    <svelte:component this={PromptLibraryModal} on:select={handlePromptSelect} />
+  {/if}
+  {#if $isShortcutsModalOpen && ShortcutsModal}
+    <svelte:component this={ShortcutsModal} />
+  {/if}
+  {#if $isReportBugModalOpen && ReportBugModal}
+    <svelte:component this={ReportBugModal} />
+  {/if}
+  {#if $isPersonalizationModalOpen && PersonalizationModal}
+    <svelte:component this={PersonalizationModal} />
+  {/if}
+  {#if $isAuthModalOpen && AuthModal}
+    <svelte:component this={AuthModal} initialMode={authModalMode} on:close={() => isAuthModalOpen.set(false)} />
+  {/if}
+  {#if $isSharedLinksModalOpen && SharedLinksModal}
+    <svelte:component this={SharedLinksModal} />
+  {/if}
+  
+  <!-- Dialog components -->
+  <ConfirmDialog />
+  <AlertDialog />
+  <PromptDialog />
 </div>
 
 <style>

@@ -15,14 +15,14 @@
 }
 
 :root {
-  --bg-primary: #171717;
-  --bg-secondary: #1f1f1f;
-  --bg-tertiary: #2a2a2a;
+  --bg-primary: #0f0f0f;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #252525;
   --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --border-color: #3a3a3a;
-  --hover-bg: #2a2a2a;
-  --input-bg: #2a2a2a;
+  --text-secondary: #d0d0d0;
+  --border-color: #404040;
+  --hover-bg: #2d2d2d;
+  --input-bg: #252525;
   --accent-blue: #3b82f6;
   
   /* Transizioni globali */

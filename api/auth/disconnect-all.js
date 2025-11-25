@@ -1,4 +1,4 @@
-// API Route per verificare sessione su Vercel
+// API Route per disconnettere da tutti i dispositivi su Vercel
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
 
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
@@ -32,11 +32,16 @@ export default async function handler(req, res) {
     }
 
     // Verifica il token JWT
-    const decoded = jwt.verify(token, JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (jwtError) {
+      return res.status(403).json({ success: false, message: 'Token non valido' });
+    }
 
-    // Verifica che la sessione esista nel database
+    // Verifica che la sessione esista nel database e ottieni l'user_id
     const sessions = await sql`
-      SELECT s.*, u.id as user_id, u.email, u.username, u.phone_number, u.is_active
+      SELECT s.*, u.id as user_id, u.is_active
       FROM sessions s
       JOIN users u ON s.user_id = u.id
       WHERE s.token = ${token}
@@ -50,50 +55,26 @@ export default async function handler(req, res) {
 
     const userId = sessions[0].user_id;
 
-    // Carica l'abbonamento attivo dell'utente
-    const subscriptions = await sql`
-      SELECT * FROM subscriptions 
+    // Elimina tutte le sessioni dell'utente tranne quella corrente
+    const result = await sql`
+      DELETE FROM sessions 
       WHERE user_id = ${userId} 
-        AND status = 'active'
-        AND (expires_at IS NULL OR expires_at > NOW())
-      ORDER BY started_at DESC
-      LIMIT 1
+        AND token != ${token}
     `;
 
-    let subscription = null;
-    if (subscriptions.length > 0) {
-      const sub = subscriptions[0];
-      subscription = {
-        active: true,
-        plan: sub.plan,
-        expiresAt: sub.expires_at ? sub.expires_at.toISOString() : null,
-        startedAt: sub.started_at ? sub.started_at.toISOString() : null,
-        autoRenew: sub.auto_renew || false,
-        status: sub.status
-      };
-    } else {
-      subscription = {
-        active: false,
-        plan: null,
-        expiresAt: null,
-        startedAt: null,
-        autoRenew: false,
-        status: 'inactive'
-      };
-    }
+    console.log(`✓ Disconnessione da tutti i dispositivi per userId=${userId} (sessione corrente mantenuta)`);
 
     res.json({
       success: true,
-      user: {
-        id: userId,
-        email: sessions[0].email,
-        username: sessions[0].username,
-        phone_number: sessions[0].phone_number || null,
-        subscription: subscription
-      }
+      message: 'Disconnessione da tutti i dispositivi completata. La sessione corrente è stata mantenuta.'
     });
   } catch (error) {
-    return res.status(403).json({ success: false, message: 'Token non valido' });
+    console.error('✗ Errore durante disconnessione da tutti i dispositivi:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la disconnessione da tutti i dispositivi',
+      error: error.message
+    });
   }
 }
 
