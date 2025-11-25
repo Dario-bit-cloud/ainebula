@@ -2,16 +2,28 @@
 
 // Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
-  // In produzione, usa l'URL relativo o quello del server
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+    
     // Se siamo su localhost, usa localhost:3001
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3001/api/auth';
     }
-    // Altrimenti usa lo stesso hostname con porta 3001 o URL assoluto
-    // Per Vercel/produzione, potrebbe essere necessario un URL diverso
-    return `${window.location.protocol}//${hostname}:3001/api/auth`;
+    
+    // In produzione, controlla se c'è una variabile d'ambiente per il backend
+    // Se il backend è deployato separatamente (es. Railway, Render), usa quella URL
+    const backendUrl = import.meta.env.VITE_API_BASE_URL;
+    
+    if (backendUrl) {
+      // Se c'è una variabile d'ambiente configurata, usala
+      console.log('🔧 [AUTH SERVICE] Usando backend URL da variabile d\'ambiente:', backendUrl);
+      return `${backendUrl}/api/auth`;
+    }
+    
+    // Altrimenti, per Vercel, usa URL relativo
+    // NOTA: Questo funziona solo se le API routes sono deployate su Vercel
+    // Se il backend è separato, devi configurare VITE_API_BASE_URL
+    return '/api/auth';
   }
   return 'http://localhost:3001/api/auth';
 };
