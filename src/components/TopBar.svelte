@@ -197,12 +197,13 @@
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
         </svg>
       </button>
-      <button class="icon-button" title="Impostazioni AI" on:click={toggleAISettings}>
+      <!-- Impostazioni AI nascoste per evitare modifiche alla temperatura -->
+      <!-- <button class="icon-button" title="Impostazioni AI" on:click={toggleAISettings}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/>
           <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
         </svg>
-      </button>
+      </button> -->
       <button class="icon-button" title="Impostazioni" on:click={toggleSettings}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/>
