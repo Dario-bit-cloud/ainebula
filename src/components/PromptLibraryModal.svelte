@@ -17,6 +17,7 @@
   };
   
   const categories = ['Tutti', 'Sviluppo', 'Comunicazione', 'Educazione', 'Creatività', 'Business', 'Produttività', 'Linguistica', 'Scrittura', 'Personalizzato'];
+  const promptPlaceholder = 'Contenuto del prompt (usa {nome_variabile} per variabili dinamiche)';
   
   $: filteredTemplates = $promptTemplates.filter(t => {
     const matchesCategory = selectedCategory === 'Tutti' || t.category === selectedCategory;
@@ -136,7 +137,7 @@
             />
             <textarea
               class="form-textarea"
-              placeholder="Contenuto del prompt (usa {nome_variabile} per variabili dinamiche)"
+              placeholder={promptPlaceholder}
               bind:value={newPrompt.prompt}
               rows="6"
             ></textarea>

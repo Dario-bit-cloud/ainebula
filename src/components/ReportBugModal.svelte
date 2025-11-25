@@ -130,7 +130,7 @@
         </div>
         
         <div class="disclaimer">
-          Qualsiasi informazione condivisa potrebbe essere esaminata per contribuire al miglioramento di Nebula AI. Se hai domande, <a href="#" class="support-link">contatta l'assistenza</a>.
+          Qualsiasi informazione condivisa potrebbe essere esaminata per contribuire al miglioramento di Nebula AI. Se hai domande, <button type="button" class="support-link" style="background: none; border: none; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; font: inherit;">contatta l'assistenza</button>.
         </div>
         
         <div class="screenshot-section">
