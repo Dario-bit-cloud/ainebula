@@ -1114,6 +1114,288 @@ app.patch('/api/chat/:chatId', authenticateToken, async (req, res) => {
 
 // ==================== FINE ENDPOINT CHAT ====================
 
+// ==================== ENDPOINT PROGETTI ====================
+
+// Ottieni tutti i progetti dell'utente
+app.get('/api/projects', authenticateToken, async (req, res) => {
+  try {
+    const projects = await sql`
+      SELECT 
+        id,
+        name,
+        description,
+        color,
+        icon,
+        created_at,
+        updated_at
+      FROM projects
+      WHERE user_id = ${req.user.id}
+      ORDER BY updated_at DESC
+    `;
+    
+    const formattedProjects = projects.map(project => ({
+      id: project.id,
+      name: project.name,
+      description: project.description || '',
+      color: project.color,
+      icon: project.icon,
+      createdAt: project.created_at,
+      updatedAt: project.updated_at
+    }));
+    
+    res.json({
+      success: true,
+      projects: formattedProjects
+    });
+  } catch (error) {
+    console.error('Errore recupero progetti:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero dei progetti',
+      error: error.message
+    });
+  }
+});
+
+// Ottieni un singolo progetto
+app.get('/api/projects/:projectId', authenticateToken, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    const projects = await sql`
+      SELECT 
+        id,
+        name,
+        description,
+        color,
+        icon,
+        created_at,
+        updated_at
+      FROM projects
+      WHERE id = ${projectId} AND user_id = ${req.user.id}
+    `;
+    
+    if (projects.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Progetto non trovato'
+      });
+    }
+    
+    const project = projects[0];
+    res.json({
+      success: true,
+      project: {
+        id: project.id,
+        name: project.name,
+        description: project.description || '',
+        color: project.color,
+        icon: project.icon,
+        createdAt: project.created_at,
+        updatedAt: project.updated_at
+      }
+    });
+  } catch (error) {
+    console.error('Errore recupero progetto:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero del progetto',
+      error: error.message
+    });
+  }
+});
+
+// Salva un progetto
+app.post('/api/projects', authenticateToken, async (req, res) => {
+  try {
+    const { id, name, description, color, icon } = req.body;
+    
+    if (!id || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID e nome sono obbligatori'
+      });
+    }
+    
+    // Verifica se il progetto esiste già
+    const existingProject = await sql`
+      SELECT id FROM projects WHERE id = ${id} AND user_id = ${req.user.id}
+    `;
+    
+    if (existingProject.length > 0) {
+      // Aggiorna il progetto esistente
+      await sql`
+        UPDATE projects 
+        SET name = ${name}, 
+            description = ${description || null}, 
+            color = ${color || null}, 
+            icon = ${icon || null},
+            updated_at = NOW()
+        WHERE id = ${id} AND user_id = ${req.user.id}
+      `;
+    } else {
+      // Crea un nuovo progetto
+      await sql`
+        INSERT INTO projects (id, user_id, name, description, color, icon, created_at, updated_at)
+        VALUES (${id}, ${req.user.id}, ${name}, ${description || null}, ${color || null}, ${icon || null}, NOW(), NOW())
+      `;
+    }
+    
+    // Recupera il progetto salvato
+    const savedProject = await sql`
+      SELECT id, name, description, color, icon, created_at, updated_at
+      FROM projects
+      WHERE id = ${id} AND user_id = ${req.user.id}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Progetto salvato con successo',
+      project: {
+        id: savedProject[0].id,
+        name: savedProject[0].name,
+        description: savedProject[0].description || '',
+        color: savedProject[0].color,
+        icon: savedProject[0].icon,
+        createdAt: savedProject[0].created_at,
+        updatedAt: savedProject[0].updated_at
+      }
+    });
+  } catch (error) {
+    console.error('Errore salvataggio progetto:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel salvataggio del progetto',
+      error: error.message
+    });
+  }
+});
+
+// Aggiorna un progetto
+app.patch('/api/projects/:projectId', authenticateToken, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { name, description, color, icon } = req.body;
+    
+    // Verifica che il progetto esista e appartenga all'utente
+    const existingProject = await sql`
+      SELECT id FROM projects WHERE id = ${projectId} AND user_id = ${req.user.id}
+    `;
+    
+    if (existingProject.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Progetto non trovato'
+      });
+    }
+    
+    // Costruisci la query di aggiornamento dinamicamente
+    const updateFields = [];
+    
+    if (name !== undefined) {
+      updateFields.push(sql`name = ${name}`);
+    }
+    if (description !== undefined) {
+      updateFields.push(sql`description = ${description}`);
+    }
+    if (color !== undefined) {
+      updateFields.push(sql`color = ${color}`);
+    }
+    if (icon !== undefined) {
+      updateFields.push(sql`icon = ${icon}`);
+    }
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nessun campo da aggiornare'
+      });
+    }
+    
+    // Aggiorna il progetto
+    const updateClause = sql.join(updateFields, sql`, `);
+    await sql`
+      UPDATE projects 
+      SET ${updateClause}, updated_at = NOW()
+      WHERE id = ${projectId} AND user_id = ${req.user.id}
+    `;
+    
+    // Recupera il progetto aggiornato
+    const updatedProject = await sql`
+      SELECT id, name, description, color, icon, created_at, updated_at
+      FROM projects
+      WHERE id = ${projectId} AND user_id = ${req.user.id}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Progetto aggiornato con successo',
+      project: {
+        id: updatedProject[0].id,
+        name: updatedProject[0].name,
+        description: updatedProject[0].description || '',
+        color: updatedProject[0].color,
+        icon: updatedProject[0].icon,
+        createdAt: updatedProject[0].created_at,
+        updatedAt: updatedProject[0].updated_at
+      }
+    });
+  } catch (error) {
+    console.error('Errore aggiornamento progetto:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'aggiornamento del progetto',
+      error: error.message
+    });
+  }
+});
+
+// Elimina un progetto
+app.delete('/api/projects/:projectId', authenticateToken, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    // Verifica che il progetto esista e appartenga all'utente
+    const existingProject = await sql`
+      SELECT id FROM projects WHERE id = ${projectId} AND user_id = ${req.user.id}
+    `;
+    
+    if (existingProject.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Progetto non trovato'
+      });
+    }
+    
+    // Rimuovi project_id dalle chat associate (imposta a null)
+    await sql`
+      UPDATE chats 
+      SET project_id = NULL 
+      WHERE project_id = ${projectId} AND user_id = ${req.user.id}
+    `;
+    
+    // Elimina il progetto
+    await sql`
+      DELETE FROM projects 
+      WHERE id = ${projectId} AND user_id = ${req.user.id}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Progetto eliminato con successo'
+    });
+  } catch (error) {
+    console.error('Errore eliminazione progetto:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nell\'eliminazione del progetto',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT PROGETTI ====================
+
 // ==================== ENDPOINT IMPOSTAZIONI UTENTE ====================
 
 // Ottieni le impostazioni dell'utente
@@ -1888,6 +2170,11 @@ app.listen(PORT, () => {
     log(`   POST /api/chat - Salva chat`);
     log(`   DELETE /api/chat/:id - Elimina chat`);
     log(`   PATCH /api/chat/:id - Aggiorna chat`);
+    log(`   GET  /api/projects - Ottieni progetti utente`);
+    log(`   GET  /api/projects/:id - Ottieni progetto singolo`);
+    log(`   POST /api/projects - Salva progetto`);
+    log(`   PATCH /api/projects/:id - Aggiorna progetto`);
+    log(`   DELETE /api/projects/:id - Elimina progetto`);
     log(`   GET  /api/user/settings - Ottieni impostazioni utente`);
     log(`   PATCH /api/user/settings - Aggiorna impostazioni utente`);
     log(`   GET  /api/user/subscription - Ottieni abbonamento utente`);
