@@ -162,10 +162,12 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Errore passkey login finish:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Errore durante il login con passkey',
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

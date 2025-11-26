@@ -3,10 +3,6 @@ import { neon } from '@neondatabase/serverless';
 import * as SimpleWebAuthnServer from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { randomBytes } from 'crypto';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
 
 // Configurazione WebAuthn
 const rpId = process.env.WEBAUTHN_RP_ID || 'ainebula.vercel.app';
@@ -109,7 +105,7 @@ export default async function handler(req, res) {
     
     await sql`
       INSERT INTO passkeys (id, user_id, credential_id, public_key, counter, device_name)
-      VALUES (${passkeyId}, ${user.id}, ${credentialId}, ${publicKey}, ${registrationInfo.counter || 0}, ${credential.response.userHandle || 'Unknown Device'})
+      VALUES (${passkeyId}, ${user.id}, ${credentialId}, ${publicKey}, ${registrationInfo.counter || 0}, ${credential.response?.userHandle || 'Unknown Device'})
     `;
     
     challenges.delete(`register:${user.id}`);
@@ -120,10 +116,12 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Errore passkey register finish:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Errore durante la registrazione della passkey',
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

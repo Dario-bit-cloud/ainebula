@@ -1,17 +1,13 @@
-// API Route per iniziare la registrazione passkey su Vercel
+// API Route per iniziare il login con passkey su Vercel
 import { neon } from '@neondatabase/serverless';
 import * as SimpleWebAuthnServer from '@simplewebauthn/server';
-import { randomBytes } from 'crypto';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 
 // Configurazione WebAuthn
 const rpId = process.env.WEBAUTHN_RP_ID || 'ainebula.vercel.app';
-const rpName = process.env.WEBAUTHN_RP_NAME || 'Nebula AI';
 const origin = process.env.WEBAUTHN_ORIGIN || 'https://ainebula.vercel.app';
 
-// Store temporaneo per le challenge (in produzione usa Redis o database)
-// Per ora usiamo un Map in-memory (non ideale per serverless, ma funziona)
+// Store temporaneo per le challenge
 const challenges = new Map();
 
 function getDatabaseConnection() {
@@ -49,7 +45,7 @@ export default async function handler(req, res) {
       });
     }
     
-    // Verifica che l'utente esista
+    // Trova l'utente e le sue passkeys
     const users = await sql`
       SELECT id, username FROM users WHERE username = ${username.toLowerCase()}
     `;
@@ -63,41 +59,44 @@ export default async function handler(req, res) {
     
     const user = users[0];
     
-    // Genera le opzioni di registrazione
-    const opts = await SimpleWebAuthnServer.generateRegistrationOptions({
-      rpName,
+    const passkeys = await sql`
+      SELECT credential_id, counter FROM passkeys WHERE user_id = ${user.id}
+    `;
+    
+    if (passkeys.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Nessuna passkey registrata per questo utente'
+      });
+    }
+    
+    // Genera challenge
+    const opts = await SimpleWebAuthnServer.generateAuthenticationOptions({
       rpID: rpId,
-      userID: user.id,
-      userName: user.username,
-      userDisplayName: user.username,
       timeout: 60000,
-      attestationType: 'none',
-      excludeCredentials: [],
-      authenticatorSelection: {
-        authenticatorAttachment: 'platform',
-        userVerification: 'required',
-        residentKey: 'preferred',
-        requireResidentKey: false
-      },
-      supportedAlgorithmIDs: [-7, -257]
+      allowCredentials: passkeys.map(pk => ({
+        id: isoBase64URL.toBuffer(pk.credential_id),
+        type: 'public-key',
+        transports: ['internal', 'hybrid']
+      })),
+      userVerification: 'preferred'
     });
     
-    // Salva la challenge (usando un timestamp per identificarla)
-    const challengeKey = `register:${user.id}:${Date.now()}`;
-    challenges.set(challengeKey, opts.challenge);
-    // Salva anche con la chiave user.id per recuperarla dopo
-    challenges.set(`register:${user.id}`, opts.challenge);
+    // Salva la challenge
+    challenges.set(`login:${user.id}`, opts.challenge);
     
     res.json({
       success: true,
       options: opts
     });
   } catch (error) {
-    console.error('Errore passkey register start:', error);
+    console.error('Errore passkey login start:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Errore durante la generazione delle opzioni di registrazione',
-      error: error.message
+      message: 'Errore durante la generazione delle opzioni di autenticazione',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

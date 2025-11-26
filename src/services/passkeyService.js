@@ -50,7 +50,7 @@ export async function registerPasskey(username) {
     }
     
     // Inizia la registrazione
-    const startResponse = await fetch(`${API_BASE_URL}/passkey/register/start`, {
+    const startResponse = await fetch(`${API_BASE_URL}/passkey-register-start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -80,7 +80,7 @@ export async function registerPasskey(username) {
     }
     
     // Completa la registrazione
-    const finishResponse = await fetch(`${API_BASE_URL}/passkey/register/finish`, {
+    const finishResponse = await fetch(`${API_BASE_URL}/passkey-register-finish`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -117,7 +117,7 @@ export async function loginWithPasskey(username) {
     }
     
     // Inizia l'autenticazione
-    const startResponse = await fetch(`${API_BASE_URL}/passkey/login/start`, {
+    const startResponse = await fetch(`${API_BASE_URL}/passkey-login-start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -147,7 +147,7 @@ export async function loginWithPasskey(username) {
     }
     
     // Completa il login
-    const finishResponse = await fetch(`${API_BASE_URL}/passkey/login/finish`, {
+    const finishResponse = await fetch(`${API_BASE_URL}/passkey-login-finish`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

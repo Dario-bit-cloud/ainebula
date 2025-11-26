@@ -47,8 +47,11 @@ Per far funzionare l'autenticazione su Vercel, devi configurare le seguenti vari
 Le API routes sono nella cartella `api/`:
 - `api/auth/login.js` - Endpoint per login
 - `api/auth/register.js` - Endpoint per registrazione
-- `api/auth/me.js` - Verifica sessione
-- `api/auth/logout.js` - Logout
+- `api/auth/index.js` - Verifica sessione e altre operazioni
+- `api/auth/passkey/register/start.js` - Inizia registrazione passkey
+- `api/auth/passkey/register/finish.js` - Completa registrazione passkey
+- `api/auth/passkey/login/start.js` - Inizia login con passkey
+- `api/auth/passkey/login/finish.js` - Completa login con passkey
 
 ## 🔧 Configurazione Alternativa: Backend Separato
 
@@ -83,4 +86,10 @@ Dopo il deploy:
 - Verifica che i file siano nella cartella `api/`
 - Controlla che `vercel.json` sia configurato correttamente
 - Rivedi i log di build su Vercel
+
+### Passkeys non funzionano
+- Verifica che `WEBAUTHN_RP_ID` sia impostato su `ainebula.vercel.app`
+- Verifica che `WEBAUTHN_ORIGIN` sia impostato su `https://ainebula.vercel.app`
+- Le passkeys richiedono HTTPS (automatico su Vercel)
+- Verifica che il browser supporti WebAuthn (Chrome, Edge, Firefox, Safari recenti)
 
