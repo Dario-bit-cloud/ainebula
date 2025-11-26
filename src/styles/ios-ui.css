@@ -1,0 +1,488 @@
+/* iOS UI Styles - Liquid Glass Effect - Applicati solo su dispositivi iOS */
+
+.ios-device {
+  /* iOS Color System */
+  --ios-bg-primary: #000000;
+  --ios-bg-secondary: #1c1c1e;
+  --ios-bg-tertiary: #2c2c2e;
+  --ios-text-primary: #ffffff;
+  --ios-text-secondary: #98989d;
+  --ios-accent-blue: #0a84ff;
+  --ios-accent-purple: #af52de;
+  --ios-accent-pink: #ff2d55;
+  
+  /* iOS Liquid Glass - Glassmorphism avanzato */
+  --ios-glass-bg: rgba(28, 28, 30, 0.95);
+  --ios-glass-bg-light: rgba(255, 255, 255, 0.95);
+  --ios-glass-border: rgba(255, 255, 255, 0.15);
+  --ios-glass-border-light: rgba(0, 0, 0, 0.1);
+  --ios-glass-blur: blur(30px) saturate(180%);
+  --ios-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  
+  /* iOS Typography - SF Pro */
+  --ios-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  
+  /* iOS Shape */
+  --ios-radius-small: 10px;
+  --ios-radius-medium: 14px;
+  --ios-radius-large: 20px;
+  --ios-radius-extra-large: 28px;
+  
+  /* iOS Shadows */
+  --ios-shadow-small: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --ios-shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --ios-shadow-large: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+/* Light Mode iOS - Manteniamo comunque scuro per coerenza */
+@media (prefers-color-scheme: light) {
+  .ios-device {
+    --ios-bg-primary: #0a0a0a;
+    --ios-bg-secondary: #141414;
+    --ios-bg-tertiary: #1a1a1a;
+    --ios-text-primary: #ffffff;
+    --ios-text-secondary: #a0a0a0;
+    --ios-glass-bg: rgba(20, 20, 22, 0.75);
+    --ios-glass-border: rgba(255, 255, 255, 0.12);
+  }
+  
+  .ios-device body {
+    background: #0a0a0a !important;
+  }
+}
+
+/* Background principale scuro e monocromatico per far risaltare il glass */
+.ios-device body {
+  background: #0a0a0a !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(255, 255, 255, 0.02) 0%, transparent 50%) !important;
+  background-attachment: fixed !important;
+}
+
+.ios-device .main-area {
+  background: transparent !important;
+}
+
+/* Sidebar con Liquid Glass */
+.ios-device .sidebar {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border-right: 1px solid var(--ios-glass-border) !important;
+  box-shadow: var(--ios-glass-shadow) !important;
+  position: relative;
+}
+
+.ios-device .sidebar-header {
+  background: transparent !important;
+}
+
+.ios-device .sidebar-nav {
+  background: transparent !important;
+}
+
+.ios-device .user-section {
+  background: transparent !important;
+}
+
+.ios-device .sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  pointer-events: none;
+  border-radius: 0;
+}
+
+/* TopBar completamente trasparente su iOS */
+.ios-device .top-bar {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  position: relative;
+}
+
+.ios-device .top-bar .left-section,
+.ios-device .top-bar .center-section,
+.ios-device .top-bar .right-section {
+  background: transparent !important;
+}
+
+/* Pulsanti iOS con glassmorphism e bordi */
+.ios-device .menu-toggle {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-radius-medium) !important;
+  box-shadow: var(--ios-shadow-small) !important;
+}
+
+.ios-device .logo-icon {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-radius-medium) !important;
+  box-shadow: var(--ios-shadow-small) !important;
+}
+
+.ios-device .model-selector {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-radius-medium) !important;
+  box-shadow: var(--ios-shadow-small) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .model-selector:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+}
+
+.ios-device .temporary-chat-button {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-radius-medium) !important;
+  box-shadow: var(--ios-shadow-small) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .temporary-chat-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+}
+
+.ios-device .temporary-chat-button.active {
+  background: rgba(10, 132, 255, 0.25) !important;
+  border-color: var(--ios-accent-blue) !important;
+  color: var(--ios-accent-blue) !important;
+}
+
+.ios-device .icon-button {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-radius-medium) !important;
+  box-shadow: var(--ios-shadow-small) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .icon-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+}
+
+.ios-device .login-button {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-radius-medium) !important;
+  box-shadow: var(--ios-shadow-small) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .login-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+}
+
+.ios-device .register-button {
+  background: linear-gradient(135deg, var(--ios-accent-blue) 0%, var(--ios-accent-purple) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: var(--ios-radius-medium) !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+  color: white !important;
+}
+
+.ios-device .register-button:hover {
+  box-shadow: var(--ios-shadow-large) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Input Container con Glass */
+.ios-device .input-container {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border-top: 1px solid var(--ios-glass-border) !important;
+  box-shadow: 0 -8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Input Wrapper con Glass */
+.ios-device .input-wrapper {
+  background: rgba(40, 40, 42, 0.8) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-radius-extra-large) !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+}
+
+/* iOS Button Styles con Glass */
+.ios-device .new-chat-button {
+  background: linear-gradient(135deg, var(--ios-accent-blue) 0%, var(--ios-accent-purple) 100%) !important;
+  border-radius: var(--ios-radius-large) !important;
+  font-family: var(--ios-font-family) !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.ios-device .new-chat-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.ios-device .new-chat-button:hover::before {
+  left: 100%;
+}
+
+.ios-device .new-chat-button:active {
+  transform: scale(0.96) !important;
+  box-shadow: var(--ios-shadow-small) !important;
+}
+
+/* Navigation Items con Glass */
+.ios-device .nav-item {
+  border-radius: var(--ios-radius-medium) !important;
+  font-family: var(--ios-font-family) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: transparent !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .nav-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.ios-device .nav-item:active {
+  transform: scale(0.95) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.ios-device .nav-item.active {
+  background: rgba(10, 132, 255, 0.25) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(10, 132, 255, 0.4) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+/* Chat Items con Glass */
+.ios-device .chat-item {
+  border-radius: var(--ios-radius-medium) !important;
+  font-family: var(--ios-font-family) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .chat-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-color: var(--ios-glass-border) !important;
+}
+
+.ios-device .chat-item:active {
+  transform: scale(0.98) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ios-device .chat-item.active {
+  background: rgba(10, 132, 255, 0.2) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-color: rgba(10, 132, 255, 0.4) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .chat-title {
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .chat-date {
+  color: var(--ios-text-secondary) !important;
+}
+
+/* Message Input con Glass */
+.ios-device .message-input {
+  border-radius: var(--ios-radius-extra-large) !important;
+  font-family: var(--ios-font-family) !important;
+  background: rgba(50, 50, 52, 0.9) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .message-input:focus {
+  background: rgba(60, 60, 62, 0.95) !important;
+  border-color: var(--ios-accent-blue) !important;
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.2) !important;
+}
+
+/* Search Input con Glass */
+.ios-device .search-input {
+  border-radius: var(--ios-radius-large) !important;
+  font-family: var(--ios-font-family) !important;
+  background: rgba(40, 40, 42, 0.9) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  color: var(--ios-text-primary) !important;
+}
+
+/* Modal/Dropdown con Glass */
+.ios-device .model-dropdown {
+  border-radius: var(--ios-radius-large) !important;
+  font-family: var(--ios-font-family) !important;
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  box-shadow: var(--ios-glass-shadow) !important;
+}
+
+/* Temporary Chat Banner con Glass */
+.ios-device .temporary-chat-banner {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.3) 0%, rgba(175, 82, 222, 0.3) 100%) !important;
+  backdrop-filter: var(--ios-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ios-glass-blur) !important;
+  border-bottom: 1px solid var(--ios-glass-border) !important;
+  border-radius: 0 !important;
+  box-shadow: var(--ios-shadow-medium) !important;
+}
+
+/* User Section con Glass */
+.ios-device .user-section {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-top: 1px solid var(--ios-glass-border) !important;
+}
+
+.ios-device .user-info {
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .username {
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .workspace {
+  color: var(--ios-text-secondary) !important;
+}
+
+/* Typography Override */
+.ios-device {
+  font-family: var(--ios-font-family) !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+.ios-device * {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Button Press Effect */
+.ios-device button:active,
+.ios-device .nav-item:active,
+.ios-device .chat-item:active {
+  opacity: 0.8;
+  transition: opacity 0.1s;
+}
+
+/* Safe Area Support */
+.ios-device {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Messages Container con Glass */
+.ios-device .messages-container {
+  background: transparent !important;
+}
+
+/* Welcome Message con Glass */
+.ios-device .welcome-message {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+  border-radius: var(--ios-radius-large) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  box-shadow: var(--ios-glass-shadow) !important;
+}
+
+.ios-device .welcome-title {
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .welcome-subtitle {
+  color: var(--ios-text-secondary) !important;
+}
+
+/* Privacy Card con Glass */
+.ios-device .privacy-card {
+  background: var(--ios-glass-bg) !important;
+  backdrop-filter: blur(30px) !important;
+  -webkit-backdrop-filter: blur(30px) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  box-shadow: var(--ios-glass-shadow) !important;
+}
+
+.ios-device .privacy-card-title {
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .privacy-feature-title {
+  color: var(--ios-text-primary) !important;
+}
+
+.ios-device .privacy-feature-description {
+  color: var(--ios-text-secondary) !important;
+}
+
+/* Scrollbar iOS style */
+.ios-device ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ios-device ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ios-device ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.ios-device ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

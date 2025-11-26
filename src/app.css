@@ -15,22 +15,35 @@
 }
 
 :root {
-  /* Valori di default per dark mode (originali) */
-  --bg-primary: #171717;
-  --bg-secondary: #1f1f1f;
-  --bg-tertiary: #2a2a2a;
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --border-color: #3a3a3a;
-  --hover-bg: #2d2d2d;
-  --input-bg: #252525;
-  --accent-blue: #3b82f6;
+  /* Material Design 3 Integration */
+  /* Mappatura variabili esistenti con Material Design 3 */
+  --bg-primary: var(--md-sys-color-surface, #171717);
+  --bg-secondary: var(--md-sys-color-surface-container, #1f1f1f);
+  --bg-tertiary: var(--md-sys-color-surface-container-high, #2a2a2a);
+  --text-primary: var(--md-sys-color-on-surface, #ffffff);
+  --text-secondary: var(--md-sys-color-on-surface-variant, #a0a0a0);
+  --border-color: var(--md-sys-color-outline-variant, #3a3a3a);
+  --hover-bg: var(--md-sys-color-surface-container-high, #2d2d2d);
+  --input-bg: var(--md-sys-color-surface-container, #252525);
+  --accent-blue: var(--md-sys-color-primary, #6750A4);
   
-  /* Transizioni globali */
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.25s ease;
-  --transition-slow: 0.35s ease;
-  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Material Design 3 specific */
+  --md-primary: var(--md-sys-color-primary);
+  --md-on-primary: var(--md-sys-color-on-primary);
+  --md-primary-container: var(--md-sys-color-primary-container);
+  --md-on-primary-container: var(--md-sys-color-on-primary-container);
+  
+  /* Transizioni globali - Material Design 3 Motion */
+  --transition-fast: var(--md-sys-motion-duration-short2, 100ms);
+  --transition-normal: var(--md-sys-motion-duration-medium1, 250ms);
+  --transition-slow: var(--md-sys-motion-duration-medium4, 400ms);
+  --transition-smooth: var(--md-sys-motion-duration-medium2, 300ms) var(--md-sys-motion-easing-standard);
+  
+  /* Shape System */
+  --radius-small: var(--md-sys-shape-corner-small, 8px);
+  --radius-medium: var(--md-sys-shape-corner-medium, 12px);
+  --radius-large: var(--md-sys-shape-corner-large, 16px);
+  --radius-extra-large: var(--md-sys-shape-corner-extra-large, 28px);
 }
 
 body {

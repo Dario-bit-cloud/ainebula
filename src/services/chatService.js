@@ -197,6 +197,12 @@ export async function saveChatToDatabase(chat) {
       }
     }
     
+    // Non salvare chat temporanee nel database
+    if (chat.isTemporary) {
+      console.log('ℹ️ [CHAT SERVICE] Chat temporanea, non salvata nel database');
+      return { success: true, message: 'Chat temporanea non salvata nel database' };
+    }
+    
     const requestBody = {
       id: chat.id,
       title: chat.title,

@@ -16,12 +16,13 @@ export const currentChat = derived(
 );
 
 // Funzioni helper
-export async function createNewChat(projectId = null) {
+export async function createNewChat(projectId = null, isTemporary = false) {
   const newChat = {
     id: Date.now().toString(),
     title: 'Nuova chat',
     messages: [],
     projectId: projectId || null,
+    isTemporary: isTemporary,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -29,9 +30,12 @@ export async function createNewChat(projectId = null) {
   chats.update(allChats => [newChat, ...allChats]);
   currentChatId.set(newChat.id);
   
-  // Salva nel database se autenticato (anche se vuota, per avere la chat nella lista)
-  if (get(isAuthenticatedStore)) {
+  // Salva nel database solo se autenticato E non è temporanea
+  if (get(isAuthenticatedStore) && !isTemporary) {
     await saveChatToDatabase(newChat);
+  } else if (isTemporary) {
+    // Salva in localStorage se è temporanea
+    saveChatsToStorage();
   }
   
   return newChat.id;
@@ -46,16 +50,20 @@ export async function moveChatToProject(chatId, projectId) {
     )
   );
   
-  if (get(isAuthenticatedStore)) {
-    // Salva nel database se autenticato
-    const allChats = get(chats);
-    const chat = allChats.find(c => c.id === chatId);
-    if (chat) {
+  const allChats = get(chats);
+  const chat = allChats.find(c => c.id === chatId);
+  if (chat) {
+    // Non salvare chat temporanee nel database
+    if (chat.isTemporary) {
+      // Salva solo in localStorage per chat temporanee
+      saveChatsToStorage();
+    } else if (get(isAuthenticatedStore)) {
+      // Salva nel database se autenticato e non temporanea
       await saveChatToDatabase(chat);
+    } else {
+      // Salva in localStorage se non autenticato
+      saveChatsToStorage();
     }
-  } else {
-    // Salva in localStorage se non autenticato
-    saveChatsToStorage();
   }
 }
 
@@ -88,8 +96,12 @@ export async function addMessage(chatId, message) {
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
   if (chat && chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
-    if (get(isAuthenticatedStore)) {
-      // Salva nel database se autenticato
+    // Non salvare chat temporanee nel database
+    if (chat.isTemporary) {
+      // Salva solo in localStorage per chat temporanee
+      saveChatsToStorage();
+    } else if (get(isAuthenticatedStore)) {
+      // Salva nel database se autenticato e non temporanea
       await saveChatToDatabase(chat);
     } else {
       // Salva in localStorage se non autenticato
@@ -105,16 +117,21 @@ export async function deleteChat(chatId) {
   });
   unsubscribe();
   
+  // Controlla se la chat è temporanea prima di eliminarla
+  const allChats = get(chats);
+  const chat = allChats.find(c => c.id === chatId);
+  const isTemporary = chat?.isTemporary === true;
+  
   chats.update(allChats => allChats.filter(chat => chat.id !== chatId));
   if (currentId === chatId) {
     currentChatId.set(null);
   }
   
-  // Elimina dal database se autenticato
-  if (get(isAuthenticatedStore)) {
+  // Elimina dal database solo se non è temporanea e se autenticato
+  if (!isTemporary && get(isAuthenticatedStore)) {
     await deleteChatFromDatabase(chatId);
   } else {
-    // Salva in localStorage se non autenticato
+    // Salva in localStorage (per aggiornare la lista dopo l'eliminazione)
     saveChatsToStorage();
   }
 }
@@ -142,16 +159,20 @@ export async function updateMessage(chatId, messageIndex, updates) {
     });
   });
   
-  if (get(isAuthenticatedStore)) {
-    // Salva nel database se autenticato
-    const allChats = get(chats);
-    const chat = allChats.find(c => c.id === chatId);
-    if (chat) {
+  const allChats = get(chats);
+  const chat = allChats.find(c => c.id === chatId);
+  if (chat) {
+    // Non salvare chat temporanee nel database
+    if (chat.isTemporary) {
+      // Salva solo in localStorage per chat temporanee
+      saveChatsToStorage();
+    } else if (get(isAuthenticatedStore)) {
+      // Salva nel database se autenticato e non temporanea
       await saveChatToDatabase(chat);
+    } else {
+      // Salva in localStorage se non autenticato
+      saveChatsToStorage();
     }
-  } else {
-    // Salva in localStorage se non autenticato
-    saveChatsToStorage();
   }
 }
 
@@ -171,16 +192,20 @@ export async function deleteMessage(chatId, messageIndex) {
     });
   });
   
-  if (get(isAuthenticatedStore)) {
-    // Salva nel database se autenticato
-    const allChats = get(chats);
-    const chat = allChats.find(c => c.id === chatId);
-    if (chat) {
+  const allChats = get(chats);
+  const chat = allChats.find(c => c.id === chatId);
+  if (chat) {
+    // Non salvare chat temporanee nel database
+    if (chat.isTemporary) {
+      // Salva solo in localStorage per chat temporanee
+      saveChatsToStorage();
+    } else if (get(isAuthenticatedStore)) {
+      // Salva nel database se autenticato e non temporanea
       await saveChatToDatabase(chat);
+    } else {
+      // Salva in localStorage se non autenticato
+      saveChatsToStorage();
     }
-  } else {
-    // Salva in localStorage se non autenticato
-    saveChatsToStorage();
   }
 }
 
@@ -191,7 +216,7 @@ export function saveChatsToStorage() {
   if (typeof window !== 'undefined') {
     let currentChats = [];
     const unsubscribe = chats.subscribe(value => {
-      // Filtra quelle senza messaggi - non salviamo quelle
+      // Salva tutte le chat (incluse temporanee) che hanno almeno un messaggio visibile
       currentChats = value.filter(chat => 
         chat.messages && 
         chat.messages.length > 0 &&
@@ -228,16 +253,38 @@ export async function loadChats() {
   isLoadingChats = true;
   
   try {
+    let dbChats = [];
+    let localChats = [];
+    
+    // Carica sempre da localStorage per le chat temporanee
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          // Filtra solo le chat temporanee da localStorage
+          localChats = parsed.filter(chat => chat.isTemporary === true);
+        }
+      } catch (error) {
+        console.error('Error loading temporary chats from storage:', error);
+      }
+    }
+    
     if (get(isAuthenticatedStore)) {
-      // Carica dal database
+      // Carica dal database (solo chat non temporanee)
       const result = await getChatsFromDatabase();
       if (result.success && result.chats) {
-        chats.set(result.chats);
+        // Filtra le chat temporanee dal database (non dovrebbero esserci, ma per sicurezza)
+        dbChats = result.chats.filter(chat => !chat.isTemporary);
       }
     } else {
-      // Carica da localStorage
+      // Carica tutte le chat da localStorage se non autenticato
       loadChatsFromStorage();
+      return; // loadChatsFromStorage già imposta le chat
     }
+    
+    // Combina chat dal database e chat temporanee da localStorage
+    chats.set([...dbChats, ...localChats]);
   } finally {
     isLoadingChats = false;
   }
@@ -266,19 +313,39 @@ export async function syncChatsOnLogin() {
     chats.set([]);
     currentChatId.set(null);
     
-    // Carica dal database
+    // Carica dal database (solo chat non temporanee)
     const result = await getChatsFromDatabase();
     console.log('Risultato getChatsFromDatabase:', result);
     
+    let dbChats = [];
     if (result.success && result.chats) {
-      console.log(`Caricate ${result.chats.length} chat dal database`);
-      chats.set(result.chats);
+      // Filtra le chat temporanee dal database (non dovrebbero esserci, ma per sicurezza)
+      dbChats = result.chats.filter(chat => !chat.isTemporary);
+      console.log(`Caricate ${dbChats.length} chat dal database (escluse temporanee)`);
     } else {
       console.warn('Nessuna chat trovata o errore nel caricamento:', result);
-      chats.set([]);
     }
     
+    // Carica chat temporanee da localStorage
+    let tempChats = [];
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          tempChats = parsed.filter(chat => chat.isTemporary === true);
+          console.log(`Caricate ${tempChats.length} chat temporanee da localStorage`);
+        }
+      } catch (error) {
+        console.error('Error loading temporary chats from storage:', error);
+      }
+    }
+    
+    // Combina chat dal database e chat temporanee
+    chats.set([...dbChats, ...tempChats]);
+    
     // Migra le chat da localStorage al database (solo se non ci sono già chat nel database)
+    // Non migrare chat temporanee
     await migrateChatsFromLocalStorage();
   } catch (error) {
     console.error('Errore in syncChatsOnLogin:', error);
@@ -324,6 +391,12 @@ export async function migrateChatsFromLocalStorage() {
     
     // Salva ogni chat locale nel database
     for (const chat of localChats) {
+      // Salta chat temporanee - non migrarle al database
+      if (chat.isTemporary) {
+        console.log(`⏭️ Chat temporanea ${chat.id} non migrata al database`);
+        continue;
+      }
+      
       // Salta se la chat esiste già nel database
       if (existingChatIds.has(chat.id)) {
         console.log(`⏭️ Chat ${chat.id} già presente nel database, skip`);

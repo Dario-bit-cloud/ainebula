@@ -976,14 +976,17 @@
 
   .sidebar {
     width: 260px;
-    background-color: var(--bg-secondary);
+    background-color: var(--md-sys-color-surface-container);
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--border-color);
+    border-right: 1px solid var(--md-sys-color-outline-variant);
     height: 100%;
-    animation: sidebarSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: 100%;
+    animation: sidebarSlideIn var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
     position: relative;
     z-index: 999;
+    flex-shrink: 0;
+    box-shadow: var(--md-sys-elevation-level1);
   }
   
   .sidebar-header {
@@ -1007,10 +1010,11 @@
   }
   
   .logo-text {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-    letter-spacing: -0.5px;
+    font-size: var(--md-sys-typescale-title-large-size);
+    font-weight: var(--md-sys-typescale-title-large-weight);
+    font-family: var(--md-sys-typescale-title-large-font);
+    color: var(--md-sys-color-on-surface);
+    letter-spacing: var(--md-sys-typescale-title-large-tracking);
   }
 
   @keyframes sidebarSlideIn {
@@ -1244,26 +1248,29 @@
     justify-content: center;
     width: 100%;
     padding: 12px 32px;
-    background-color: var(--text-primary);
+    background-color: var(--md-sys-color-primary);
     border: none;
-    border-radius: 12px;
-    color: var(--bg-primary);
-    font-size: 15px;
-    font-weight: 600;
+    border-radius: var(--md-sys-shape-corner-large);
+    color: var(--md-sys-color-on-primary);
+    font-size: var(--md-sys-typescale-label-large-size);
+    font-weight: var(--md-sys-typescale-label-large-weight);
+    font-family: var(--md-sys-typescale-label-large-font);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
     z-index: 1;
+    box-shadow: var(--md-sys-elevation-level1);
   }
   
   .new-chat-button:hover {
-    background-color: var(--text-primary);
-    opacity: 0.9;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
+    background-color: var(--md-sys-color-primary);
+    opacity: 0.92;
+    box-shadow: var(--md-sys-elevation-level2);
+    transform: translateY(-1px);
   }
   
   .new-chat-button:active {
     transform: translateY(0);
+    box-shadow: var(--md-sys-elevation-level1);
   }
   
   .new-chat-arrow {
@@ -1298,11 +1305,13 @@
     padding: 10px 12px;
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--md-sys-color-on-surface-variant);
     cursor: pointer;
-    border-radius: 8px;
-    font-size: 14px;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: var(--md-sys-shape-corner-medium);
+    font-size: var(--md-sys-typescale-body-medium-size);
+    font-weight: var(--md-sys-typescale-body-medium-weight);
+    font-family: var(--md-sys-typescale-body-medium-font);
+    transition: all var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
     position: relative;
     text-align: left;
     flex-shrink: 0;
@@ -1318,13 +1327,13 @@
   }
 
   .nav-item:hover {
-    background-color: var(--hover-bg);
-    color: var(--text-primary);
+    background-color: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface);
   }
 
   .nav-item.active {
-    background-color: var(--hover-bg);
-    color: var(--text-primary);
+    background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
   }
 
   .nav-item svg {
@@ -1515,14 +1524,14 @@
 
   .chat-item {
     padding: 10px 12px;
-    border-radius: 6px;
+    border-radius: var(--md-sys-shape-corner-small);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: chatItemSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+    animation: chatItemSlideIn var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
     animation-fill-mode: both;
   }
 
@@ -1544,11 +1553,11 @@
   }
 
   .chat-item:hover {
-    background-color: var(--hover-bg);
+    background-color: var(--md-sys-color-surface-container-high);
   }
 
   .chat-item.active {
-    background-color: var(--bg-tertiary);
+    background-color: var(--md-sys-color-secondary-container);
   }
 
   .chat-item:hover .chat-delete {

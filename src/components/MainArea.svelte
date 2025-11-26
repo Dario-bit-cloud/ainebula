@@ -1,6 +1,7 @@
 <script>
   import { onMount, tick, afterUpdate } from 'svelte';
   import { get } from 'svelte/store';
+  import { createEventDispatcher } from 'svelte';
   import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, saveChatsToStorage } from '../stores/chat.js';
   import { selectedModel } from '../stores/models.js';
   import { hasActiveSubscription } from '../stores/user.js';
@@ -14,6 +15,13 @@
   import PrivacyModal from './PrivacyModal.svelte';
   import { showAlert, showPrompt } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
+  import TopBar from './TopBar.svelte';
+  
+  const dispatch = createEventDispatcher();
+  
+  function handleOpenAuth(event) {
+    dispatch('openAuth', event.detail);
+  }
   
   let inputValue = '';
   let inputRef;
@@ -88,6 +96,7 @@
   let tokenWarning = false;
   let showError = false;
   let errorMessage = '';
+  let isTemporaryChat = false;
   
   // Usa textarea invece di input
   $: isTextarea = true;
@@ -96,9 +105,11 @@
   $: {
     try {
       messages = $currentChat?.messages || [];
+      isTemporaryChat = $currentChat?.isTemporary === true;
     } catch (error) {
       console.error('Error accessing currentChat:', error);
       messages = [];
+      isTemporaryChat = false;
     }
   }
   
@@ -1081,6 +1092,7 @@
 </script>
 
 <main class="main-area" bind:this={mainAreaElement}>
+  <TopBar on:openAuth={handleOpenAuth} />
   {#if showError}
     <div class="error-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1090,6 +1102,25 @@
       </svg>
       <span>{errorMessage}</span>
       <button class="error-close" on:click={() => showError = false}>×</button>
+    </div>
+  {/if}
+  
+  {#if isTemporaryChat}
+    <div class="temporary-chat-banner">
+      <div class="temporary-banner-content">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4.52148 15.1664C4.61337 14.8108 4.39951 14.4478 4.04395 14.3559C3.73281 14.2756 3.41605 14.4295 3.28027 14.7074L3.2334 14.8334C3.13026 15.2324 3.0046 15.6297 2.86133 16.0287L2.71289 16.4281C2.63179 16.6393 2.66312 16.8775 2.79688 17.06C2.93067 17.2424 3.14825 17.3443 3.37402 17.3305L3.7793 17.3002C4.62726 17.2265 5.44049 17.0856 6.23438 16.8764C6.84665 17.1788 7.50422 17.4101 8.19434 17.558C8.55329 17.6348 8.9064 17.4062 8.9834 17.0473C9.06036 16.6882 8.83177 16.3342 8.47266 16.2572C7.81451 16.1162 7.19288 15.8862 6.62305 15.5815C6.50913 15.5206 6.38084 15.4946 6.25391 15.5053L6.12793 15.5277C5.53715 15.6955 4.93256 15.819 4.30566 15.9027C4.33677 15.8053 4.36932 15.7081 4.39844 15.6098L4.52148 15.1664Z"></path>
+          <path d="M15.7998 14.5365C15.5786 14.3039 15.2291 14.2666 14.9668 14.4301L14.8604 14.5131C13.9651 15.3633 12.8166 15.9809 11.5273 16.2572C11.1682 16.3342 10.9396 16.6882 11.0166 17.0473C11.0936 17.4062 11.4467 17.6348 11.8057 17.558C13.2388 17.2509 14.5314 16.5858 15.5713 15.6645L15.7754 15.477C16.0417 15.2241 16.0527 14.8028 15.7998 14.5365Z"></path>
+          <path d="M2.23828 7.58927C1.97668 8.34847 1.83496 9.15958 1.83496 10.0004C1.835 10.736 1.94324 11.4483 2.14551 12.1234L2.23828 12.4106C2.35793 12.7576 2.73588 12.9421 3.08301 12.8227C3.3867 12.718 3.56625 12.4154 3.52637 12.1088L3.49512 11.977C3.2808 11.3549 3.16508 10.6908 3.16504 10.0004C3.16504 9.30977 3.28072 8.64514 3.49512 8.02286C3.61476 7.67563 3.43024 7.2968 3.08301 7.17716C2.73596 7.05778 2.35799 7.24232 2.23828 7.58927Z"></path>
+          <path d="M16.917 12.8227C17.2641 12.9421 17.6421 12.7576 17.7617 12.4106C18.0233 11.6515 18.165 10.8411 18.165 10.0004C18.165 9.15958 18.0233 8.34847 17.7617 7.58927C17.642 7.24231 17.264 7.05778 16.917 7.17716C16.5698 7.2968 16.3852 7.67563 16.5049 8.02286C16.7193 8.64514 16.835 9.30977 16.835 10.0004C16.8349 10.6908 16.7192 11.3549 16.5049 11.977C16.3852 12.3242 16.5698 12.703 16.917 12.8227Z"></path>
+          <path d="M8.9834 2.95255C8.90632 2.59374 8.55322 2.3651 8.19434 2.44181C6.76126 2.74892 5.46855 3.41405 4.42871 4.33536L4.22461 4.52286C3.95829 4.77577 3.94729 5.19697 4.2002 5.46329C4.42146 5.69604 4.77088 5.73328 5.0332 5.56973L5.13965 5.4877C6.03496 4.63748 7.18337 4.0189 8.47266 3.74259C8.83177 3.66563 9.06036 3.31166 8.9834 2.95255Z"></path>
+          <path d="M15.5713 4.33536C14.5314 3.41405 13.2387 2.74892 11.8057 2.44181C11.4468 2.3651 11.0937 2.59374 11.0166 2.95255C10.9396 3.31166 11.1682 3.66563 11.5273 3.74259C12.7361 4.00163 13.8209 4.56095 14.6895 5.33048L14.8604 5.4877L14.9668 5.56973C15.2291 5.73327 15.5785 5.69604 15.7998 5.46329C16.0211 5.23026 16.0403 4.87903 15.8633 4.6254L15.7754 4.52286L15.5713 4.33536Z"></path>
+        </svg>
+        <div class="temporary-banner-text">
+          <strong>Chat temporanea attiva</strong>
+          <span class="temporary-banner-subtitle">Questa conversazione non verrà salvata</span>
+        </div>
+      </div>
     </div>
   {/if}
   
@@ -1157,7 +1188,17 @@
           {#if showPrivacyCard}
             <div class="privacy-card" on:click={() => isPrivacyModalOpen = true} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && (isPrivacyModalOpen = true)}>
               <div class="privacy-card-header">
-                <span class="privacy-card-title">Qualunque cosa mi chiedi è:</span>
+                <div class="privacy-card-title-wrapper">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" data-rtl-flip="" class="privacy-icon-header">
+                    <path d="M4.52148 15.1664C4.61337 14.8108 4.39951 14.4478 4.04395 14.3559C3.73281 14.2756 3.41605 14.4295 3.28027 14.7074L3.2334 14.8334C3.13026 15.2324 3.0046 15.6297 2.86133 16.0287L2.71289 16.4281C2.63179 16.6393 2.66312 16.8775 2.79688 17.06C2.93067 17.2424 3.14825 17.3443 3.37402 17.3305L3.7793 17.3002C4.62726 17.2265 5.44049 17.0856 6.23438 16.8764C6.84665 17.1788 7.50422 17.4101 8.19434 17.558C8.55329 17.6348 8.9064 17.4062 8.9834 17.0473C9.06036 16.6882 8.83177 16.3342 8.47266 16.2572C7.81451 16.1162 7.19288 15.8862 6.62305 15.5815C6.50913 15.5206 6.38084 15.4946 6.25391 15.5053L6.12793 15.5277C5.53715 15.6955 4.93256 15.819 4.30566 15.9027C4.33677 15.8053 4.36932 15.7081 4.39844 15.6098L4.52148 15.1664Z"></path>
+                    <path d="M15.7998 14.5365C15.5786 14.3039 15.2291 14.2666 14.9668 14.4301L14.8604 14.5131C13.9651 15.3633 12.8166 15.9809 11.5273 16.2572C11.1682 16.3342 10.9396 16.6882 11.0166 17.0473C11.0936 17.4062 11.4467 17.6348 11.8057 17.558C13.2388 17.2509 14.5314 16.5858 15.5713 15.6645L15.7754 15.477C16.0417 15.2241 16.0527 14.8028 15.7998 14.5365Z"></path>
+                    <path d="M2.23828 7.58927C1.97668 8.34847 1.83496 9.15958 1.83496 10.0004C1.835 10.736 1.94324 11.4483 2.14551 12.1234L2.23828 12.4106C2.35793 12.7576 2.73588 12.9421 3.08301 12.8227C3.3867 12.718 3.56625 12.4154 3.52637 12.1088L3.49512 11.977C3.2808 11.3549 3.16508 10.6908 3.16504 10.0004C3.16504 9.30977 3.28072 8.64514 3.49512 8.02286C3.61476 7.67563 3.43024 7.2968 3.08301 7.17716C2.73596 7.05778 2.35799 7.24232 2.23828 7.58927Z"></path>
+                    <path d="M16.917 12.8227C17.2641 12.9421 17.6421 12.7576 17.7617 12.4106C18.0233 11.6515 18.165 10.8411 18.165 10.0004C18.165 9.15958 18.0233 8.34847 17.7617 7.58927C17.642 7.24231 17.264 7.05778 16.917 7.17716C16.5698 7.2968 16.3852 7.67563 16.5049 8.02286C16.7193 8.64514 16.835 9.30977 16.835 10.0004C16.8349 10.6908 16.7192 11.3549 16.5049 11.977C16.3852 12.3242 16.5698 12.703 16.917 12.8227Z"></path>
+                    <path d="M8.9834 2.95255C8.90632 2.59374 8.55322 2.3651 8.19434 2.44181C6.76126 2.74892 5.46855 3.41405 4.42871 4.33536L4.22461 4.52286C3.95829 4.77577 3.94729 5.19697 4.2002 5.46329C4.42146 5.69604 4.77088 5.73328 5.0332 5.56973L5.13965 5.4877C6.03496 4.63748 7.18337 4.0189 8.47266 3.74259C8.83177 3.66563 9.06036 3.31166 8.9834 2.95255Z"></path>
+                    <path d="M15.5713 4.33536C14.5314 3.41405 13.2387 2.74892 11.8057 2.44181C11.4468 2.3651 11.0937 2.59374 11.0166 2.95255C10.9396 3.31166 11.1682 3.66563 11.5273 3.74259C12.7361 4.00163 13.8209 4.56095 14.6895 5.33048L14.8604 5.4877L14.9668 5.56973C15.2291 5.73327 15.5785 5.69604 15.7998 5.46329C16.0211 5.23026 16.0403 4.87903 15.8633 4.6254L15.7754 4.52286L15.5713 4.33536Z"></path>
+                  </svg>
+                  <span class="privacy-card-title">Qualunque cosa mi chiedi è:</span>
+                </div>
                 <button class="privacy-card-close" on:click|stopPropagation={() => showPrivacyCard = false} title="Chiudi">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"/>
@@ -1653,20 +1694,98 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background-color: var(--bg-primary);
+    background-color: var(--md-sys-color-surface);
     position: relative;
     overflow: hidden;
     min-height: 0;
   }
   
+  .temporary-chat-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px;
+    background: var(--md-sys-color-primary-container);
+    border-bottom: 2px solid var(--md-sys-color-primary);
+    animation: slideDown var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--md-sys-elevation-level1);
+  }
+
+  .temporary-chat-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: shimmer 3s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      left: -100%;
+    }
+    100% {
+      left: 100%;
+    }
+  }
+
+  .temporary-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1;
+    position: relative;
+  }
+
+  .temporary-banner-content svg {
+    color: var(--md-sys-color-primary);
+    flex-shrink: 0;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.05);
+    }
+  }
+
+  .temporary-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .temporary-banner-text strong {
+    font-size: var(--md-sys-typescale-body-medium-size);
+    font-weight: var(--md-sys-typescale-title-medium-weight);
+    font-family: var(--md-sys-typescale-body-medium-font);
+    color: var(--md-sys-color-on-primary-container);
+  }
+
+  .temporary-banner-subtitle {
+    font-size: var(--md-sys-typescale-body-small-size);
+    font-family: var(--md-sys-typescale-body-small-font);
+    color: var(--md-sys-color-on-primary-container);
+    opacity: 0.8;
+  }
+
   .search-bar {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 12px 24px;
-    background-color: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    animation: slideDown 0.3s ease;
+    background-color: var(--md-sys-color-surface-container);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    animation: slideDown var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
   }
   
   @keyframes slideDown {
@@ -1973,6 +2092,23 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 24px;
+  }
+  
+  .privacy-card-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .privacy-icon-header {
+    color: var(--accent-blue);
+    flex-shrink: 0;
+    opacity: 0.9;
+    transition: opacity 0.2s;
+  }
+  
+  .privacy-card:hover .privacy-icon-header {
+    opacity: 1;
   }
   
   .privacy-card-title {

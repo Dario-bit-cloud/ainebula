@@ -1,4 +1,5 @@
 import { writable, readable } from 'svelte/store';
+import { isIOS } from '../utils/platform.js';
 
 // Store per lo stato generale dell'applicazione
 export const sidebarView = writable('chat'); // 'chat', 'search', 'library', 'projects'
@@ -84,4 +85,17 @@ function createMediaQuery(query) {
 }
 
 export const isMobile = createMediaQuery('(max-width: 768px)');
+
+// Store per rilevare iOS
+export const isIOSDevice = writable(false);
+
+// Inizializza il rilevamento iOS
+if (typeof window !== 'undefined') {
+  isIOSDevice.set(isIOS());
+  
+  // Aggiungi classe al body per stili iOS
+  if (isIOS()) {
+    document.documentElement.classList.add('ios-device');
+  }
+}
 

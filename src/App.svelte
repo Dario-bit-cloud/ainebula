@@ -1,6 +1,5 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
-  import TopBar from './components/TopBar.svelte';
   import Sidebar from './components/Sidebar.svelte';
   import MainArea from './components/MainArea.svelte';
   import UserMenu from './components/UserMenu.svelte';
@@ -359,10 +358,9 @@
 </script>
 
 <div class="app-container">
-  <TopBar on:openAuth={handleOpenAuth} />
   <div class="main-layout">
     <Sidebar />
-    <MainArea />
+    <MainArea on:openAuth={handleOpenAuth} />
   </div>
   <UserMenu />
   {#if $isSettingsOpen && SettingsModal}

@@ -1,5 +1,8 @@
 import './app.css';
+import './styles/material-design-3.css';
+import './styles/ios-ui.css';
 import App from './App.svelte';
+import { isIOS } from './utils/platform.js';
 
 // Inizializza il tema PRIMA che l'app venga montata per evitare flash
 function initTheme() {
@@ -42,6 +45,32 @@ function initTheme() {
 
 // Inizializza il tema immediatamente
 initTheme();
+
+// Rileva iOS e applica classe
+if (typeof window !== 'undefined') {
+  // Controlla se c'è un parametro URL o localStorage per forzare iOS
+  const urlParams = new URLSearchParams(window.location.search);
+  const forceIOS = urlParams.get('ios') === 'true' || localStorage.getItem('force-ios') === 'true';
+  
+  if (isIOS() || forceIOS) {
+    document.documentElement.classList.add('ios-device');
+  }
+  
+  // Aggiungi funzione globale per toggle (utile per debug)
+  window.toggleIOS = function() {
+    const isIOSActive = document.documentElement.classList.contains('ios-device');
+    if (isIOSActive) {
+      document.documentElement.classList.remove('ios-device');
+      localStorage.removeItem('force-ios');
+    } else {
+      document.documentElement.classList.add('ios-device');
+      localStorage.setItem('force-ios', 'true');
+    }
+    console.log('iOS UI:', !isIOSActive ? 'Attivata' : 'Disattivata');
+    // Ricarica per applicare tutti gli stili
+    window.location.reload();
+  };
+}
 
 const app = new App({
   target: document.getElementById('app')
