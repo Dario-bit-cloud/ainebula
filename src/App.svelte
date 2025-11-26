@@ -4,7 +4,7 @@
   import MainArea from './components/MainArea.svelte';
   import UserMenu from './components/UserMenu.svelte';
   // Lazy load modals per ridurre il bundle iniziale
-  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen } from './stores/app.js';
+  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen, isHelpCenterModalOpen, isReleaseNotesModalOpen, isTermsModalOpen, isDownloadAppModalOpen, isWorkspaceSettingsModalOpen } from './stores/app.js';
   import { initAuth, user, isAuthenticatedStore, isLoading } from './stores/auth.js';
   import { logout } from './services/authService.js';
   import { clearUser } from './stores/auth.js';
@@ -17,6 +17,7 @@
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
   let PromptLibraryModal, ShortcutsModal, ReportBugModal, PersonalizationModal, AuthModal, SharedLinksModal;
+  let HelpCenterModal, ReleaseNotesModal, TermsModal, DownloadAppModal, WorkspaceSettingsModal;
   // Dialog components (always loaded)
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AlertDialog from './components/AlertDialog.svelte';
@@ -101,6 +102,41 @@
     }
   }
   
+  async function loadHelpCenterModal() {
+    if (!HelpCenterModal) {
+      const module = await import('./components/HelpCenterModal.svelte');
+      HelpCenterModal = module.default;
+    }
+  }
+  
+  async function loadReleaseNotesModal() {
+    if (!ReleaseNotesModal) {
+      const module = await import('./components/ReleaseNotesModal.svelte');
+      ReleaseNotesModal = module.default;
+    }
+  }
+  
+  async function loadTermsModal() {
+    if (!TermsModal) {
+      const module = await import('./components/TermsModal.svelte');
+      TermsModal = module.default;
+    }
+  }
+  
+  async function loadDownloadAppModal() {
+    if (!DownloadAppModal) {
+      const module = await import('./components/DownloadAppModal.svelte');
+      DownloadAppModal = module.default;
+    }
+  }
+  
+  async function loadWorkspaceSettingsModal() {
+    if (!WorkspaceSettingsModal) {
+      const module = await import('./components/WorkspaceSettingsModal.svelte');
+      WorkspaceSettingsModal = module.default;
+    }
+  }
+  
   // Precarica modals quando vengono aperti
   $: if ($isSettingsOpen && !SettingsModal) {
     loadSettingsModal();
@@ -134,6 +170,21 @@
   }
   $: if ($isAuthModalOpen && !AuthModal) {
     loadAuthModal();
+  }
+  $: if ($isHelpCenterModalOpen && !HelpCenterModal) {
+    loadHelpCenterModal();
+  }
+  $: if ($isReleaseNotesModalOpen && !ReleaseNotesModal) {
+    loadReleaseNotesModal();
+  }
+  $: if ($isTermsModalOpen && !TermsModal) {
+    loadTermsModal();
+  }
+  $: if ($isDownloadAppModalOpen && !DownloadAppModal) {
+    loadDownloadAppModal();
+  }
+  $: if ($isWorkspaceSettingsModalOpen && !WorkspaceSettingsModal) {
+    loadWorkspaceSettingsModal();
   }
   
   function handlePromptSelect(event) {
@@ -395,6 +446,21 @@
   {/if}
   {#if $isSharedLinksModalOpen && SharedLinksModal}
     <svelte:component this={SharedLinksModal} />
+  {/if}
+  {#if $isHelpCenterModalOpen && HelpCenterModal}
+    <svelte:component this={HelpCenterModal} bind:isOpen={$isHelpCenterModalOpen} />
+  {/if}
+  {#if $isReleaseNotesModalOpen && ReleaseNotesModal}
+    <svelte:component this={ReleaseNotesModal} bind:isOpen={$isReleaseNotesModalOpen} />
+  {/if}
+  {#if $isTermsModalOpen && TermsModal}
+    <svelte:component this={TermsModal} bind:isOpen={$isTermsModalOpen} />
+  {/if}
+  {#if $isDownloadAppModalOpen && DownloadAppModal}
+    <svelte:component this={DownloadAppModal} bind:isOpen={$isDownloadAppModalOpen} />
+  {/if}
+  {#if $isWorkspaceSettingsModalOpen && WorkspaceSettingsModal}
+    <svelte:component this={WorkspaceSettingsModal} />
   {/if}
   
   <!-- Dialog components -->

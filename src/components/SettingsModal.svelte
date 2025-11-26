@@ -8,11 +8,12 @@
   import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
   import { createDataExport, downloadDataExport } from '../services/dataExportService.js';
+  import { deleteAllChatsFromDatabase } from '../services/chatService.js';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
   import { availableLanguages } from '../utils/i18n.js';
-  import { currentLanguage, t } from '../stores/language.js';
+  import { currentLanguage, t, setLanguage } from '../stores/language.js';
   
   let activeSection = 'generale';
   let theme = 'system';
@@ -1250,7 +1251,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
     animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
     flex-shrink: 0;
@@ -1299,7 +1300,7 @@
   }
 
   .modal-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
@@ -1472,7 +1473,7 @@
 
   .settings-content {
     flex: 1;
-    padding: 32px;
+    padding: 20px 24px;
     overflow-y: auto;
     overflow-x: hidden;
   }
@@ -1561,7 +1562,7 @@
   }
 
   .setting-section {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
     animation: slideInLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
   }
 
@@ -1585,10 +1586,10 @@
   }
 
   .setting-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
   }
 
   .theme-buttons {
@@ -1685,7 +1686,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 0;
+    padding: 12px 0;
     border-bottom: 1px solid var(--border-color);
     animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
   }

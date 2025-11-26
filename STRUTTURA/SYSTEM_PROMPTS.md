@@ -429,3 +429,5 @@ Informazioni sull'utente: [occupazione]. Tieni conto di questo contesto quando f
 **Ultimo aggiornamento:** Documento creato il $(date)
 **File sorgente:** `src/services/aiService.js`, `src/stores/aiSettings.js`, `src/stores/personalization.js`
 
+
+

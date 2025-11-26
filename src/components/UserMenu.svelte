@@ -6,6 +6,7 @@
   import { accounts, currentAccountId, getCurrentAccount, getOtherAccounts, switchAccount, removeAccount } from '../stores/accounts.js';
   import { isAuthModalOpen } from '../stores/app.js';
   import { showConfirm, showAlert } from '../services/dialogService.js';
+  import { get } from 'svelte/store';
   
   let hoveredItem = null;
   let activeSubmenu = null;
@@ -90,6 +91,12 @@
         module.isPersonalizationModalOpen.set(true);
       });
       isUserMenuOpen.set(false);
+    } else if (item.id === 'workspace-settings') {
+      // Apri modal impostazioni workspace
+      import('../stores/app.js').then(module => {
+        module.isWorkspaceSettingsModalOpen.set(true);
+      });
+      isUserMenuOpen.set(false);
     } else {
       showAlert(`${item.label} - Funzionalità in arrivo`, 'Info', 'OK', 'info');
       if (!item.hasSubmenu) {
@@ -128,6 +135,26 @@
     } else if (submenuItem.id === 'report-bug') {
       import('../stores/app.js').then(module => {
         module.isReportBugModalOpen.set(true);
+      });
+      closeMenu();
+    } else if (submenuItem.id === 'help-center') {
+      import('../stores/app.js').then(module => {
+        module.isHelpCenterModalOpen.set(true);
+      });
+      closeMenu();
+    } else if (submenuItem.id === 'release-notes') {
+      import('../stores/app.js').then(module => {
+        module.isReleaseNotesModalOpen.set(true);
+      });
+      closeMenu();
+    } else if (submenuItem.id === 'terms') {
+      import('../stores/app.js').then(module => {
+        module.isTermsModalOpen.set(true);
+      });
+      closeMenu();
+    } else if (submenuItem.id === 'download-app') {
+      import('../stores/app.js').then(module => {
+        module.isDownloadAppModalOpen.set(true);
       });
       closeMenu();
     } else {

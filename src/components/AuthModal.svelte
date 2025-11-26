@@ -479,8 +479,8 @@
   .form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 2.5em 2.5em 2em 2.5em;
+    gap: 14px;
+    padding: 2em 2em 1.5em 2em;
     background: linear-gradient(135deg, #1a1a1a 0%, #171717 100%);
     border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -514,9 +514,9 @@
   
   #heading {
     text-align: center;
-    margin: 0.5em 0 1.5em 0;
+    margin: 0.4em 0 1.2em 0;
     color: #ffffff;
-    font-size: 1.75em;
+    font-size: 1.5em;
     font-weight: 700;
     letter-spacing: -0.02em;
     background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
@@ -540,9 +540,9 @@
   .field {
     display: flex;
     align-items: center;
-    gap: 0.75em;
-    border-radius: 16px;
-    padding: 0.85em 1.1em;
+    gap: 0.65em;
+    border-radius: 14px;
+    padding: 0.75em 1em;
     border: 1.5px solid rgba(255, 255, 255, 0.08);
     outline: none;
     color: white;
@@ -631,14 +631,14 @@
     display: flex;
     justify-content: center;
     flex-direction: row;
-    margin-top: 1.5em;
-    gap: 0.75em;
+    margin-top: 1.2em;
+    gap: 0.65em;
     animation: fadeIn 0.6s ease-out 0.3s both;
   }
   
   .button1 {
     flex: 1;
-    padding: 0.85em 1.5em;
+    padding: 0.75em 1.3em;
     border-radius: 12px;
     border: none;
     outline: none;
@@ -646,7 +646,7 @@
     background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -696,7 +696,7 @@
   }
   
   .button2 {
-    padding: 0.85em 1.8em;
+    padding: 0.75em 1.6em;
     border-radius: 12px;
     border: 1.5px solid rgba(255, 255, 255, 0.15);
     outline: none;
@@ -706,7 +706,7 @@
     -webkit-backdrop-filter: blur(10px);
     color: white;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
     white-space: nowrap;
   }
@@ -761,11 +761,11 @@
   .success-message {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 18px;
+    gap: 8px;
+    padding: 12px 16px;
     border-radius: 12px;
-    margin-bottom: 8px;
-    font-size: 14px;
+    margin-bottom: 6px;
+    font-size: 13px;
     font-weight: 500;
     animation: slideInBounce 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);

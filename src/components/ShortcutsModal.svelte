@@ -167,12 +167,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid #3a3a3a;
   }
 
   .modal-title {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
     color: #ffffff;
     margin: 0;
@@ -198,17 +198,17 @@
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 16px 20px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 16px;
   }
 
   .shortcut-category {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
   .category-title {
@@ -230,7 +230,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px;
+    padding: 10px;
     background-color: #3a3a3a;
     border-radius: 8px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);

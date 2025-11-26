@@ -17,6 +17,31 @@ export const currentChat = derived(
 
 // Funzioni helper
 export async function createNewChat(projectId = null, isTemporary = false) {
+  const allChats = get(chats);
+  const currentId = get(currentChatId);
+  
+  // Elimina automaticamente le chat "Nuova chat" vuote prima di crearne una nuova
+  // Non eliminare la chat corrente se è "Nuova chat" (potrebbe essere quella in uso)
+  const emptyNewChats = allChats.filter(chat => {
+    // Seleziona solo chat con titolo "Nuova chat"
+    if (chat.title !== 'Nuova chat') return false;
+    
+    // Non eliminare la chat corrente
+    if (chat.id === currentId) return false;
+    
+    // Elimina solo chat vuote (senza messaggi o con solo messaggi nascosti/vuoti)
+    const hasVisibleMessages = chat.messages && 
+                              chat.messages.length > 0 && 
+                              chat.messages.some(msg => !msg.hidden && msg.content && msg.content.trim().length > 0);
+    
+    return !hasVisibleMessages;
+  });
+  
+  // Elimina le chat "Nuova chat" vuote
+  for (const chatToDelete of emptyNewChats) {
+    await deleteChat(chatToDelete.id);
+  }
+  
   const newChat = {
     id: Date.now().toString(),
     title: 'Nuova chat',

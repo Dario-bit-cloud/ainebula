@@ -244,12 +244,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid #3a3a3a;
   }
-  
+
   .modal-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: #ffffff;
     margin: 0;
@@ -274,27 +274,27 @@
   }
   
   .modal-body {
-    padding: 24px;
+    padding: 16px 20px;
     overflow-y: auto;
     flex: 1;
   }
   
   .create-section {
-    margin-bottom: 32px;
-    padding-bottom: 24px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
     border-bottom: 1px solid #3a3a3a;
   }
   
   .create-section h3,
   .links-section h3 {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: #ffffff;
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
   }
   
   .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
   
   .form-group label {

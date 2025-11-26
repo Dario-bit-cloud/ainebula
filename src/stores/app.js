@@ -19,6 +19,11 @@ export const isReportBugModalOpen = writable(false);
 export const isPersonalizationModalOpen = writable(false);
 export const isAuthModalOpen = writable(false);
 export const isSharedLinksModalOpen = writable(false);
+export const isHelpCenterModalOpen = writable(false);
+export const isReleaseNotesModalOpen = writable(false);
+export const isTermsModalOpen = writable(false);
+export const isDownloadAppModalOpen = writable(false);
+export const isWorkspaceSettingsModalOpen = writable(false);
 
 // Stores per i dialoghi personalizzati
 export const confirmDialogState = writable({

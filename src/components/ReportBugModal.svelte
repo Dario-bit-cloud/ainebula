@@ -218,12 +218,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid #3a3a3a;
   }
 
   .modal-title {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
     color: #ffffff;
     margin: 0;
@@ -251,11 +251,11 @@
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 16px 20px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
 
   .problem-textarea {

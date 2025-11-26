@@ -242,12 +242,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
   }
 
   .modal-header h2 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
@@ -267,13 +267,13 @@
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 16px 20px;
     flex: 1;
     overflow-y: auto;
   }
 
   .search-bar {
-    margin-bottom: 20px;
+    margin-bottom: 14px;
   }
 
   .search-input {
@@ -290,8 +290,8 @@
   .categories {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 20px;
+    gap: 6px;
+    margin-bottom: 14px;
   }
 
   .category-button {
@@ -416,7 +416,7 @@
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 16px;
+    padding: 12px;
     cursor: pointer;
     transition: all 0.2s;
   }

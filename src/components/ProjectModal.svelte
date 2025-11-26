@@ -188,12 +188,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
   }
 
   .modal-header h2 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
@@ -216,13 +216,13 @@
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 16px 20px;
     overflow-y: auto;
     flex: 1;
   }
 
   .form-section {
-    margin-bottom: 20px;
+    margin-bottom: 14px;
   }
 
   .form-label {
@@ -314,8 +314,8 @@
   .modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 24px;
+    gap: 10px;
+    padding: 12px 20px;
     border-top: 1px solid var(--border-color);
   }
 

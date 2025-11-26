@@ -247,13 +247,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
   
   .modal-header h2 {
     margin: 0;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
   }
@@ -279,11 +279,11 @@
   .modal-body {
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
+    padding: 16px 20px;
   }
   
   .section {
-    margin-bottom: 24px;
+    margin-bottom: 16px;
   }
   
   .section:last-child {
@@ -302,15 +302,15 @@
   }
   
   .section h3 {
-    margin: 0 0 4px 0;
-    font-size: 16px;
+    margin: 0 0 3px 0;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
   }
-  
+
   .section-description {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
     line-height: 1.4;
   }
@@ -318,7 +318,7 @@
   .divider {
     height: 1px;
     background-color: rgba(255, 255, 255, 0.1);
-    margin: 24px 0;
+    margin: 16px 0;
   }
   
   /* Toggle Switch */
@@ -495,8 +495,8 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 24px;
+    gap: 10px;
+    padding: 12px 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
   

@@ -209,12 +209,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
   }
 
   .modal-header h2 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
@@ -237,44 +237,44 @@
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 16px 20px;
     flex: 1;
     overflow-y: auto;
     color: var(--text-primary);
   }
 
   .settings-section {
-    margin-bottom: 24px;
+    margin-bottom: 16px;
   }
 
   .settings-section h3 {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     color: var(--text-primary);
   }
 
   .section-description {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
 
   .preset-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 6px;
+    margin-bottom: 10px;
   }
 
   .preset-button {
-    padding: 6px 12px;
+    padding: 5px 10px;
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     color: var(--text-primary);
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     transition: all 0.2s;
   }
 
@@ -285,24 +285,24 @@
 
   .prompt-input {
     width: 100%;
-    min-height: 120px;
-    padding: 12px;
+    min-height: 100px;
+    padding: 10px;
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-primary);
     font-family: inherit;
-    font-size: 14px;
+    font-size: 13px;
     resize: vertical;
   }
 
   .param-group {
-    margin-bottom: 20px;
+    margin-bottom: 14px;
   }
 
   .param-group label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   .param-group label > span:first-child {
@@ -314,7 +314,7 @@
 
   .param-description {
     display: block;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary);
   }
 
@@ -349,17 +349,17 @@
   .modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 24px;
+    gap: 10px;
+    padding: 12px 20px;
     border-top: 1px solid var(--border-color);
   }
 
   .cancel-button,
   .save-button {
-    padding: 10px 20px;
+    padding: 8px 16px;
     border: none;
     border-radius: 8px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;

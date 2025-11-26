@@ -199,13 +199,13 @@
   }
 
   .modal-body {
-    padding: 48px 40px;
+    padding: 32px 28px;
     overflow-y: auto;
     flex: 1;
   }
 
   .privacy-header {
-    margin-bottom: 48px;
+    margin-bottom: 32px;
     animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -221,24 +221,24 @@
   }
 
   .privacy-title {
-    font-size: 36px;
+    font-size: 28px;
     font-weight: 700;
     color: var(--text-primary);
-    margin: 0 0 20px 0;
+    margin: 0 0 14px 0;
     line-height: 1.2;
     letter-spacing: -0.5px;
   }
 
   .privacy-intro {
-    font-size: 18px;
-    line-height: 1.7;
+    font-size: 15px;
+    line-height: 1.6;
     color: var(--text-secondary);
     margin: 0;
     max-width: 800px;
   }
 
   .privacy-section {
-    margin-bottom: 48px;
+    margin-bottom: 32px;
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     animation-fill-mode: both;
   }
@@ -252,16 +252,16 @@
   }
 
   .section-title {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
     line-height: 1.3;
   }
 
   .section-description {
-    font-size: 16px;
-    line-height: 1.7;
+    font-size: 14px;
+    line-height: 1.6;
     color: var(--text-secondary);
     margin: 0;
     max-width: 900px;
@@ -270,15 +270,15 @@
   .privacy-features-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    margin-top: 32px;
+    gap: 16px;
+    margin-top: 20px;
   }
 
   .privacy-feature-card {
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 24px;
+    padding: 16px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     animation: cardFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     animation-fill-mode: both;
@@ -318,13 +318,13 @@
   }
 
   .feature-icon {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #ff6b35;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -333,16 +333,16 @@
   }
 
   .feature-title {
-    font-size: 20px;
+    font-size: 17px;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 12px 0;
+    margin: 0 0 8px 0;
     line-height: 1.3;
   }
 
   .feature-description {
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: 13px;
+    line-height: 1.5;
     color: var(--text-secondary);
     margin: 0;
   }
@@ -462,5 +462,7 @@
     }
   }
 </style>
+
+
 
 

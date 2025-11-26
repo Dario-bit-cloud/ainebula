@@ -287,8 +287,8 @@
   }
 </script>
 
-{#if $isPremiumModalOpen}
-  <div class="modal-backdrop" on:click={handleBackdropClick} on:keydown={(e) => e.key === 'Escape' && closeModal()}>
+  {#if $isPremiumModalOpen}
+  <div class="modal-backdrop" role="button" tabindex="-1" on:click={handleBackdropClick} on:keydown={(e) => e.key === 'Escape' && closeModal()}>
     <div class="modal-content" class:modal-mobile={$isMobile} role="dialog" aria-modal="true" aria-labelledby="premium-modal-title">
       <div class="modal-header">
         <div class="premium-icon">
@@ -314,7 +314,7 @@
             <p class="section-description">Scegli il piano che fa per te</p>
             
             <div class="plans-grid">
-              <div class="plan-card" class:selected={selectedPlan === 'monthly'} on:click={() => selectPlan('monthly')}>
+              <div class="plan-card" class:selected={selectedPlan === 'monthly'} role="button" tabindex="0" on:click={() => selectPlan('monthly')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('monthly'))}>
                 {#if plans.monthly.badge}
                   <div class="plan-badge">{plans.monthly.badge}</div>
                 {/if}
@@ -339,7 +339,7 @@
                 <button class="select-plan-button">Ottieni Pro</button>
               </div>
               
-              <div class="plan-card" class:selected={selectedPlan === 'yearly'} on:click={() => selectPlan('yearly')}>
+              <div class="plan-card" class:selected={selectedPlan === 'yearly'} role="button" tabindex="0" on:click={() => selectPlan('yearly')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('yearly'))}>
                 {#if plans.yearly.badge}
                   <div class="plan-badge">{plans.yearly.badge}</div>
                 {/if}
@@ -620,7 +620,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 24px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
     position: relative;
   }
@@ -633,7 +633,7 @@
   }
 
   .modal-header h2 {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
@@ -659,7 +659,7 @@
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 16px 20px;
     flex: 1;
     overflow-y: auto;
   }
@@ -667,22 +667,22 @@
   .section-description {
     text-align: center;
     color: var(--text-secondary);
-    margin-bottom: 24px;
-    font-size: 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
   }
 
   .plans-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 24px;
+    gap: 16px;
+    margin-bottom: 0;
   }
 
   .plan-card {
     background-color: var(--bg-tertiary);
     border: 2px solid var(--border-color);
     border-radius: 12px;
-    padding: 24px;
+    padding: 16px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
@@ -714,25 +714,25 @@
   }
 
   .plan-header {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
   }
 
   .plan-header h3 {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 12px 0;
+    margin: 0 0 8px 0;
   }
 
   .plan-price {
     display: flex;
     align-items: baseline;
     gap: 4px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .price-amount {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
     color: var(--text-primary);
   }
@@ -742,51 +742,49 @@
     color: var(--text-secondary);
   }
 
-  .price-savings {
-    font-size: 12px;
-    color: #10b981;
-    font-weight: 500;
-    margin-top: 4px;
-  }
 
   .plan-description {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-secondary);
-    margin: 0 0 20px 0;
-    line-height: 1.5;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
   }
 
   .plan-features {
     list-style: none;
     padding: 0;
-    margin: 0 0 20px 0;
+    margin: 0 0 12px 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .plan-features li {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 14px;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
     color: var(--text-primary);
+    line-height: 1.4;
   }
 
   .plan-features li svg {
     color: #10b981;
     flex-shrink: 0;
+    margin-top: 2px;
+    width: 14px;
+    height: 14px;
   }
 
   .select-plan-button {
     width: 100%;
-    padding: 12px;
+    padding: 10px;
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
     border: none;
     border-radius: 8px;
     color: #000;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -1055,16 +1053,6 @@
     width: 100%;
   }
 
-  /* Reset input number styles */
-  .input_field::-webkit-outer-spin-button,
-  .input_field::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  .input_field[type=number] {
-    -moz-appearance: textfield;
-  }
 
   /* Form Footer */
   .form-footer-new {
