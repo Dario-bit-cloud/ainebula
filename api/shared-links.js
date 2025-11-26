@@ -1,4 +1,4 @@
-// API Route per gestire i link condivisi su Vercel
+// API Route consolidata per gestire i link condivisi su Vercel
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
@@ -125,7 +125,85 @@ export default async function handler(req, res) {
     });
   }
 
-  // Verifica autenticazione
+  // Estrai il percorso dalla URL per determinare quale endpoint gestire
+  // Su Vercel, req.url contiene il percorso completo
+  const pathname = req.url.split('?')[0]; // Rimuovi query string
+  
+  // Gestisci /api/shared/:token (accesso pubblico)
+  if (pathname.startsWith('/api/shared/')) {
+    const token = pathname.split('/api/shared/')[1];
+    
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token non fornito'
+      });
+    }
+
+    try {
+      if (req.method === 'GET') {
+        const link = await sql`
+          SELECT 
+            sl.*,
+            c.title as chat_title,
+            c.id as chat_id
+          FROM shared_links sl
+          JOIN chats c ON sl.chat_id = c.id
+          WHERE sl.share_token = ${token}
+            AND sl.is_active = TRUE
+            AND (sl.expires_at IS NULL OR sl.expires_at > NOW())
+        `;
+        
+        if (link.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Link non valido o scaduto'
+          });
+        }
+        
+        // Incrementa contatore accessi
+        await sql`
+          UPDATE shared_links 
+          SET access_count = access_count + 1
+          WHERE id = ${link[0].id}
+        `;
+        
+        // Ottieni i messaggi della chat
+        const messages = await sql`
+          SELECT id, type, content, hidden, timestamp
+          FROM messages
+          WHERE chat_id = ${link[0].chat_id}
+            AND hidden = FALSE
+          ORDER BY timestamp ASC
+        `;
+        
+        return res.json({
+          success: true,
+          chat: {
+            id: link[0].chat_id,
+            title: link[0].title || link[0].chat_title,
+            messages: messages.map(m => ({
+              id: m.id,
+              type: m.type,
+              content: m.content,
+              timestamp: m.timestamp
+            }))
+          }
+        });
+      }
+
+      return res.status(405).json({ success: false, message: 'Method not allowed' });
+    } catch (error) {
+      console.error('❌ [SHARED API] Errore:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Errore nel server',
+        error: error.message
+      });
+    }
+  }
+
+  // Per gli altri endpoint, richiede autenticazione
   const auth = await authenticateToken(req);
   if (auth.error) {
     return res.status(auth.status).json({ success: false, message: auth.error });
@@ -133,8 +211,34 @@ export default async function handler(req, res) {
   const user = auth.user;
 
   try {
-    // GET - Ottieni tutti i link condivisi dell'utente
-    if (req.method === 'GET') {
+    // Gestisci DELETE /api/shared-links/:linkId
+    const linkIdMatch = pathname.match(/^\/api\/shared-links\/(.+)$/);
+    if (linkIdMatch && req.method === 'DELETE') {
+      const linkId = linkIdMatch[1];
+      
+      // Verifica che il link appartenga all'utente
+      const link = await sql`
+        SELECT id FROM shared_links WHERE id = ${linkId} AND user_id = ${user.user_id}
+      `;
+      
+      if (link.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Link non trovato'
+        });
+      }
+      
+      // Elimina il link
+      await sql`DELETE FROM shared_links WHERE id = ${linkId}`;
+      
+      return res.json({
+        success: true,
+        message: 'Link eliminato con successo'
+      });
+    }
+
+    // GET /api/shared-links - Ottieni tutti i link condivisi dell'utente
+    if (req.method === 'GET' && pathname === '/api/shared-links') {
       const links = await sql`
         SELECT 
           sl.id,
@@ -173,8 +277,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // POST - Crea un nuovo link condiviso
-    if (req.method === 'POST') {
+    // POST /api/shared-links - Crea un nuovo link condiviso
+    if (req.method === 'POST' && pathname === '/api/shared-links') {
       const { chatId, title } = req.body;
       
       if (!chatId) {
