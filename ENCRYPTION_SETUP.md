@@ -83,3 +83,4 @@ Per testare la crittografia:
 3. Controlla nel database che i messaggi siano crittografati (prefisso `encrypted:`)
 4. Ricarica la pagina e verifica che i messaggi vengano decrittografati correttamente
 
+

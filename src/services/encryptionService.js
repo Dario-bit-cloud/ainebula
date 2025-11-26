@@ -302,3 +302,4 @@ export function clearEncryptionKey(userId) {
   console.log('🔒 [ENCRYPTION] Chiave di crittografia rimossa');
 }
 
+

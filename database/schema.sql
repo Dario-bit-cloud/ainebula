@@ -236,3 +236,18 @@ CREATE INDEX IF NOT EXISTS idx_data_exports_token ON data_exports(export_token);
 -- Aggiungi colonna phone_number alla tabella users
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);
 
+-- Tabella per le passkeys (WebAuthn credentials)
+CREATE TABLE IF NOT EXISTS passkeys (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    credential_id TEXT NOT NULL UNIQUE,
+    public_key TEXT NOT NULL,
+    counter BIGINT DEFAULT 0,
+    device_name VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkeys(user_id);
+CREATE INDEX IF NOT EXISTS idx_passkeys_credential_id ON passkeys(credential_id);
+

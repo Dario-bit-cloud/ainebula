@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte';
   import { register, login } from '../services/authService.js';
+  import { registerPasskey, loginWithPasskey, isPasskeySupported } from '../services/passkeyService.js';
   import { setUser, isAuthenticatedStore } from '../stores/auth.js';
   import { get } from 'svelte/store';
   
@@ -21,9 +22,13 @@
   const MAX_RETRIES = 3;
   let isRetrying = false;
   let isSwitching = false;
+  let passkeySupported = false;
+  let isPasskeyLoading = false;
   
   // Carica credenziali salvate al mount e referral code dall'URL
   onMount(() => {
+    passkeySupported = isPasskeySupported();
+    
     const savedUsername = localStorage.getItem('saved_username');
     const savedPassword = localStorage.getItem('saved_password');
     const savedRemember = localStorage.getItem('remember_credentials') === 'true';
@@ -242,6 +247,75 @@
       closeModal();
     }
   }
+  
+  async function handlePasskeyRegister() {
+    if (!username) {
+      error = 'Inserisci prima lo username';
+      return;
+    }
+    
+    if (username.length < 3) {
+      error = 'Lo username deve essere di almeno 3 caratteri';
+      return;
+    }
+    
+    error = '';
+    successMessage = '';
+    isPasskeyLoading = true;
+    
+    try {
+      const result = await registerPasskey(username);
+      
+      if (result.success) {
+        successMessage = 'Passkey registrata con successo! Ora puoi usarla per accedere.';
+        // Dopo la registrazione, effettua automaticamente il login con passkey
+        setTimeout(async () => {
+          await handlePasskeyLogin();
+        }, 1500);
+      } else {
+        error = result.message || 'Errore durante la registrazione della passkey';
+      }
+    } catch (err) {
+      error = `Errore: ${err.message || 'Errore sconosciuto'}`;
+    } finally {
+      isPasskeyLoading = false;
+    }
+  }
+  
+  async function handlePasskeyLogin() {
+    if (!username) {
+      error = 'Inserisci prima lo username';
+      return;
+    }
+    
+    error = '';
+    successMessage = '';
+    isPasskeyLoading = true;
+    
+    try {
+      const result = await loginWithPasskey(username);
+      
+      if (result.success) {
+        setUser(result.user);
+        successMessage = 'Login con passkey completato con successo!';
+        
+        // Chiudi il modal dopo il login
+        setTimeout(async () => {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const isAuth = get(isAuthenticatedStore);
+          if (isAuth) {
+            closeModal();
+          }
+        }, 1500);
+      } else {
+        error = result.message || 'Errore durante il login con passkey';
+      }
+    } catch (err) {
+      error = `Errore: ${err.message || 'Errore sconosciuto'}`;
+    } finally {
+      isPasskeyLoading = false;
+    }
+  }
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -346,6 +420,31 @@
             />
             <span>Ricorda le credenziali</span>
           </label>
+        </div>
+      {/if}
+
+      {#if passkeySupported}
+        <div class="passkey-section">
+          <div class="passkey-divider">
+            <span>oppure</span>
+          </div>
+          <button 
+            class="passkey-button" 
+            type="button" 
+            on:click={isLogin ? handlePasskeyLogin : handlePasskeyRegister}
+            disabled={isLoading || isPasskeyLoading || !username}
+          >
+            {#if isPasskeyLoading}
+              <span class="spinner"></span>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{isLogin ? 'Accesso con passkey...' : 'Registrazione passkey...'}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            {:else}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{isLogin ? 'Accedi con Passkey' : 'Registra Passkey'}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            {/if}
+          </button>
         </div>
       {/if}
 
@@ -735,6 +834,81 @@
   .button3:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  
+  .passkey-section {
+    margin: 1.5em 0 1em 0;
+    animation: fadeIn 0.5s ease-out 0.2s both;
+  }
+  
+  .passkey-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5em 0;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+  }
+  
+  .passkey-divider::before,
+  .passkey-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .passkey-divider span {
+    padding: 0 1em;
+  }
+  
+  .passkey-button {
+    width: 100%;
+    padding: 0.85em 1.5em;
+    border-radius: 12px;
+    border: 1.5px solid rgba(59, 130, 246, 0.3);
+    outline: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #60a5fa;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 
+      0 2px 8px rgba(59, 130, 246, 0.2),
+      0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .passkey-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
+    border-color: rgba(59, 130, 246, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 
+      0 4px 12px rgba(59, 130, 246, 0.3),
+      0 2px 4px rgba(0, 0, 0, 0.2);
+    color: #93c5fd;
+  }
+  
+  .passkey-button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 
+      0 2px 6px rgba(59, 130, 246, 0.2),
+      0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .passkey-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .passkey-button svg {
+    flex-shrink: 0;
   }
   
   .error-message,

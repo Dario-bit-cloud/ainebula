@@ -78,6 +78,24 @@ async function createTables() {
     await sql`CREATE INDEX IF NOT EXISTS idx_chats_project_id ON chats(project_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_chats_updated_at ON chats(updated_at)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id)`;
+    
+    // Crea tabella passkeys
+    await sql`
+      CREATE TABLE IF NOT EXISTS passkeys (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        credential_id TEXT NOT NULL UNIQUE,
+        public_key TEXT NOT NULL,
+        counter BIGINT DEFAULT 0,
+        device_name VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_used_at TIMESTAMP WITH TIME ZONE
+      )
+    `;
+    console.log('✅ Tabella passkeys creata');
+    
+    await sql`CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkeys(user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_passkeys_credential_id ON passkeys(credential_id)`;
     console.log('✅ Indici creati');
     
     // Crea funzione per aggiornare updated_at
