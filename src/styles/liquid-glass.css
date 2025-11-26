@@ -15,18 +15,73 @@
   --lg-glass-bg-light: rgba(255, 255, 255, 0.7);
   --lg-glass-bg-hover-light: rgba(255, 255, 255, 0.8);
   --lg-glass-border-light: rgba(0, 0, 0, 0.1);
+  
+  /* Blur values - desktop */
+  --lg-blur-weak: 10px;
+  --lg-blur-medium: 20px;
+  --lg-blur-strong: 30px;
+  --lg-blur-body: 20px;
+  
+  /* Transition timing */
+  --lg-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --lg-transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --lg-transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile optimizations - reduce blur for better performance */
+@media (max-width: 768px) {
+  :root {
+    --lg-blur-weak: 6px;
+    --lg-blur-medium: 12px;
+    --lg-blur-strong: 18px;
+    --lg-blur-body: 12px;
+  }
 }
 
 /* Apply Liquid Glass style */
 body.liquid-glass {
   /* Backdrop blur effect */
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(var(--lg-blur-body));
+  -webkit-backdrop-filter: blur(var(--lg-blur-body));
+  /* Performance optimization */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: scroll-position;
 }
 
 body.liquid-glass * {
-  /* Smooth transitions */
-  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  /* Smooth transitions with hardware acceleration */
+  transition: background-color var(--lg-transition-smooth), 
+              border-color var(--lg-transition-smooth), 
+              box-shadow var(--lg-transition-smooth),
+              transform var(--lg-transition-fast);
+  /* Enable hardware acceleration */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  /* Contain layout for better performance - but exclude interactive dropdowns */
+  contain: layout style paint;
+}
+
+/* Exclude dropdowns and menus from global contain rule */
+body.liquid-glass .model-dropdown,
+body.liquid-glass .attach-menu,
+body.liquid-glass .more-options-menu,
+body.liquid-glass .move-menu,
+body.liquid-glass .legacy-submenu,
+body.liquid-glass .model-selector-wrapper,
+body.liquid-glass .attach-button-wrapper {
+  contain: none !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure wrapper buttons are clickable */
+body.liquid-glass .model-selector,
+body.liquid-glass .attach-button {
+  contain: none !important;
+  pointer-events: auto !important;
+  /* Allow proper transform for hover effects */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
 }
 
 /* Glass surfaces */
@@ -35,10 +90,25 @@ body.liquid-glass .modal-content,
 body.liquid-glass .top-bar,
 body.liquid-glass .user-section {
   background: var(--lg-glass-bg) !important;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(var(--lg-blur-medium)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--lg-blur-medium)) saturate(180%);
   border: 1px solid var(--lg-glass-border) !important;
   box-shadow: 0 8px 32px 0 var(--lg-glass-shadow) !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, backdrop-filter;
+  contain: layout style paint;
+}
+
+/* Mobile: reduce shadow complexity */
+@media (max-width: 768px) {
+  body.liquid-glass .sidebar,
+  body.liquid-glass .modal-content,
+  body.liquid-glass .top-bar,
+  body.liquid-glass .user-section {
+    box-shadow: 0 4px 16px 0 var(--lg-glass-shadow) !important;
+  }
 }
 
 /* Glass buttons */
@@ -46,10 +116,15 @@ body.liquid-glass button,
 body.liquid-glass .nav-item,
 body.liquid-glass .chat-item {
   background: var(--lg-glass-bg) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--lg-blur-weak));
+  -webkit-backdrop-filter: blur(var(--lg-blur-weak));
   border: 1px solid var(--lg-glass-border) !important;
   box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1) !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, backdrop-filter;
+  contain: layout style paint;
 }
 
 body.liquid-glass button:hover,
@@ -57,7 +132,19 @@ body.liquid-glass .nav-item:hover,
 body.liquid-glass .chat-item:hover {
   background: var(--lg-glass-bg-hover) !important;
   box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.15) !important;
-  transform: translateY(-2px);
+  transform: translate3d(0, -2px, 0);
+  -webkit-transform: translate3d(0, -2px, 0);
+}
+
+/* Mobile: reduce hover transform */
+@media (max-width: 768px) {
+  body.liquid-glass button:hover,
+  body.liquid-glass .nav-item:hover,
+  body.liquid-glass .chat-item:hover {
+    transform: translate3d(0, -1px, 0);
+    -webkit-transform: translate3d(0, -1px, 0);
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.12) !important;
+  }
 }
 
 /* Glass inputs */
@@ -65,10 +152,15 @@ body.liquid-glass input,
 body.liquid-glass textarea,
 body.liquid-glass select {
   background: var(--lg-glass-bg) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--lg-blur-weak));
+  -webkit-backdrop-filter: blur(var(--lg-blur-weak));
   border: 1px solid var(--lg-glass-border) !important;
   box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1) !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: backdrop-filter;
+  contain: layout style paint;
 }
 
 body.liquid-glass input:focus,
@@ -77,6 +169,19 @@ body.liquid-glass select:focus {
   background: var(--lg-glass-bg-hover) !important;
   box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.15) !important;
   border-color: var(--accent-blue) !important;
+  /* Smooth focus transition */
+  transition: background-color var(--lg-transition-fast),
+              box-shadow var(--lg-transition-fast),
+              border-color var(--lg-transition-fast);
+}
+
+/* Mobile: reduce focus shadow */
+@media (max-width: 768px) {
+  body.liquid-glass input:focus,
+  body.liquid-glass textarea:focus,
+  body.liquid-glass select:focus {
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.12) !important;
+  }
 }
 
 /* Glass modals */
@@ -84,14 +189,36 @@ body.liquid-glass .modal-backdrop {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   background: rgba(0, 0, 0, 0.3) !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: backdrop-filter;
+  contain: layout style paint;
 }
 
 body.liquid-glass .modal-content {
   background: var(--lg-glass-bg) !important;
-  backdrop-filter: blur(30px) saturate(180%);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(var(--lg-blur-strong)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--lg-blur-strong)) saturate(180%);
   border: 1px solid var(--lg-glass-border) !important;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, backdrop-filter;
+  contain: layout style paint;
+}
+
+/* Mobile: reduce modal blur and shadow */
+@media (max-width: 768px) {
+  body.liquid-glass .modal-backdrop {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  
+  body.liquid-glass .modal-content {
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.15) !important;
+  }
 }
 
 /* Override per il modal delle impostazioni: sfondo opaco */
@@ -106,19 +233,96 @@ body.liquid-glass .chat-item,
 body.liquid-glass .project-folder,
 body.liquid-glass .user-info {
   background: var(--lg-glass-bg) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--lg-blur-weak));
+  -webkit-backdrop-filter: blur(var(--lg-blur-weak));
   border: 1px solid var(--lg-glass-border) !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, backdrop-filter;
+  contain: layout style paint;
 }
 
 /* Glass dropdowns */
 body.liquid-glass .model-dropdown,
 body.liquid-glass .move-menu {
   background: var(--lg-glass-bg) !important;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(var(--lg-blur-medium)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--lg-blur-medium)) saturate(180%);
   border: 1px solid var(--lg-glass-border) !important;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+  /* Performance optimizations - but allow interaction */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, backdrop-filter;
+  /* Don't contain - dropdowns need to be interactive */
+  contain: none !important;
+  /* Ensure pointer events work */
+  pointer-events: auto !important;
+  /* Ensure z-index works and is above other elements */
+  isolation: isolate;
+  position: fixed !important;
+  /* Ensure stacking context */
+  z-index: 10000 !important;
+}
+
+/* Mobile: reduce dropdown shadow */
+@media (max-width: 768px) {
+  body.liquid-glass .model-dropdown,
+  body.liquid-glass .move-menu {
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.15) !important;
+  }
+}
+
+/* Attachment menu - same fixes */
+body.liquid-glass .attach-menu,
+body.liquid-glass .more-options-menu {
+  background: var(--lg-glass-bg) !important;
+  backdrop-filter: blur(var(--lg-blur-medium)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--lg-blur-medium)) saturate(180%);
+  border: 1px solid var(--lg-glass-border) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+  /* Don't contain - menus need to be interactive */
+  contain: none !important;
+  /* Ensure pointer events work */
+  pointer-events: auto !important;
+  /* Ensure z-index works and is above other elements */
+  isolation: isolate;
+  /* Ensure stacking context */
+  z-index: 10001 !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, backdrop-filter;
+}
+
+/* Mobile: reduce attachment menu shadow */
+@media (max-width: 768px) {
+  body.liquid-glass .attach-menu,
+  body.liquid-glass .more-options-menu {
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.15) !important;
+  }
+}
+
+/* Menu items inside dropdowns - ensure they're clickable */
+body.liquid-glass .model-dropdown button,
+body.liquid-glass .attach-menu button,
+body.liquid-glass .more-options-menu button,
+body.liquid-glass .move-menu button {
+  /* Override global contain for interactive elements */
+  contain: none !important;
+  pointer-events: auto !important;
+  /* Reset transform to allow proper positioning */
+  transform: none;
+  -webkit-transform: none;
+}
+
+body.liquid-glass .model-dropdown button:hover,
+body.liquid-glass .attach-menu button:hover,
+body.liquid-glass .more-options-menu button:hover,
+body.liquid-glass .move-menu button:hover {
+  transform: none;
+  -webkit-transform: none;
 }
 
 /* Theme-specific adjustments */
@@ -158,12 +362,18 @@ body.liquid-glass .new-chat-button {
   color: #ffffff !important;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 8px rgba(0, 0, 0, 0.2) !important;
   font-weight: 600 !important;
-  backdrop-filter: blur(10px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
+  backdrop-filter: blur(var(--lg-blur-weak)) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur-weak)) saturate(150%) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4), 
               0 0 24px rgba(236, 72, 153, 0.3),
               inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  /* Performance optimizations */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform, backdrop-filter;
+  contain: layout style paint;
+  transition: all var(--lg-transition-smooth);
 }
 
 body.liquid-glass .new-chat-button:hover {
@@ -172,14 +382,87 @@ body.liquid-glass .new-chat-button:hover {
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5), 
               0 0 32px rgba(236, 72, 153, 0.4),
               inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  transform: translate3d(0, -1px, 0);
+  -webkit-transform: translate3d(0, -1px, 0);
+}
+
+/* Mobile: reduce button shadow complexity */
+@media (max-width: 768px) {
+  body.liquid-glass .new-chat-button {
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35), 
+                0 0 16px rgba(236, 72, 153, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  }
+  
+  body.liquid-glass .new-chat-button:hover {
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4), 
+                0 0 24px rgba(236, 72, 153, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  }
 }
 
 body.liquid-glass .new-chat-arrow {
   stroke: #ffffff !important;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) !important;
+  /* Performance optimization */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: filter;
+  transition: filter var(--lg-transition-fast);
 }
 
 body.liquid-glass .new-chat-wrapper:hover .new-chat-arrow {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4)) !important;
+}
+
+/* Additional mobile optimizations */
+@media (max-width: 768px) {
+  /* Reduce transition complexity on mobile */
+  body.liquid-glass * {
+    transition: background-color var(--lg-transition-fast), 
+                border-color var(--lg-transition-fast), 
+                box-shadow var(--lg-transition-fast),
+                transform var(--lg-transition-fast);
+  }
+  
+  /* Disable hover effects on touch devices */
+  @media (hover: none) {
+    body.liquid-glass button:hover,
+    body.liquid-glass .nav-item:hover,
+    body.liquid-glass .chat-item:hover {
+      transform: translate3d(0, 0, 0);
+      -webkit-transform: translate3d(0, 0, 0);
+    }
+  }
+  
+  /* Optimize scrolling performance */
+  body.liquid-glass .sidebar,
+  body.liquid-glass .main-area {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+  }
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  body.liquid-glass {
+    /* Slightly reduce blur on high DPI for better performance */
+    --lg-blur-body: calc(var(--lg-blur-body) * 0.9);
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  body.liquid-glass * {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  body.liquid-glass button:hover,
+  body.liquid-glass .nav-item:hover,
+  body.liquid-glass .chat-item:hover {
+    transform: translate3d(0, 0, 0) !important;
+    -webkit-transform: translate3d(0, 0, 0) !important;
+  }
 }
 
