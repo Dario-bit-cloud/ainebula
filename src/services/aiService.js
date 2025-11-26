@@ -11,11 +11,11 @@ import { getCurrentLanguage } from '../utils/i18n.js';
  */
 function getLanguageInstruction(lang) {
   const spacingInstruction = {
-    it: ' IMPORTANTE: Non lasciare spazi vuoti tra una riga e l\'altra nei messaggi. Evita righe vuote non necessarie.',
-    en: ' IMPORTANT: Do not leave empty spaces between lines in messages. Avoid unnecessary blank lines.',
-    es: ' IMPORTANTE: No dejes espacios vacíos entre una línea y otra en los mensajes. Evita líneas vacías innecesarias.',
-    fr: ' IMPORTANT : Ne laissez pas d\'espaces vides entre les lignes dans les messages. Évitez les lignes vides inutiles.',
-    de: ' WICHTIG: Lassen Sie keine Leerzeichen zwischen den Zeilen in den Nachrichten. Vermeiden Sie unnötige Leerzeilen.'
+    it: ' REGOLA CRITICA SULLA FORMATTAZIONE: Non aggiungere MAI spazi dopo ogni riga di testo. Usa SOLO l\'interlinea (line-height) per separare le righe. Non inserire spazi vuoti alla fine delle righe. Ogni riga deve terminare direttamente con il carattere di nuova riga, senza spazi aggiuntivi. Evita righe vuote non necessarie.',
+    en: ' CRITICAL FORMATTING RULE: NEVER add spaces after each line of text. Use ONLY line-height to separate lines. Do not insert empty spaces at the end of lines. Each line must end directly with the newline character, without additional spaces. Avoid unnecessary blank lines.',
+    es: ' REGLA CRÍTICA DE FORMATO: NUNCA agregues espacios después de cada línea de texto. Usa SOLO el interlineado (line-height) para separar las líneas. No insertes espacios vacíos al final de las líneas. Cada línea debe terminar directamente con el carácter de nueva línea, sin espacios adicionales. Evita líneas vacías innecesarias.',
+    fr: ' RÈGLE CRITIQUE DE FORMATAGE: N\'ajoutez JAMAIS d\'espaces après chaque ligne de texte. Utilisez UNIQUEMENT l\'interligne (line-height) pour séparer les lignes. N\'insérez pas d\'espaces vides à la fin des lignes. Chaque ligne doit se terminer directement par le caractère de nouvelle ligne, sans espaces supplémentaires. Évitez les lignes vides inutiles.',
+    de: ' KRITISCHE FORMATIERUNGSREGEL: Fügen Sie NIE Leerzeichen nach jeder Textzeile hinzu. Verwenden Sie NUR den Zeilenabstand (line-height), um Zeilen zu trennen. Fügen Sie keine Leerzeichen am Ende von Zeilen ein. Jede Zeile muss direkt mit dem Zeilenumbruchzeichen enden, ohne zusätzliche Leerzeichen. Vermeiden Sie unnötige Leerzeilen.'
   };
   
   const instructions = {

@@ -9,7 +9,7 @@
   import { availableModels } from '../stores/models.js';
   import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView, isSidebarOpen } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
-  import { renderMarkdown, initCodeCopyButtons } from '../utils/markdown.js';
+  import { renderMarkdown, initCodeCopyButtons, normalizeTextSpacing } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
   import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
   import PrivacyModal from './PrivacyModal.svelte';
@@ -536,14 +536,17 @@
           abortController
         )) {
           fullResponse += chunk;
+          // Normalizza il testo rimuovendo spazi extra alla fine delle righe
+          const normalizedResponse = normalizeTextSpacing(fullResponse);
           // Aggiorna il messaggio in tempo reale
-          updateMessage(chatId, messageIndex, { content: fullResponse });
+          updateMessage(chatId, messageIndex, { content: normalizedResponse });
           await tick();
           scrollToBottom(false); // Scroll continuo ma non smooth per performance
         }
         
-        // Salva la risposta finale
-        updateMessage(chatId, messageIndex, { content: fullResponse });
+        // Normalizza e salva la risposta finale
+        const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
+        updateMessage(chatId, messageIndex, { content: normalizedFinalResponse });
         
         currentStreamingMessageId = null;
         
@@ -743,17 +746,21 @@
           abortController
         )) {
           fullResponse += chunk;
+          // Normalizza il testo rimuovendo spazi extra alla fine delle righe
+          const normalizedResponse = normalizeTextSpacing(fullResponse);
           const currentChatData = get(currentChat);
           if (currentChatData && currentChatData.messages.length > 0) {
-            updateMessage(chatId, currentChatData.messages.length - 1, { content: fullResponse });
+            updateMessage(chatId, currentChatData.messages.length - 1, { content: normalizedResponse });
           }
           await tick();
           scrollToBottom(false);
         }
         
+        // Normalizza e salva la risposta finale
+        const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
         const currentChatData = get(currentChat);
         if (currentChatData && currentChatData.messages.length > 0) {
-          updateMessage(chatId, currentChatData.messages.length - 1, { content: fullResponse });
+          updateMessage(chatId, currentChatData.messages.length - 1, { content: normalizedFinalResponse });
         }
         currentStreamingMessageId = null;
         

@@ -18,11 +18,20 @@ marked.setOptions({
   gfm: true
 });
 
+// Normalizza il testo rimuovendo spazi extra alla fine di ogni riga
+export function normalizeTextSpacing(text) {
+  if (!text) return '';
+  // Rimuove spazi e tab alla fine di ogni riga, mantenendo solo il carattere di nuova riga
+  return text.replace(/[ \t]+$/gm, '');
+}
+
 // Renderizza markdown in HTML sicuro
 export function renderMarkdown(markdown) {
   if (!markdown) return '';
   try {
-    let html = marked.parse(markdown);
+    // Normalizza il testo prima di renderizzarlo
+    const normalizedMarkdown = normalizeTextSpacing(markdown);
+    let html = marked.parse(normalizedMarkdown);
     
     // Rimuovi paragrafi vuoti o con solo spazi
     html = html.replace(/<p[^>]*>\s*<\/p>/g, '');
