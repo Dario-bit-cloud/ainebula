@@ -1,0 +1,213 @@
+================================================================================
+                    STRUTTURA DEL SITO - NEBULA AI
+================================================================================
+
+Nebula AI è un'applicazione web moderna costruita con Svelte per interfacciarsi
+con modelli di intelligenza artificiale. L'applicazione è strutturata come segue:
+
+--------------------------------------------------------------------------------
+1. STRUTTURA DELLE CARTELLE
+--------------------------------------------------------------------------------
+
+ROOT/
+├── api/                          # API Routes per Vercel Serverless Functions
+│   ├── admin/                    # Endpoint amministrativi
+│   ├── auth/                     # Endpoint autenticazione
+│   │   ├── 2fa.js               # Autenticazione a due fattori
+│   │   ├── index.js             # Verifica sessione, logout
+│   │   ├── login.js             # Login utente
+│   │   ├── passkey.js           # Gestione passkeys (WebAuthn)
+│   │   └── register.js          # Registrazione utente
+│   ├── chat/                     # Endpoint gestione chat
+│   │   ├── [chatId].js          # Operazioni su chat specifica
+│   │   └── index.js             # Lista chat, creazione chat
+│   ├── projects/                 # Endpoint gestione progetti
+│   │   ├── [projectId].js       # Operazioni su progetto specifico
+│   │   └── index.js             # Lista progetti, creazione progetto
+│   └── referral/                 # Endpoint sistema referral
+│       └── index.js             # Gestione referral e guadagni
+│
+├── database/                      # Script e schema database
+│   ├── create-tables.js          # Script creazione tabelle
+│   ├── create-test-user.js       # Script creazione utente test
+│   ├── init-db.js                # Script inizializzazione database
+│   └── schema.sql                # Schema completo database PostgreSQL
+│
+├── dist/                          # Build di produzione (generato)
+│   ├── assets/                   # File JavaScript e CSS compilati
+│   └── index.html                # HTML di produzione
+│
+├── public/                        # File statici pubblici
+│   └── logo.png                  # Logo dell'applicazione
+│
+├── src/                           # Codice sorgente principale
+│   ├── components/                # Componenti Svelte
+│   │   ├── AISettingsModal.svelte      # Modal impostazioni AI
+│   │   ├── AlertDialog.svelte          # Dialog di alert
+│   │   ├── AuthModal.svelte             # Modal autenticazione
+│   │   ├── ConfirmDialog.svelte         # Dialog di conferma
+│   │   ├── InviteModal.svelte           # Modal invito referral
+│   │   ├── IOSSwitch.svelte             # Switch iOS-style
+│   │   ├── MainArea.svelte              # Area principale chat
+│   │   ├── MessageActions.svelte        # Azioni sui messaggi
+│   │   ├── PersonalizationModal.svelte  # Modal personalizzazione
+│   │   ├── PremiumModal.svelte          # Modal abbonamento premium
+│   │   ├── PrivacyModal.svelte           # Modal privacy
+│   │   ├── ProjectModal.svelte          # Modal gestione progetti
+│   │   ├── PromptDialog.svelte          # Dialog prompt personalizzato
+│   │   ├── PromptLibraryModal.svelte    # Modal libreria prompt
+│   │   ├── ReportBugModal.svelte        # Modal segnalazione bug
+│   │   ├── SettingsModal.svelte         # Modal impostazioni
+│   │   ├── SharedLinksModal.svelte      # Modal link condivisi
+│   │   ├── ShortcutsModal.svelte        # Modal scorciatoie tastiera
+│   │   ├── Sidebar.svelte               # Barra laterale
+│   │   ├── TopBar.svelte                # Barra superiore
+│   │   └── UserMenu.svelte              # Menu utente
+│   │
+│   ├── config/                    # File di configurazione
+│   │   └── api.js                 # Configurazione API keys e provider
+│   │
+│   ├── services/                  # Servizi business logic
+│   │   ├── aiService.js           # Servizio chiamate AI
+│   │   ├── authService.js         # Servizio autenticazione
+│   │   ├── chatService.js         # Servizio gestione chat
+│   │   ├── databaseService.js      # Servizio database
+│   │   ├── dataExportService.js   # Servizio esportazione dati
+│   │   ├── dialogService.js       # Servizio dialog modals
+│   │   ├── encryptionService.js   # Servizio crittografia E2E
+│   │   ├── imageGenerationService.js  # Servizio generazione immagini
+│   │   ├── passkeyService.js      # Servizio passkeys (WebAuthn)
+│   │   ├── projectService.js      # Servizio gestione progetti
+│   │   ├── sharedLinksService.js  # Servizio link condivisi
+│   │   └── subscriptionService.js # Servizio abbonamenti
+│   │
+│   ├── stores/                    # Svelte stores (state management)
+│   │   ├── abortController.js    # Controller per annullare richieste
+│   │   ├── accounts.js            # Store account utente
+│   │   ├── aiSettings.js          # Store impostazioni AI
+│   │   ├── app.js                 # Store stato applicazione
+│   │   ├── auth.js                # Store autenticazione
+│   │   ├── chat.js                # Store chat e messaggi
+│   │   ├── language.js            # Store lingua/i18n
+│   │   ├── models.js              # Store modelli AI disponibili
+│   │   ├── personalization.js     # Store personalizzazione UI
+│   │   ├── projects.js            # Store progetti
+│   │   ├── promptLibrary.js       # Store libreria prompt
+│   │   └── user.js                # Store dati utente
+│   │
+│   ├── styles/                    # File CSS globali
+│   │   ├── ios-ui.css             # Stili iOS
+│   │   ├── liquid-glass.css       # Stili glassmorphism
+│   │   └── material-design-3.css  # Stili Material Design 3
+│   │
+│   ├── utils/                     # Utility functions
+│   │   ├── i18n.js                # Internazionalizzazione
+│   │   ├── markdown.js            # Rendering markdown
+│   │   ├── platform.js            # Rilevamento piattaforma
+│   │   ├── shortcuts.js           # Gestione scorciatoie tastiera
+│   │   └── tokenCounter.js        # Contatore token
+│   │
+│   ├── App.svelte                 # Componente root applicazione
+│   ├── app.css                    # Stili globali applicazione
+│   ├── main.js                    # Entry point applicazione
+│   └── logo.png                   # Logo
+│
+├── STRUTTURA/                     # Documentazione progetto (questa cartella)
+│
+├── server.js                      # Server Express backend (sviluppo)
+├── index.html                     # HTML entry point
+├── package.json                   # Dipendenze e script npm
+├── svelte.config.js              # Configurazione Svelte
+├── vite.config.js                # Configurazione Vite
+├── vercel.json                   # Configurazione deploy Vercel
+└── README.md                     # Documentazione principale
+
+--------------------------------------------------------------------------------
+2. ARCHITETTURA TECNICA
+--------------------------------------------------------------------------------
+
+FRONTEND:
+- Framework: Svelte 4
+- Build Tool: Vite
+- State Management: Svelte Stores
+- Styling: CSS puro con temi personalizzabili
+- Markdown: marked + highlight.js
+
+BACKEND:
+- Runtime: Node.js 18+
+- Framework: Express.js
+- Database: Neon PostgreSQL (serverless)
+- Autenticazione: JWT + WebAuthn/Passkeys
+- Crittografia: Web Crypto API (AES-GCM)
+
+DEPLOYMENT:
+- Frontend: Vercel (Serverless Functions)
+- Backend: Vercel Serverless Functions o server Express separato
+- Database: Neon PostgreSQL (cloud)
+
+--------------------------------------------------------------------------------
+3. STRUTTURA DATABASE
+--------------------------------------------------------------------------------
+
+TABELLE PRINCIPALI:
+- users              # Utenti registrati
+- sessions            # Sessioni utente (JWT)
+- chats               # Chat degli utenti
+- messages            # Messaggi nelle chat
+- projects            # Progetti utente
+- user_settings       # Impostazioni utente
+- subscriptions       # Abbonamenti premium
+- payments            # Storico pagamenti
+- referrals           # Sistema referral
+- referral_earnings   # Guadagni referral
+- withdrawals         # Ritiri guadagni
+- shared_links        # Link condivisi per chat
+- data_exports        # Esportazioni dati utente
+- passkeys            # Credenziali WebAuthn
+
+Vedi database/schema.sql per schema completo.
+
+--------------------------------------------------------------------------------
+4. FLUSSO DATI
+--------------------------------------------------------------------------------
+
+AUTENTICAZIONE:
+1. Utente inserisce credenziali → AuthModal
+2. authService.js chiama /api/auth/login
+3. server.js verifica credenziali nel database
+4. Genera JWT token e salva sessione
+5. Token salvato in localStorage
+6. Store auth.js aggiorna stato autenticazione
+
+CHAT:
+1. Utente invia messaggio → MainArea.svelte
+2. chat.js store aggiunge messaggio
+3. aiService.js chiama API provider (Electron Hub/LLM7)
+4. Risposta streaming salvata in chat.js
+5. chatService.js salva nel database (se autenticato)
+6. Messaggi crittografati con encryptionService.js
+
+PERSISTENZA:
+- Utente autenticato: Database PostgreSQL
+- Utente non autenticato: localStorage
+- Migrazione automatica al login
+
+--------------------------------------------------------------------------------
+5. CONFIGURAZIONE
+--------------------------------------------------------------------------------
+
+FILE DI CONFIGURAZIONE:
+- src/config/api.js          # API keys e provider
+- server.js                   # Configurazione server Express
+- vercel.json                 # Configurazione Vercel
+- .env                        # Variabili d'ambiente (non committato)
+
+VARIABILI D'AMBIENTE:
+- DATABASE_URL                # Connection string PostgreSQL
+- JWT_SECRET                  # Chiave segreta JWT
+- WEBAUTHN_RP_ID             # Dominio per WebAuthn
+- WEBAUTHN_ORIGIN            # URL frontend per WebAuthn
+- WEBAUTHN_RP_NAME           # Nome applicazione WebAuthn
+
+================================================================================
+

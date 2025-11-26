@@ -1,0 +1,362 @@
+================================================================================
+                    INTERFACCIA UTENTE - NEBULA AI
+================================================================================
+
+Questo documento descrive l'interfaccia utente dell'applicazione Nebula AI.
+
+--------------------------------------------------------------------------------
+1. LAYOUT PRINCIPALE
+--------------------------------------------------------------------------------
+
+STRUTTURA:
+┌─────────────────────────────────────────────────────────────┐
+│ TopBar (barra superiore)                                    │
+├──────────┬──────────────────────────────────────────────────┤
+│          │                                                  │
+│ Sidebar  │  MainArea (area chat principale)                │
+│ (sinistra)│                                                  │
+│          │                                                  │
+│          │                                                  │
+├──────────┴──────────────────────────────────────────────────┤
+│ UserMenu (menu utente in basso)                            │
+└─────────────────────────────────────────────────────────────┘
+
+COMPONENTI:
+- TopBar: Controlli principali, ricerca, impostazioni AI, modals
+- Sidebar: Lista chat, progetti, navigazione
+- MainArea: Area chat, messaggi, input utente
+- UserMenu: Info utente, logout, premium
+
+--------------------------------------------------------------------------------
+2. SIDEBAR (Barra Laterale)
+--------------------------------------------------------------------------------
+
+SEZIONI:
+1. PULSANTE "NUOVA CHAT"
+   - Crea nuova chat vuota
+   - Posizionato in alto
+
+2. BARRA RICERCA
+   - Icona ricerca in alto
+   - Filtra chat per titolo in tempo reale
+   - Tasto ESC per chiudere
+
+3. LISTA CHAT
+   - Chat ordinate per data (più recenti in alto)
+   - Click su chat → carica chat
+   - Click destro → menu contestuale:
+     * Rinomina
+     * Elimina
+     * Sposta in progetto
+   - Drag & drop per spostare in progetti
+   - Badge "NEW" per chat nuove
+
+4. PROGETTI
+   - Sezione espandibile/collassabile
+   - Progetti con colore e icona personalizzati
+   - Chat raggruppate per progetto
+   - Click su progetto → filtra chat del progetto
+   - Click destro progetto → modifica/elimina
+
+5. NAVIGAZIONE INFERIORE
+   - Invita amici (referral)
+   - Impostazioni
+   - Premium
+
+STILI:
+- Background glassmorphism
+- Animazioni smooth
+- Responsive: si nasconde su mobile, mostra hamburger menu
+
+--------------------------------------------------------------------------------
+3. MAINAREA (Area Chat Principale)
+--------------------------------------------------------------------------------
+
+SEZIONI:
+
+1. TOPBAR INTEGRATA
+   - Titolo chat corrente
+   - Pulsante modifica titolo
+   - Pulsante condivisione
+   - Pulsante elimina chat
+   - Pulsante impostazioni AI
+   - Pulsante scorciatoie tastiera
+
+2. AREA MESSAGGI
+   - Scroll verticale automatico
+   - Messaggi utente a destra (blu)
+   - Messaggi AI a sinistra (grigio)
+   - Markdown rendering con syntax highlighting
+   - Copy button su blocchi codice
+   - Azioni messaggio (modifica, elimina, copia)
+   - Streaming in tempo reale per risposte AI
+   - Immagini allegate mostrate inline
+
+3. INPUT AREA
+   - Textarea espandibile
+   - Pulsante invio
+   - Pulsante allegare (immagini)
+   - Pulsante opzioni (più opzioni)
+   - Contatore token
+   - Indicatore generazione (typing indicator)
+
+4. FUNZIONALITÀ:
+   - Auto-scroll al nuovo messaggio
+   - Scroll to top button quando scrollato in alto
+   - Ricerca nei messaggi (Ctrl+F)
+   - Evidenziazione messaggi cercati
+   - Modifica messaggi (doppio click)
+   - Eliminazione messaggi
+   - Regenera risposta AI
+   - Stop generazione (pulsante durante streaming)
+
+STILI:
+- Background gradient
+- Messaggi con card glassmorphism
+- Animazioni fade-in per nuovi messaggi
+- Highlight su hover
+- Responsive design
+
+--------------------------------------------------------------------------------
+4. TOPBAR (Barra Superiore)
+--------------------------------------------------------------------------------
+
+ELEMENTI:
+- Logo Nebula AI (sinistra)
+- Pulsante ricerca globale
+- Pulsante impostazioni AI
+- Pulsante libreria prompt
+- Pulsante personalizzazione
+- Pulsante segnala bug
+- Pulsante scorciatoie
+- Pulsante impostazioni generali
+- Menu utente (destra)
+
+FUNZIONALITÀ:
+- Ricerca globale: cerca in tutte le chat
+- Impostazioni AI: temperatura, tokens, modello
+- Libreria prompt: prompt predefiniti
+- Personalizzazione: temi, colori, lingua
+- Segnala bug: form segnalazione
+- Scorciatoie: lista tutte le scorciatoie tastiera
+
+STILI:
+- Barra fissa in alto
+- Background glassmorphism
+- Icone con tooltip
+- Animazioni hover
+
+--------------------------------------------------------------------------------
+5. USERMENU (Menu Utente)
+--------------------------------------------------------------------------------
+
+POSIZIONE: In basso a sinistra (sopra Sidebar)
+
+ELEMENTI:
+- Avatar utente (o iniziali)
+- Nome utente
+- Email utente
+- Badge abbonamento (se premium)
+- Pulsante logout
+- Pulsante esporta dati
+- Pulsante elimina account
+
+FUNZIONALITÀ:
+- Click su avatar → mostra menu dropdown
+- Logout → disconnette e mostra AuthModal
+- Esporta dati → scarica JSON con tutti i dati
+- Elimina account → conferma e rimuove account
+
+STILI:
+- Card glassmorphism
+- Animazioni smooth
+- Badge colorati per abbonamenti
+
+--------------------------------------------------------------------------------
+6. MODALS (Finestre Modali)
+--------------------------------------------------------------------------------
+
+AUTHSETTINGS MODAL:
+- Form login/registrazione
+- Toggle tra login e registrazione
+- Supporto passkeys (WebAuthn)
+- Validazione in tempo reale
+- Messaggi errore
+
+SETTINGS MODAL:
+- Impostazioni generali
+- Tema (light/dark/system)
+- Lingua
+- Notifiche
+- Privacy
+- Account
+
+AISETTINGS MODAL:
+- Modello AI selezionato
+- Temperature slider
+- Max tokens input
+- Top P slider
+- Frequency penalty slider
+- Presence penalty slider
+- Reset ai default
+
+PROJECT MODAL:
+- Crea/modifica progetto
+- Nome progetto
+- Descrizione
+- Selettore colore
+- Selettore icona
+- Anteprima progetto
+
+PREMIUM MODAL:
+- Piani abbonamento
+- Confronto funzionalità
+- Form pagamento
+- Termini e condizioni
+
+PROMPT LIBRARY MODAL:
+- Categorie prompt
+- Ricerca prompt
+- Anteprima prompt
+- Click per usare prompt
+
+SHORTCUTS MODAL:
+- Lista tutte le scorciatoie
+- Raggruppate per categoria
+- Evidenziazione tasti
+
+PERSONALIZATION MODAL:
+- Selettore tema
+- Personalizzazione colori
+- Selettore lingua
+- Anteprima in tempo reale
+
+SHARED LINKS MODAL:
+- Lista link condivisi
+- Crea nuovo link
+- Copia link
+- Elimina link
+- Statistiche accessi
+
+INVITE MODAL:
+- Codice referral
+- Link referral
+- Statistiche referral
+- Guadagni referral
+
+REPORT BUG MODAL:
+- Form segnalazione bug
+- Categoria bug
+- Descrizione
+- Screenshot opzionale
+- Submit
+
+STILI MODALS:
+- Overlay scuro semi-trasparente
+- Card centrata con glassmorphism
+- Animazioni fade-in/out
+- Chiusura con ESC o click overlay
+- Scroll interno se contenuto lungo
+
+--------------------------------------------------------------------------------
+7. DIALOGS (Dialoghi)
+--------------------------------------------------------------------------------
+
+CONFIRM DIALOG:
+- Messaggio conferma
+- Pulsante conferma (rosso)
+- Pulsante annulla
+- Usato per azioni distruttive
+
+ALERT DIALOG:
+- Messaggio informativo
+- Pulsante OK
+- Icona tipo messaggio (info/warning/error)
+
+PROMPT DIALOG:
+- Input personalizzato
+- Pulsante conferma
+- Pulsante annulla
+- Validazione input
+
+STILI:
+- Overlay scuro
+- Card piccola centrata
+- Animazioni smooth
+
+--------------------------------------------------------------------------------
+8. RESPONSIVE DESIGN
+--------------------------------------------------------------------------------
+
+MOBILE (< 768px):
+- Sidebar nascosta di default
+- Hamburger menu per aprire Sidebar
+- TopBar compatta
+- MainArea full width
+- Modals full screen
+- Touch gestures (swipe per aprire Sidebar)
+
+TABLET (768px - 1024px):
+- Sidebar collassabile
+- Layout adattivo
+- Modals dimensioni medie
+
+DESKTOP (> 1024px):
+- Layout completo
+- Sidebar sempre visibile
+- Modals dimensioni ottimali
+
+--------------------------------------------------------------------------------
+9. TEMI E STILI
+--------------------------------------------------------------------------------
+
+TEMI DISPONIBILI:
+- Light: Sfondo chiaro, testo scuro
+- Dark: Sfondo scuro, testo chiaro (default)
+- System: Segue impostazioni OS
+
+STILI APPLICATI:
+- Glassmorphism: Effetto vetro smerigliato
+- Material Design 3: Componenti moderni
+- iOS UI: Elementi stile iOS (switch, card)
+
+COLORI:
+- Primary: Blu (#3b82f6)
+- Secondary: Grigio (#6b7280)
+- Success: Verde (#10b981)
+- Warning: Giallo (#f59e0b)
+- Error: Rosso (#ef4444)
+- Background: Gradiente scuro
+- Text: Bianco/Grigio chiaro
+
+ANIMAZIONI:
+- Fade in/out per modals
+- Slide per Sidebar
+- Smooth scroll
+- Hover effects
+- Loading spinners
+- Typing indicators
+
+--------------------------------------------------------------------------------
+10. ACCESSIBILITÀ
+--------------------------------------------------------------------------------
+
+FEATURES:
+- Keyboard navigation completa
+- Focus visible su elementi interattivi
+- ARIA labels su elementi importanti
+- Contrasto colori sufficiente
+- Testo scalabile
+- Screen reader friendly
+
+SCORCIATOIE TASTIERA:
+- Ctrl/Cmd + K: Ricerca
+- Ctrl/Cmd + N: Nuova chat
+- Ctrl/Cmd + /: Scorciatoie
+- ESC: Chiudi modal/dialog
+- Enter: Invia messaggio
+- Shift + Enter: Nuova riga
+- Ctrl/Cmd + F: Ricerca nei messaggi
+
+================================================================================
+

@@ -33,10 +33,9 @@ export async function createNewChat(projectId = null, isTemporary = false) {
   // Salva nel database solo se autenticato E non è temporanea
   if (get(isAuthenticatedStore) && !isTemporary) {
     await saveChatToDatabase(newChat);
-  } else if (isTemporary) {
-    // Salva in localStorage se è temporanea
-    saveChatsToStorage();
   }
+  // Non salvare chat temporanee vuote in localStorage
+  // Verranno salvate solo quando avranno almeno un messaggio
   
   return newChat.id;
 }
@@ -111,29 +110,35 @@ export async function addMessage(chatId, message) {
 }
 
 export async function deleteChat(chatId) {
-  let currentId = null;
-  const unsubscribe = currentChatId.subscribe(id => {
-    currentId = id;
-  });
-  unsubscribe();
+  if (!chatId) return;
   
-  // Controlla se la chat è temporanea prima di eliminarla
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
-  const isTemporary = chat?.isTemporary === true;
+  if (!chat) return;
   
-  chats.update(allChats => allChats.filter(chat => chat.id !== chatId));
+  const isTemporary = chat.isTemporary === true;
+  const currentId = get(currentChatId);
+  
+  // Rimuovi la chat dallo store
+  chats.update(allChats => allChats.filter(c => c.id !== chatId));
+  
+  // Se era la chat corrente, resetta il currentChatId
   if (currentId === chatId) {
     currentChatId.set(null);
   }
   
   // Elimina dal database solo se non è temporanea e se autenticato
   if (!isTemporary && get(isAuthenticatedStore)) {
-    await deleteChatFromDatabase(chatId);
-  } else {
-    // Salva in localStorage (per aggiornare la lista dopo l'eliminazione)
-    saveChatsToStorage();
+    try {
+      await deleteChatFromDatabase(chatId);
+    } catch (error) {
+      console.error('Errore durante eliminazione chat dal database:', error);
+    }
   }
+  
+  // Aggiorna localStorage per rimuovere la chat eliminata
+  // (importante per le chat temporanee)
+  saveChatsToStorage();
 }
 
 export function loadChat(chatId) {
@@ -214,17 +219,23 @@ const STORAGE_KEY = 'nebula-ai-chats';
 
 export function saveChatsToStorage() {
   if (typeof window !== 'undefined') {
-    let currentChats = [];
-    const unsubscribe = chats.subscribe(value => {
+    try {
+      const allChats = get(chats);
       // Salva tutte le chat (incluse temporanee) che hanno almeno un messaggio visibile
-      currentChats = value.filter(chat => 
-        chat.messages && 
-        chat.messages.length > 0 &&
-        chat.messages.some(msg => !msg.hidden) // Almeno un messaggio visibile
-      );
-    });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentChats));
-    unsubscribe();
+      const chatsToSave = allChats.filter(chat => {
+        // Per le chat temporanee, salva anche se vuote (per mantenere lo stato)
+        if (chat.isTemporary) {
+          return true; // Salva tutte le chat temporanee
+        }
+        // Per le chat normali, salva solo quelle con messaggi
+        return chat.messages && 
+               chat.messages.length > 0 &&
+               chat.messages.some(msg => !msg.hidden);
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(chatsToSave));
+    } catch (error) {
+      console.error('Errore durante salvataggio chat in localStorage:', error);
+    }
   }
 }
 

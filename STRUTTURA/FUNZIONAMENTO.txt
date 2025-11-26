@@ -1,0 +1,333 @@
+================================================================================
+                    FUNZIONAMENTO - NEBULA AI
+================================================================================
+
+Questo documento descrive come funziona l'applicazione Nebula AI, i flussi
+di lavoro principali e le interazioni tra i vari componenti.
+
+--------------------------------------------------------------------------------
+1. AVVIO APPLICAZIONE
+--------------------------------------------------------------------------------
+
+FLUSSO DI BOOTSTRAP:
+1. Browser carica index.html
+2. Vite carica main.js
+3. main.js monta App.svelte
+4. App.svelte inizializza:
+   - initAuth() per verificare sessione esistente
+   - Carica chat da localStorage o database
+   - Carica progetti da database
+   - Inizializza stores (chat, auth, user, projects)
+5. Se utente non autenticato → mostra AuthModal
+6. Se utente autenticato → mostra interfaccia principale
+
+COMPONENTI PRINCIPALI:
+- App.svelte: Container principale, gestisce modals
+- Sidebar.svelte: Lista chat e progetti
+- MainArea.svelte: Area chat e input
+- TopBar.svelte: Barra superiore con controlli
+- UserMenu.svelte: Menu utente in basso
+
+--------------------------------------------------------------------------------
+2. AUTENTICAZIONE
+--------------------------------------------------------------------------------
+
+REGISTRAZIONE:
+1. Utente compila form in AuthModal
+2. authService.register() chiama POST /api/auth/register
+3. server.js:
+   - Verifica email/username unici
+   - Hash password con bcrypt
+   - Crea utente nel database
+   - Genera JWT token
+   - Salva sessione nel database
+4. Token salvato in localStorage
+5. Store auth.js aggiornato
+6. encryptionService inizializza chiave crittografia dalla password
+7. Chat da localStorage migrate al database
+
+LOGIN:
+1. Utente inserisce credenziali in AuthModal
+2. authService.login() chiama POST /api/auth/login
+3. server.js:
+   - Verifica credenziali
+   - Genera JWT token
+   - Salva sessione
+4. Token salvato, store aggiornato
+5. Chiave crittografia derivata dalla password
+6. Chat caricate dal database
+
+LOGOUT:
+1. Utente clicca logout in UserMenu
+2. authService.logout() chiama POST /api/auth/logout
+3. server.js rimuove sessione dal database
+4. localStorage pulito
+5. Store auth.js resettato
+6. Chiave crittografia rimossa
+
+PASSKEYS (WebAuthn):
+1. Utente registra passkey → passkeyService.registerPasskey()
+2. Chiama /api/auth/passkey/register/start
+3. Server genera challenge
+4. Browser crea credenziale con WebAuthn API
+5. Credenziale inviata a /api/auth/passkey/register/finish
+6. Server salva credenziale in tabella passkeys
+7. Login successivo: passkeyService.loginWithPasskey()
+8. Server verifica credenziale senza password
+
+--------------------------------------------------------------------------------
+3. GESTIONE CHAT
+--------------------------------------------------------------------------------
+
+CREAZIONE CHAT:
+1. Utente clicca "Nuova Chat" in Sidebar
+2. chat.js createNewChat() genera nuovo ID
+3. Chat aggiunta a store chats
+4. Se autenticato: chatService.saveChat() → POST /api/chat
+5. Server salva chat nel database
+6. currentChatId aggiornato
+
+INVIO MESSAGGIO:
+1. Utente digita messaggio in MainArea
+2. Utente preme Invio o clicca invio
+3. MainArea.svelte:
+   - Aggiunge messaggio utente a chat corrente
+   - Chiama generateResponseStream() da aiService.js
+4. aiService.js:
+   - Prepara richiesta con messaggio e history
+   - Determina provider (Electron Hub o LLM7) da modello selezionato
+   - Chiama API provider con streaming
+   - Aggiorna messaggio AI in tempo reale
+5. Al completamento:
+   - Messaggio salvato in chat.js store
+   - Se autenticato: chatService.saveChat() → POST /api/chat
+   - Messaggi crittografati prima del salvataggio
+6. Server salva chat e messaggi nel database
+
+CRITTOGRAFIA MESSAGGI:
+1. Al login: encryptionService.initializeEncryption() deriva chiave da password
+2. Chiave salvata in localStorage (formato JWK)
+3. Al salvataggio chat:
+   - encryptionService.encryptMessage() crittografa ogni messaggio
+   - Prefisso "encrypted:" aggiunto
+   - IV casuale generato per ogni messaggio
+4. Al caricamento chat:
+   - encryptionService.decryptMessage() decrittografa messaggi
+   - Messaggi mostrati in chiaro all'utente
+5. Server non può leggere messaggi crittografati
+
+ELIMINAZIONE CHAT:
+1. Utente clicca elimina in Sidebar
+2. Dialog di conferma
+3. chat.js deleteChat() rimuove da store
+4. Se autenticato: chatService.deleteChat() → DELETE /api/chat/:chatId
+5. Server elimina chat e messaggi correlati (CASCADE)
+
+RICERCA CHAT:
+1. Utente digita in barra ricerca Sidebar
+2. Sidebar filtra chat per titolo
+3. Risultati mostrati in tempo reale
+
+--------------------------------------------------------------------------------
+4. GESTIONE PROGETTI
+--------------------------------------------------------------------------------
+
+CREAZIONE PROGETTO:
+1. Utente clicca "Nuovo Progetto" in Sidebar
+2. ProjectModal si apre
+3. Utente inserisce nome, descrizione, colore, icona
+4. projectService.createProject() → POST /api/projects
+5. Server salva progetto nel database
+6. Store projects.js aggiornato
+
+SPOSTAMENTO CHAT IN PROGETTO:
+1. Utente drag & drop chat su progetto in Sidebar
+2. chat.js moveChatToProject() aggiorna chat
+3. chatService.updateChat() → PATCH /api/chat/:chatId
+4. Server aggiorna project_id della chat
+
+ELIMINAZIONE PROGETTO:
+1. Utente clicca elimina progetto
+2. Dialog di conferma
+3. projectService.deleteProject() → DELETE /api/projects/:projectId
+4. Server elimina progetto
+5. Chat nel progetto rimangono ma senza project_id
+
+--------------------------------------------------------------------------------
+5. CHIAMATE AI
+--------------------------------------------------------------------------------
+
+FLUSSO RICHIESTA:
+1. Utente invia messaggio
+2. aiService.js genera richiesta:
+   - Legge modello selezionato da models.js store
+   - Determina provider da MODEL_MAPPING in api.js
+   - Prepara messaggi con history
+   - Aggiunge immagini se presenti
+3. Chiama API provider:
+   - Electron Hub: https://api.electronhub.ai/v1/chat/completions
+   - LLM7.io: https://api.llm7.io/v1/chat/completions
+4. Risposta streaming:
+   - Legge stream chunk per chunk
+   - Aggiorna messaggio AI in tempo reale
+   - Gestisce abort se utente cancella
+5. Al completamento:
+   - Messaggio completo salvato
+   - Token contati con tokenCounter.js
+
+MODELLI DISPONIBILI:
+- nebula-1.0: GPT-4o via Electron Hub (gratuito)
+- nebula-pro: GPT-4 via LLM7.io (premium)
+- nebula-coder: GPT-4 specializzato coding via LLM7.io
+- nebula-premium-pro: GPT-4 per abbonati Pro
+- nebula-premium-max: GPT-4 per abbonati Max
+
+GESTIONE ERRORI:
+- 401 Unauthorized: API key non valida
+- 429 Too Many Requests: Rate limit raggiunto
+- 402 Payment Required: Crediti insufficienti
+- Network error: Retry automatico o messaggio errore
+
+--------------------------------------------------------------------------------
+6. ABBONAMENTI E PREMIUM
+--------------------------------------------------------------------------------
+
+SISTEMA ABBONAMENTI:
+1. Utente clicca "Premium" in UserMenu
+2. PremiumModal mostra piani disponibili
+3. Utente seleziona piano e procede pagamento
+4. subscriptionService.createSubscription() → POST /api/subscription
+5. Server:
+   - Crea abbonamento nel database
+   - Integra con provider pagamento (Stripe/PayPal)
+   - Aggiorna status utente
+6. Store user.js aggiornato con hasActiveSubscription
+7. Funzionalità premium sbloccate
+
+VERIFICA ABBONAMENTO:
+- user.js store verifica hasActiveSubscription
+- Modelli premium disponibili solo se abbonato
+- Funzionalità premium mostrate solo se abbonato
+
+--------------------------------------------------------------------------------
+7. SISTEMA REFERRAL
+--------------------------------------------------------------------------------
+
+FUNZIONAMENTO:
+1. Utente registrato ottiene codice referral unico
+2. Utente condivide codice con amici
+3. Amico si registra con codice referral
+4. Server crea record in tabella referrals
+5. Quando referral completa azioni (es. abbonamento):
+   - referral_earnings creato per referrer
+   - Importo aggiunto al saldo referrer
+6. Referrer può ritirare guadagni:
+   - withdrawal creato
+   - Pagamento processato
+   - Status aggiornato
+
+--------------------------------------------------------------------------------
+8. LINK CONDIVISI
+--------------------------------------------------------------------------------
+
+CONDIVISIONE CHAT:
+1. Utente clicca "Condividi" su chat
+2. SharedLinksModal si apre
+3. sharedLinksService.createSharedLink() → POST /api/shared-links
+4. Server:
+   - Genera token unico
+   - Crea record in shared_links
+   - Imposta scadenza opzionale
+5. Link generato: https://ainebula.vercel.app/shared/:token
+6. Chiunque può accedere al link e vedere chat (sola lettura)
+
+ACCESSO LINK:
+1. Utente visita URL condiviso
+2. Server verifica token in shared_links
+3. Carica chat associata
+4. Mostra chat in modalità sola lettura
+5. Incrementa access_count
+
+--------------------------------------------------------------------------------
+9. ESPORTAZIONE DATI
+--------------------------------------------------------------------------------
+
+ESPORTARE CHAT:
+1. Utente clicca "Esporta Dati" in SettingsModal
+2. dataExportService.exportUserData() → POST /api/data-export
+3. Server:
+   - Genera token esportazione
+   - Prepara tutti i dati utente (chat, progetti, impostazioni)
+   - Crea file JSON
+   - Salva in data_exports
+4. Utente scarica file JSON con tutti i dati
+
+--------------------------------------------------------------------------------
+10. PERSONALIZZAZIONE UI
+--------------------------------------------------------------------------------
+
+TEMI:
+- Light mode
+- Dark mode
+- System (segue OS)
+- Personalizzazione colori in PersonalizationModal
+
+LINGUE:
+- Italiano (default)
+- Inglese
+- Altri (estendibile)
+
+IMPOSTAZIONI AI:
+- Temperature
+- Max tokens
+- Top P
+- Frequency penalty
+- Presence penalty
+- Modello predefinito
+
+SALVATAGGIO:
+- Impostazioni salvate in user_settings nel database
+- Sincronizzate tra dispositivi
+- Applicate al login
+
+--------------------------------------------------------------------------------
+11. SICUREZZA
+--------------------------------------------------------------------------------
+
+PROTEZIONI IMPLEMENTATE:
+- Password hashate con bcrypt (10 rounds)
+- JWT token firmati per autenticazione
+- Sessioni salvate nel database con scadenza
+- Crittografia end-to-end per messaggi (AES-GCM)
+- CORS configurato per sicurezza
+- SQL injection prevenuta con parametri
+- XSS prevenuto con sanitizzazione input
+- CSRF protection con token
+
+VALIDAZIONE:
+- Input utente validato lato client e server
+- Email formato verificato
+- Password minimo 6 caratteri
+- Username unico verificato
+
+--------------------------------------------------------------------------------
+12. PERFORMANCE
+--------------------------------------------------------------------------------
+
+OTTIMIZZAZIONI:
+- Lazy loading modals (caricati solo quando necessari)
+- Code splitting con Vite
+- Streaming risposte AI (no attesa completa)
+- Indici database per query veloci
+- Compressione risposte server
+- Caching localStorage per chat non autenticate
+- Debouncing ricerca chat
+
+GESTIONE MEMORIA:
+- Chat non caricate tutte insieme
+- Messaggi caricati on-demand
+- Cleanup sessioni scadute
+- Pulizia localStorage periodica
+
+================================================================================
+

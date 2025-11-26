@@ -486,3 +486,104 @@
 .ios-device ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* iOS Switch - From Uiverse.io by zanina-yassine */
+.ios-device .ios-switch-container {
+  width: 51px;
+  height: 31px;
+  position: relative;
+}
+
+.ios-device .ios-switch-checkbox {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.ios-device .ios-switch {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-color: #e9e9eb;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+
+.ios-device .ios-switch-slider {
+  width: 27px;
+  height: 27px;
+  position: absolute;
+  left: calc(50% - 27px/2 - 10px);
+  top: calc(50% - 27px/2);
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.15), 0px 3px 1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+}
+
+.ios-device .ios-switch-checkbox:checked + .ios-switch {
+  background-color: #34C759;
+}
+
+.ios-device .ios-switch-checkbox:checked + .ios-switch .ios-switch-slider {
+  left: calc(50% - 27px/2 + 10px);
+  top: calc(50% - 27px/2);
+}
+
+/* Sostituisci gli switch esistenti con lo stile iOS */
+.ios-device .toggle-switch,
+.ios-device .screenshot-toggle {
+  width: 51px;
+  height: 31px;
+  position: relative;
+  display: inline-block;
+}
+
+.ios-device .toggle-switch input,
+.ios-device .screenshot-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.ios-device .toggle-switch .toggle-slider,
+.ios-device .screenshot-toggle .toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e9e9eb;
+  border-radius: 16px;
+  transition: all 0.2s ease-out;
+}
+
+.ios-device .toggle-switch .toggle-slider::before,
+.ios-device .screenshot-toggle .toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 27px;
+  height: 27px;
+  left: calc(50% - 27px/2 - 10px);
+  top: calc(50% - 27px/2);
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.15), 0px 3px 1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease-out;
+}
+
+.ios-device .toggle-switch input:checked + .toggle-slider,
+.ios-device .screenshot-toggle input:checked + .toggle-slider {
+  background-color: #34C759;
+}
+
+.ios-device .toggle-switch input:checked + .toggle-slider::before,
+.ios-device .screenshot-toggle input:checked + .toggle-slider::before {
+  left: calc(50% - 27px/2 + 10px);
+  top: calc(50% - 27px/2);
+}

@@ -815,16 +815,27 @@
                     <div class="chat-title">{chat.title}</div>
                     <div class="chat-date">{formatDate(chat.updatedAt)}</div>
                   </div>
-                  <button 
-                    class="chat-delete" 
-                    on:click={(e) => handleDeleteChat(e, chat.id)}
-                    title={$t('deleteChat')}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="3 6 5 6 21 6"/>
-                      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                    </svg>
-                  </button>
+                  <div class="chat-actions">
+                    <button 
+                      class="chat-move" 
+                      on:click={(e) => handleMoveChat(e, chat.id)}
+                      title={$t('moveToFolder')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </button>
+                    <button 
+                      class="chat-delete" 
+                      on:click={(e) => handleDeleteChat(e, chat.id)}
+                      title={$t('deleteChat')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               {/each}
             {/if}
@@ -835,7 +846,11 @@
                 <div class="project-folder">
                   <div 
                     class="project-header"
+                    class:drag-over={dragOverProjectId === project.id}
                     on:click={() => handleProjectClick(project.id)}
+                    on:dragover={(e) => handleDragOver(e, project.id)}
+                    on:dragleave={handleDragLeave}
+                    on:drop={(e) => handleDrop(e, project.id)}
                   >
                     <div class="project-icon-wrapper" style="background-color: {project.color}20; color: {project.color}">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -869,6 +884,15 @@
                             <div class="chat-date">{formatDate(chat.updatedAt)}</div>
                           </div>
                           <div class="chat-actions">
+                            <button 
+                              class="chat-move" 
+                              on:click={(e) => handleMoveChat(e, chat.id)}
+                              title={$t('moveToFolder')}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"/>
+                              </svg>
+                            </button>
                             <button 
                               class="chat-delete" 
                               on:click={(e) => handleDeleteChat(e, chat.id)}

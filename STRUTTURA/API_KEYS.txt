@@ -1,0 +1,274 @@
+================================================================================
+                    API KEYS - NEBULA AI
+================================================================================
+
+Questo documento elenca tutte le API keys utilizzate nel progetto e a cosa
+appartengono.
+
+--------------------------------------------------------------------------------
+1. API KEYS AI PROVIDER
+--------------------------------------------------------------------------------
+
+FILE: src/config/api.js
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ API_CONFIG (Electron Hub)                                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Provider: Electron Hub                                                   │
+│ Base URL: https://api.electronhub.ai/v1                                 │
+│ API Key: ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ          │
+│                                                                          │
+│ Utilizzo:                                                               │
+│ - Modello: nebula-1.0 (GPT-4o)                                         │
+│ - Provider predefinito per utenti gratuiti                             │
+│ - Usato in: aiService.js per chiamate chat completions                 │
+│                                                                          │
+│ Note:                                                                   │
+│ - Piano gratuito disponibile                                           │
+│ - Rate limits applicati                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ LLM7_CONFIG (LLM7.io)                                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Provider: LLM7.io                                                       │
+│ Base URL: https://api.llm7.io/v1                                       │
+│ API Key: 9I0oxFYS9vFJKLYm6Tbpn6YMObVnMdsrNOPs/r6ZZA0T4Ve2Vn8eWcuYSOMy  │
+│          37eZ6TwyC4WUPmPE6/y6ioivxNo3HkPG72k12SoM25DN5i4+21BPY6E/DFoib │
+│          TaN+zAW/216gIo=                                                │
+│                                                                          │
+│ Utilizzo:                                                               │
+│ - Modelli: nebula-pro, nebula-coder, nebula-premium-pro,               │
+│            nebula-premium-max (tutti GPT-4)                            │
+│ - Provider per utenti premium                                           │
+│ - Usato in: aiService.js per chiamate chat completions                 │
+│                                                                          │
+│ Note:                                                                   │
+│ - Richiede abbonamento premium                                         │
+│ - Migliore qualità risposte                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+MAPPATURA MODELLI:
+- nebula-1.0 → Electron Hub (GPT-4o)
+- nebula-pro → LLM7.io (GPT-4)
+- nebula-coder → LLM7.io (GPT-4)
+- nebula-premium-pro → LLM7.io (GPT-4)
+- nebula-premium-max → LLM7.io (GPT-4)
+
+--------------------------------------------------------------------------------
+2. DATABASE CREDENTIALS
+--------------------------------------------------------------------------------
+
+FILE: server.js (o variabile d'ambiente DATABASE_URL)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ DATABASE_URL (Neon PostgreSQL)                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Provider: Neon PostgreSQL (Serverless)                                 │
+│ Host: ep-spring-leaf-ads75xz2-pooler.c-2.us-east-1.aws.neon.tech      │
+│ Database: neondb                                                        │
+│ User: neondb_owner                                                      │
+│                                                                          │
+│ Utilizzo:                                                               │
+│ - Connessione database per tutte le operazioni                         │
+│ - Tabelle: users, sessions, chats, messages, projects, ecc.            │
+│ - Usato in: server.js, tutti gli endpoint API                          │
+│                                                                          │
+│ Formato:                                                                │
+│ postgresql://user:password@host/database?sslmode=require               │
+│                                                                          │
+│ Note:                                                                   │
+│ - Credenziali complete nella connection string                          │
+│ - SSL richiesto                                                        │
+│ - In produzione: usa variabile d'ambiente DATABASE_URL                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------------------------------------
+3. JWT SECRET
+--------------------------------------------------------------------------------
+
+FILE: server.js (o variabile d'ambiente JWT_SECRET)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ JWT_SECRET                                                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Tipo: Stringa segreta                                                   │
+│ Default: 'your-secret-key-change-in-production'                         │
+│                                                                          │
+│ Utilizzo:                                                               │
+│ - Firma e verifica token JWT per autenticazione                        │
+│ - Usato in: server.js per creare/verificare token                      │
+│                                                                          │
+│ Note:                                                                   │
+│ - ⚠️ IMPORTANTE: Cambia in produzione!                                  │
+│ - Genera con: openssl rand -base64 32                                  │
+│ - Deve essere la stessa per tutte le istanze server                    │
+│ - In produzione: usa variabile d'ambiente JWT_SECRET                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------------------------------------
+4. WEBAUTHN CONFIGURATION
+--------------------------------------------------------------------------------
+
+FILE: server.js (o variabili d'ambiente)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ WEBAUTHN_RP_ID (Relying Party ID)                                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Tipo: Dominio                                                           │
+│ Default: 'ainebula.vercel.app'                                          │
+│                                                                          │
+│ Utilizzo:                                                               │
+│ - Identificatore per WebAuthn/Passkeys                                 │
+│ - Deve corrispondere al dominio del sito                                │
+│                                                                          │
+│ Note:                                                                   │
+│ - In sviluppo: 'localhost'                                              │
+│ - In produzione: dominio effettivo del sito                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ WEBAUTHN_ORIGIN                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Tipo: URL completo                                                      │
+│ Default: 'https://ainebula.vercel.app'                                  │
+│                                                                          │
+│ Utilizzo:                                                               │
+│ - URL completo del frontend per WebAuthn                               │
+│                                                                          │
+│ Note:                                                                   │
+│ - In sviluppo: 'http://localhost:5173'                                  │
+│ - In produzione: URL HTTPS del sito                                      │
+│ - Deve essere HTTPS in produzione                                       │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ WEBAUTHN_RP_NAME                                                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Tipo: Nome applicazione                                                 │
+│ Default: 'Nebula AI'                                                    │
+│                                                                          │
+│ Utilizzo:                                                               │
+│ - Nome mostrato durante registrazione passkey                          │
+│                                                                          │
+│ Note:                                                                   │
+│ - Può essere personalizzato                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------------------------------------
+5. API KEYS NON UTILIZZATE (STORICHE)
+--------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ OpenRouter API Key (DEPRECATA)                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Provider: OpenRouter                                                    │
+│ Base URL: https://openrouter.ai/api/v1                                 │
+│ API Key: (non più utilizzata)                                          │
+│                                                                          │
+│ Note:                                                                   │
+│ - Sostituita da Electron Hub                                           │
+│ - Vedi API_KEY_SETUP.md per istruzioni se necessario                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Electron Hub API Key Alternativa (DEPRECATA)                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Provider: Electron Hub                                                 │
+│ API Key: ek-1Nr31Tdp53bBR3y04Apz6MCSCC4FMTOcYpmb0DVxoDTZO0FR2e          │
+│                                                                          │
+│ Note:                                                                   │
+│ - Vecchia chiave, sostituita dalla corrente                            │
+│ - Mantenuta in documentazione per riferimento                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------------------------------------
+6. DOVE SONO CONFIGURATE
+--------------------------------------------------------------------------------
+
+FILE PRINCIPALI:
+
+1. src/config/api.js
+   - API_CONFIG.apiKey (Electron Hub)
+   - LLM7_CONFIG.apiKey (LLM7.io)
+   - MODEL_MAPPING (mappatura modelli)
+
+2. server.js
+   - DATABASE_URL (da process.env o hardcoded)
+   - JWT_SECRET (da process.env o default)
+   - WEBAUTHN_RP_ID (da process.env o default)
+   - WEBAUTHN_ORIGIN (da process.env o default)
+   - WEBAUTHN_RP_NAME (da process.env o default)
+
+3. .env (file non committato, creare manualmente)
+   - DATABASE_URL=...
+   - JWT_SECRET=...
+   - WEBAUTHN_RP_ID=...
+   - WEBAUTHN_ORIGIN=...
+   - WEBAUTHN_RP_NAME=...
+
+4. Vercel Dashboard (variabili d'ambiente produzione)
+   - Configurare in Settings → Environment Variables
+
+--------------------------------------------------------------------------------
+7. SICUREZZA
+--------------------------------------------------------------------------------
+
+⚠️ IMPORTANTE:
+
+1. NON COMMITTARE API KEYS NEL REPOSITORY
+   - Usa variabili d'ambiente per produzione
+   - File .env non deve essere committato (già in .gitignore)
+
+2. ROTAZIONE PERIODICA
+   - Cambia API keys periodicamente
+   - Revoca chiavi compromesse immediatamente
+
+3. PERMESSI MINIMI
+   - Usa API keys con permessi limitati
+   - Non usare chiavi admin per operazioni normali
+
+4. MONITORAGGIO
+   - Monitora uso API keys
+   - Imposta alert per uso anomalo
+   - Controlla rate limits
+
+5. JWT_SECRET
+   - Deve essere unico e sicuro
+   - Mai condiviso o esposto
+   - Cambia in produzione
+
+--------------------------------------------------------------------------------
+8. COME OTTENERE NUOVE API KEYS
+--------------------------------------------------------------------------------
+
+ELECTRON HUB:
+1. Vai su https://playground.electronhub.ai/console
+2. Accedi o registrati
+3. Vai alla sezione API Keys
+4. Crea nuova chiave
+5. Copia e incolla in src/config/api.js
+
+LLM7.IO:
+1. Vai su https://llm7.io
+2. Accedi o registrati
+3. Vai alla sezione API Keys
+4. Crea nuova chiave
+5. Copia e incolla in src/config/api.js
+
+OPENROUTER (se necessario):
+1. Vai su https://openrouter.ai
+2. Accedi con Google/Discord/Email
+3. Vai su https://openrouter.ai/keys
+4. Crea nuova chiave
+5. Configura in src/config/api.js
+
+NEON POSTGRESQL:
+1. Vai su https://neon.tech
+2. Accedi al tuo progetto
+3. Vai su Connection Details
+4. Copia connection string
+5. Configura in DATABASE_URL
+
+================================================================================
+

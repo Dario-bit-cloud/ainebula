@@ -303,7 +303,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 1000;
+    z-index: 1002;
     background-color: transparent;
     animation: backdropFadeIn 0.2s ease forwards;
   }
@@ -320,7 +320,7 @@
     left: 12px;
     display: flex;
     gap: 8px;
-    z-index: 1001;
+    z-index: 1003;
     animation: menuSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 

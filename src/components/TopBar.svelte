@@ -1,6 +1,6 @@
 <script>
   import { selectedModel, availableModels } from '../stores/models.js';
-  import { isGenerating, createNewChat, currentChatId, currentChat } from '../stores/chat.js';
+  import { isGenerating, createNewChat, currentChatId, currentChat, deleteChat } from '../stores/chat.js';
   import { isSettingsOpen, isSidebarOpen, isMobile, isAISettingsModalOpen, isPromptLibraryModalOpen, isPremiumModalOpen } from '../stores/app.js';
   import { user, hasPlanOrHigher } from '../stores/user.js';
   import { isAuthenticatedStore, isLoading } from '../stores/auth.js';
@@ -20,15 +20,48 @@
   }
   
   async function toggleTemporaryChat() {
-    const currentId = get(currentChatId);
-    const chat = get(currentChat);
-    
-    if (isTemporaryChatMode) {
-      // Se la chat corrente è temporanea, crea una nuova chat normale
-      await createNewChat(null, false); // false = non temporanea
-    } else {
-      // Se la chat corrente non è temporanea, crea una nuova chat temporanea
-      await createNewChat(null, true); // true = isTemporary
+    try {
+      const currentId = get(currentChatId);
+      const chat = get(currentChat);
+      
+      // Se la chat corrente è temporanea
+      if (isTemporaryChatMode && chat) {
+        // Controlla se la chat ha messaggi (è già iniziata)
+        const hasMessages = chat.messages && 
+                           chat.messages.length > 0 && 
+                           chat.messages.some(msg => !msg.hidden);
+        
+        if (hasMessages) {
+          // Se la chat è già iniziata: elimina quella vecchia e crea una nuova chat temporanea
+          const oldChatId = currentId;
+          
+          // Crea la nuova chat temporanea prima di eliminare quella vecchia
+          const newChatId = await createNewChat(null, true);
+          
+          // Elimina la chat vecchia solo se la nuova è stata creata con successo
+          if (newChatId && oldChatId) {
+            await deleteChat(oldChatId);
+          }
+        } else {
+          // Se la chat non è ancora iniziata: disattiva la modalità temporanea
+          // Converti la chat temporanea vuota in una chat normale
+          const oldChatId = currentId;
+          
+          // Crea una nuova chat normale
+          const newChatId = await createNewChat(null, false);
+          
+          // Elimina la chat temporanea vuota solo se la nuova è stata creata con successo
+          if (newChatId && oldChatId) {
+            await deleteChat(oldChatId);
+          }
+        }
+      } else {
+        // Se la chat corrente non è temporanea (o non c'è una chat corrente)
+        // Crea una nuova chat temporanea
+        await createNewChat(null, true);
+      }
+    } catch (error) {
+      console.error('Errore durante toggle chat temporanea:', error);
     }
   }
   
