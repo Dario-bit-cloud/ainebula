@@ -505,9 +505,48 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
 // ==================== ENDPOINT PASSKEYS ====================
 
 // Configurazione WebAuthn
-const rpId = process.env.WEBAUTHN_RP_ID || 'localhost';
+// Per produzione su Vercel: usa ainebula.vercel.app
+const getRpId = () => {
+  if (process.env.WEBAUTHN_RP_ID) {
+    return process.env.WEBAUTHN_RP_ID;
+  }
+  // Per Vercel, usa il dominio principale
+  if (process.env.VERCEL_URL) {
+    // VERCEL_URL può essere preview deployments, usa il dominio principale
+    return 'ainebula.vercel.app';
+  }
+  // In produzione, usa il dominio principale
+  if (process.env.NODE_ENV === 'production') {
+    return 'ainebula.vercel.app';
+  }
+  return 'localhost';
+};
+
+const getOrigin = () => {
+  if (process.env.WEBAUTHN_ORIGIN) {
+    return process.env.WEBAUTHN_ORIGIN;
+  }
+  // Per Vercel, usa il dominio principale
+  if (process.env.VERCEL_URL || process.env.NODE_ENV === 'production') {
+    return 'https://ainebula.vercel.app';
+  }
+  return 'http://localhost:5173';
+};
+
+const rpId = getRpId();
 const rpName = process.env.WEBAUTHN_RP_NAME || 'Nebula AI';
-const origin = process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173';
+const origin = getOrigin();
+
+// Log della configurazione (solo in sviluppo)
+if (isDevelopment) {
+  log('🔐 [WEBAUTHN] Configurazione:', {
+    rpId,
+    rpName,
+    origin,
+    nodeEnv: process.env.NODE_ENV,
+    vercelUrl: process.env.VERCEL_URL
+  });
+}
 
 // Store temporaneo per le challenge (in produzione usa Redis o database)
 const challenges = new Map();

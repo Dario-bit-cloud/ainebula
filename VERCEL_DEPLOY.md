@@ -15,6 +15,20 @@ Per far funzionare l'autenticazione su Vercel, devi configurare le seguenti vari
    - Genera una chiave sicura: `openssl rand -base64 32`
    - **IMPORTANTE**: Usa una chiave diversa per produzione!
 
+3. **WEBAUTHN_RP_ID** (Opzionale)
+   - Il dominio per WebAuthn/Passkeys
+   - Default: `ainebula.vercel.app`
+   - **IMPORTANTE**: Deve corrispondere al dominio del sito
+
+4. **WEBAUTHN_ORIGIN** (Opzionale)
+   - L'URL completo del frontend per WebAuthn
+   - Default: `https://ainebula.vercel.app`
+   - **IMPORTANTE**: Deve essere HTTPS in produzione
+
+5. **WEBAUTHN_RP_NAME** (Opzionale)
+   - Il nome dell'applicazione per WebAuthn
+   - Default: `Nebula AI`
+
 ### Come Configurare le Variabili su Vercel
 
 1. Vai su [Vercel Dashboard](https://vercel.com/dashboard)
