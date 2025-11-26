@@ -46,9 +46,15 @@
     }
     
     isCreating = true;
-    createProject(projectName.trim(), projectDescription.trim(), selectedColor, selectedIcon);
-    isCreating = false;
-    closeModal();
+    try {
+      await createProject(projectName.trim(), projectDescription.trim(), selectedColor, selectedIcon);
+      closeModal();
+    } catch (error) {
+      console.error('Errore creazione progetto:', error);
+      await showAlert('Errore durante la creazione della cartella', 'Errore', 'OK', 'danger');
+    } finally {
+      isCreating = false;
+    }
   }
 </script>
 

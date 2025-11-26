@@ -6,7 +6,7 @@
   import { get } from 'svelte/store';
   import { selectedModel, setModel } from '../stores/models.js';
   import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
-  import { projects, updateProject, deleteProject } from '../stores/projects.js';
+  import { projects, updateProject, deleteProject, syncProjectsOnLogin, loadProjects } from '../stores/projects.js';
   import { showConfirm } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
   
@@ -20,10 +20,13 @@
   let moveMenuPosition = { x: 0, y: 0 };
   let showSearchInput = false;
   let searchInputRef = null;
+  let draggedChatId = null;
+  let dragOverProjectId = null;
   
-  // Carica le chat quando l'utente si autentica
+  // Carica le chat e i progetti quando l'utente si autentica
   let lastAuthState = false;
   let hasLoadedChats = false;
+  let hasLoadedProjects = false;
   
   $: {
     if ($isAuthenticatedStore && !lastAuthState) {
@@ -35,10 +38,17 @@
           console.error('Errore caricamento chat:', err);
         });
       }
+      if (!hasLoadedProjects) {
+        hasLoadedProjects = true;
+        syncProjectsOnLogin().catch(err => {
+          console.error('Errore caricamento progetti:', err);
+        });
+      }
     } else if (!$isAuthenticatedStore && lastAuthState) {
       // L'utente si è disconnesso
       lastAuthState = false;
       hasLoadedChats = false;
+      hasLoadedProjects = false;
     }
   }
   
@@ -165,6 +175,12 @@
         showSearchInput = false;
         sidebarView.set('projects');
         activeItem = 'projects';
+        // Carica i progetti se non ancora caricati
+        if ($isAuthenticatedStore && !hasLoadedProjects) {
+          loadProjects().catch(err => {
+            console.error('Errore caricamento progetti:', err);
+          });
+        }
         break;
     }
   }
@@ -292,8 +308,56 @@
           removeChatFromProject(chat.id);
         }
       });
-      deleteProject(projectId);
+      await deleteProject(projectId);
     }
+  }
+
+  function handleDragStart(event, chatId) {
+    draggedChatId = chatId;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', chatId);
+    // Aggiungi classe per feedback visivo
+    event.target.style.opacity = '0.5';
+  }
+
+  function handleDragEnd(event) {
+    event.target.style.opacity = '1';
+    draggedChatId = null;
+    dragOverProjectId = null;
+  }
+
+  function handleDragOver(event, projectId) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    dragOverProjectId = projectId;
+  }
+
+  function handleDragLeave(event) {
+    dragOverProjectId = null;
+  }
+
+  function handleDrop(event, projectId) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (draggedChatId) {
+      moveChatToProject(draggedChatId, projectId);
+    }
+    
+    draggedChatId = null;
+    dragOverProjectId = null;
+  }
+
+  function handleDropUnassigned(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (draggedChatId) {
+      removeChatFromProject(draggedChatId);
+    }
+    
+    draggedChatId = null;
+    dragOverProjectId = null;
   }
 </script>
 
@@ -421,10 +485,16 @@
             {/if}
             <span>{item.label}</span>
             {#if item.id === 'projects'}
-              <svg class="plus-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
+              <button 
+                class="plus-icon-button" 
+                on:click|stopPropagation={() => isProjectModalOpen.set(true)}
+                title={$t('newFolder')}
+              >
+                <svg class="plus-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
             {/if}
           </button>
         {/if}
@@ -469,7 +539,11 @@
               <div class="project-folder">
                 <div 
                   class="project-header"
+                  class:drag-over={dragOverProjectId === project.id}
                   on:click={() => handleProjectClick(project.id)}
+                  on:dragover={(e) => handleDragOver(e, project.id)}
+                  on:dragleave={handleDragLeave}
+                  on:drop={(e) => handleDrop(e, project.id)}
                 >
                   <div class="project-icon-wrapper" style="background-color: {project.color}20; color: {project.color}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -502,6 +576,10 @@
                       <div 
                         class="chat-item nested" 
                         class:active={chat.id === $currentChatId}
+                        class:dragging={draggedChatId === chat.id}
+                        draggable="true"
+                        on:dragstart={(e) => handleDragStart(e, chat.id)}
+                        on:dragend={handleDragEnd}
                         on:click={() => handleChatClick(chat.id)}
                       >
                         <div class="chat-info">
@@ -540,7 +618,13 @@
           <!-- Chat non assegnate -->
           {#if organizedChats.unassigned.length > 0}
             <div class="project-folder">
-              <div class="project-header unassigned-header">
+              <div 
+                class="project-header unassigned-header"
+                class:drag-over={dragOverProjectId === 'unassigned'}
+                on:dragover={(e) => { e.preventDefault(); dragOverProjectId = 'unassigned'; }}
+                on:dragleave={() => { dragOverProjectId = null; }}
+                on:drop={handleDropUnassigned}
+              >
                 <span class="project-name">{$t('chatWithoutFolder')}</span>
                 <span class="project-count">({organizedChats.unassigned.length})</span>
               </div>
@@ -549,6 +633,10 @@
                   <div 
                     class="chat-item nested" 
                     class:active={chat.id === $currentChatId}
+                    class:dragging={draggedChatId === chat.id}
+                    draggable="true"
+                    on:dragstart={(e) => handleDragStart(e, chat.id)}
+                    on:dragend={handleDragEnd}
                     on:click={() => handleChatClick(chat.id)}
                   >
                     <div class="chat-info">
@@ -581,6 +669,99 @@
               </div>
             </div>
           {/if}
+        {:else if $sidebarView === 'projects'}
+          <!-- Vista progetti: mostra tutti i progetti con gestione completa -->
+          <div class="projects-view">
+            {#if $projects.length > 0}
+              {#each $projects as project}
+                <div class="project-folder">
+                  <div 
+                    class="project-header"
+                    on:click={() => handleProjectClick(project.id)}
+                  >
+                    <div class="project-icon-wrapper" style="background-color: {project.color}20; color: {project.color}">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d={project.icon}/>
+                      </svg>
+                    </div>
+                    <span class="project-name">{project.name}</span>
+                    <span class="project-count">
+                      ({organizedChats.projects[project.id] ? organizedChats.projects[project.id].length : 0})
+                    </span>
+                    <svg 
+                      class="expand-icon" 
+                      class:expanded={expandedProjects.has(project.id)}
+                      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    >
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                    <button 
+                      class="project-delete" 
+                      on:click={(e) => handleProjectDelete(e, project.id)}
+                      title={$t('deleteFolder')}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                  {#if expandedProjects.has(project.id)}
+                    <div class="project-chats">
+                      {#if organizedChats.projects[project.id] && organizedChats.projects[project.id].length > 0}
+                        {#each organizedChats.projects[project.id] as chat}
+                        <div 
+                          class="chat-item nested" 
+                          class:active={chat.id === $currentChatId}
+                          class:dragging={draggedChatId === chat.id}
+                          draggable="true"
+                          on:dragstart={(e) => handleDragStart(e, chat.id)}
+                          on:dragend={handleDragEnd}
+                          on:click={() => handleChatClick(chat.id)}
+                        >
+                            <div class="chat-info">
+                              <div class="chat-title">{chat.title}</div>
+                              <div class="chat-date">{formatDate(chat.updatedAt)}</div>
+                            </div>
+                            <div class="chat-actions">
+                              <button 
+                                class="chat-move" 
+                                on:click={(e) => handleMoveChat(e, chat.id)}
+                                title={$t('moveToFolder')}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                              </button>
+                              <button 
+                                class="chat-delete" 
+                                on:click={(e) => handleDeleteChat(e, chat.id)}
+                                title={$t('deleteChat')}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <polyline points="3 6 5 6 21 6"/>
+                                  <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        {/each}
+                      {:else}
+                        <div class="empty-project">
+                          <p>{$t('noChatsInFolder')}</p>
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            {:else}
+              <div class="empty-state">
+                <p>{$t('noFoldersYet')}</p>
+                <p class="empty-hint">{$t('createNewFolder')}</p>
+              </div>
+            {/if}
+          </div>
         {:else if $sidebarView === 'search'}
           {#if filteredChats.length > 0}
             {#each filteredChats as chat}
@@ -624,6 +805,10 @@
                 <div 
                   class="chat-item" 
                   class:active={chat.id === $currentChatId}
+                  class:dragging={draggedChatId === chat.id}
+                  draggable="true"
+                  on:dragstart={(e) => handleDragStart(e, chat.id)}
+                  on:dragend={handleDragEnd}
                   on:click={() => handleChatClick(chat.id)}
                 >
                   <div class="chat-info">
@@ -673,6 +858,10 @@
                         <div 
                           class="chat-item nested" 
                           class:active={chat.id === $currentChatId}
+                          class:dragging={draggedChatId === chat.id}
+                          draggable="true"
+                          on:dragstart={(e) => handleDragStart(e, chat.id)}
+                          on:dragend={handleDragEnd}
                           on:click={() => handleChatClick(chat.id)}
                         >
                           <div class="chat-info">
@@ -1147,6 +1336,41 @@
     opacity: 0.6;
   }
 
+  .plus-icon-button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+    opacity: 0.6;
+  }
+
+  .plus-icon-button:hover {
+    opacity: 1;
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+  }
+
+  .projects-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .empty-project {
+    padding: 12px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-style: italic;
+  }
+
   .chat-list {
     margin-top: 8px;
     flex: 1;
@@ -1483,6 +1707,17 @@
   .chat-item.nested {
     padding: 8px 12px;
     margin-left: 0;
+  }
+
+  .chat-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+  }
+
+  .project-header.drag-over {
+    background-color: var(--accent-blue);
+    opacity: 0.3;
+    border: 2px dashed var(--accent-blue);
   }
 
   .chat-actions {

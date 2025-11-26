@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { getCurrentUser, isAuthenticated, verifySession } from '../services/authService.js';
 import { syncChatsOnLogin, clearChatsOnLogout } from './chat.js';
+import { syncProjectsOnLogin, clearProjectsOnLogout } from './projects.js';
 
 // Store per lo stato di autenticazione
 export const user = writable(null);
@@ -22,8 +23,11 @@ export function initAuth() {
       if (result.success) {
         user.set(result.user);
         isAuthenticatedStore.set(true);
-        // Carica le chat dal database (solo una volta qui)
-        await syncChatsOnLogin();
+        // Carica le chat e i progetti dal database (solo una volta qui)
+        await Promise.all([
+          syncChatsOnLogin(),
+          syncProjectsOnLogin()
+        ]);
       } else {
         // Sessione non valida, pulisci tutto
         user.set(null);
@@ -57,8 +61,11 @@ export function initAuth() {
 export async function setUser(userData) {
   user.set(userData);
   isAuthenticatedStore.set(true);
-  // Sincronizza le chat dal database
-  await syncChatsOnLogin();
+  // Sincronizza le chat e i progetti dal database
+  await Promise.all([
+    syncChatsOnLogin(),
+    syncProjectsOnLogin()
+  ]);
 }
 
 // Pulisci lo store dopo logout
@@ -69,7 +76,8 @@ export function clearUser() {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user');
   localStorage.removeItem('nebula-ai-user');
-  // Pulisci le chat salvate sull'account
+  // Pulisci le chat e i progetti salvati sull'account
   clearChatsOnLogout();
+  clearProjectsOnLogout();
 }
 
