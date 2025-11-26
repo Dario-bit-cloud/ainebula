@@ -1,6 +1,6 @@
 <script>
   import { user as authUser } from '../stores/auth.js';
-  import { isUserMenuOpen } from '../stores/app.js';
+  import { isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
   import { logout } from '../services/authService.js';
   import { clearUser, setUser as setAuthUser } from '../stores/auth.js';
   import { accounts, currentAccountId, getCurrentAccount, getOtherAccounts, switchAccount, removeAccount } from '../stores/accounts.js';
@@ -80,6 +80,10 @@
         module.isSettingsOpen.set(true);
       });
       isUserMenuOpen.set(false);
+      // Chiudi la sidebar su mobile quando si apre il popup impostazioni
+      if ($isMobile) {
+        isSidebarOpen.set(false);
+      }
     } else if (item.id === 'personalization') {
       // Apri modal personalizzazione
       import('../stores/app.js').then(module => {

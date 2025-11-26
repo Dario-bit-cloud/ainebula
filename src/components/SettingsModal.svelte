@@ -1,12 +1,13 @@
 <script>
-  import { isSettingsOpen, isPremiumModalOpen } from '../stores/app.js';
+  import { isSettingsOpen, isPremiumModalOpen, isMobile, isSidebarOpen } from '../stores/app.js';
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
   import { deleteAccount, getToken, updateUsername, updatePassword, getCurrentUser } from '../services/authService.js';
-  import { getCurrentAccount, removeAccount } from '../stores/accounts.js';
+  import { getCurrentAccount, removeAccount, accounts } from '../stores/accounts.js';
   import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
+  import { createDataExport, downloadDataExport } from '../services/dataExportService.js';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
@@ -17,12 +18,6 @@
   let theme = 'system';
   let uiStyle = 'material';
   let language = 'system';
-  let phoneNumber = '';
-  let isEditingPhone = false;
-  let phoneInput = '';
-  let isSavingPhone = false;
-  let isLoadingPhone = false;
-  
   let username = '';
   let isEditingUsername = false;
   let usernameInput = '';
@@ -34,6 +29,8 @@
   let newPassword = '';
   let confirmPassword = '';
   let isSavingPassword = false;
+  
+  let sidebarRef;
   
   const sections = [
     { id: 'generale', label: 'Generale', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
@@ -63,10 +60,56 @@
     if (savedLanguage) {
       language = savedLanguage;
     }
+    
+    // Aggiungi listener per lo scroll su mobile
+    return () => {
+      if (sidebarRef) {
+        sidebarRef.removeEventListener('scroll', handleSidebarScroll);
+      }
+    };
   });
+  
+  function handleSidebarScroll() {
+    if (!$isMobile || !sidebarRef) return;
+    
+    // Trova la sezione più vicina al centro durante lo scroll
+    const container = sidebarRef;
+    const containerCenter = container.scrollLeft + container.offsetWidth / 2;
+    const items = container.querySelectorAll('.sidebar-item');
+    
+    let closestItem = null;
+    let closestDistance = Infinity;
+    
+    items.forEach((item) => {
+      const itemCenter = item.offsetLeft + item.offsetWidth / 2;
+      const distance = Math.abs(itemCenter - containerCenter);
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestItem = item;
+      }
+    });
+    
+    if (closestItem) {
+      const sectionId = closestItem.getAttribute('data-section');
+      if (sectionId && sectionId !== activeSection) {
+        activeSection = sectionId;
+      }
+    }
+  }
+  
+  // Aggiungi listener quando sidebarRef è disponibile
+  $: if (sidebarRef && $isMobile) {
+    sidebarRef.addEventListener('scroll', handleSidebarScroll, { passive: true });
+  }
   
   function closeModal() {
     isSettingsOpen.set(false);
+  }
+  
+  // Chiudi la sidebar quando si apre il popup su mobile
+  $: if ($isSettingsOpen && $isMobile) {
+    isSidebarOpen.set(false);
   }
   
   function handleBackdropClick(event) {
@@ -79,9 +122,47 @@
     activeSection = sectionId;
     // Carica i dati quando si apre la sezione profilo
     if (sectionId === 'profilo' && $isAuthenticatedStore) {
-      loadPhoneNumber();
       loadUsername();
     }
+    
+    // Su mobile, scrolla automaticamente alla sezione selezionata
+    if ($isMobile && sidebarRef) {
+      setTimeout(() => {
+        scrollToSection(sectionId);
+      }, 100);
+    }
+  }
+  
+  function scrollToSection(sectionId) {
+    if (!sidebarRef) return;
+    
+    const sectionIndex = sections.findIndex(s => s.id === sectionId);
+    if (sectionIndex === -1) return;
+    
+    const items = sidebarRef.querySelectorAll('.sidebar-item');
+    if (items[sectionIndex]) {
+      const item = items[sectionIndex];
+      const container = sidebarRef;
+      const itemLeft = item.offsetLeft;
+      const itemWidth = item.offsetWidth;
+      const containerWidth = container.offsetWidth;
+      const scrollLeft = container.scrollLeft;
+      const itemCenter = itemLeft + itemWidth / 2;
+      const containerCenter = scrollLeft + containerWidth / 2;
+      const scrollTo = scrollLeft + (itemCenter - containerCenter);
+      
+      container.scrollTo({
+        left: scrollTo,
+        behavior: 'smooth'
+      });
+    }
+  }
+  
+  // Scrolla alla sezione attiva quando il modal si apre su mobile
+  $: if ($isSettingsOpen && $isMobile && activeSection && sidebarRef) {
+    setTimeout(() => {
+      scrollToSection(activeSection);
+    }, 300);
   }
   
   function applyTheme(newTheme) {
@@ -155,102 +236,6 @@
     }, 300);
   }
   
-  async function handleDisconnect() {
-    const confirmed = await showConfirm('Sei sicuro di voler disconnetterti da tutti i dispositivi?', 'Disconnetti', 'Disconnetti', 'Annulla');
-    if (confirmed) {
-      try {
-        const token = getToken();
-        if (!token) {
-          await showAlert('Errore: token di autenticazione non trovato', 'Errore', 'OK', 'error');
-          return;
-        }
-
-        // Determina l'URL base dell'API
-        const getApiBaseUrl = () => {
-          if (typeof window !== 'undefined') {
-            const hostname = window.location.hostname;
-            if (hostname === 'localhost' || hostname === '127.0.0.1') {
-              return 'http://localhost:3001/api/auth';
-            }
-            const backendUrl = import.meta.env.VITE_API_BASE_URL;
-            if (backendUrl) {
-              return `${backendUrl}/api/auth`;
-            }
-            return '/api/auth';
-          }
-          return 'http://localhost:3001/api/auth';
-        };
-
-        const response = await fetch(`${getApiBaseUrl()}/disconnect-all`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          await showAlert('Disconnessione da tutti i dispositivi completata. La sessione corrente è stata mantenuta.', 'Disconnessione completata', 'OK', 'success');
-        } else {
-          await showAlert(data.message || 'Errore durante la disconnessione', 'Errore', 'OK', 'error');
-        }
-      } catch (error) {
-        console.error('Errore durante disconnessione:', error);
-        await showAlert('Errore durante la disconnessione da tutti i dispositivi', 'Errore', 'OK', 'error');
-      }
-    }
-  }
-  
-  async function loadPhoneNumber() {
-    if (!$isAuthenticatedStore || isLoadingPhone) return;
-    
-    isLoadingPhone = true;
-    try {
-      const token = getToken();
-      if (!token) {
-        isLoadingPhone = false;
-        return;
-      }
-
-      // Determina l'URL base dell'API
-      const getApiBaseUrl = () => {
-        if (typeof window !== 'undefined') {
-          const hostname = window.location.hostname;
-          if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return 'http://localhost:3001/api/auth';
-          }
-          const backendUrl = import.meta.env.VITE_API_BASE_URL;
-          if (backendUrl) {
-            return `${backendUrl}/api/auth`;
-          }
-          return '/api/auth';
-        }
-        return 'http://localhost:3001/api/auth';
-      };
-
-      const response = await fetch(`${getApiBaseUrl()}/me`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-      
-      if (data.success && data.user) {
-        phoneNumber = data.user.phone_number || '';
-        phoneInput = phoneNumber;
-      }
-    } catch (error) {
-      console.error('Errore durante caricamento numero di telefono:', error);
-    } finally {
-      isLoadingPhone = false;
-    }
-  }
-  
   async function loadUsername() {
     if (!$isAuthenticatedStore || isLoadingUsername) return;
     
@@ -299,16 +284,6 @@
     }
   }
   
-  function startEditingPhone() {
-    isEditingPhone = true;
-    phoneInput = phoneNumber;
-  }
-  
-  function cancelEditingPhone() {
-    isEditingPhone = false;
-    phoneInput = phoneNumber;
-  }
-  
   function startEditingUsername() {
     isEditingUsername = true;
     usernameInput = username;
@@ -331,62 +306,6 @@
     currentPassword = '';
     newPassword = '';
     confirmPassword = '';
-  }
-  
-  async function savePhoneNumber() {
-    if (isSavingPhone) return;
-    
-    isSavingPhone = true;
-    try {
-      const token = getToken();
-      if (!token) {
-        await showAlert('Errore: token di autenticazione non trovato', 'Errore', 'OK', 'error');
-        isSavingPhone = false;
-        return;
-      }
-
-      // Determina l'URL base dell'API
-      const getApiBaseUrl = () => {
-        if (typeof window !== 'undefined') {
-          const hostname = window.location.hostname;
-          if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return 'http://localhost:3001/api/auth';
-          }
-          const backendUrl = import.meta.env.VITE_API_BASE_URL;
-          if (backendUrl) {
-            return `${backendUrl}/api/auth`;
-          }
-          return '/api/auth';
-        }
-        return 'http://localhost:3001/api/auth';
-      };
-
-      const response = await fetch(`${getApiBaseUrl()}/update-phone`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          phone_number: phoneInput.trim() || null
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        phoneNumber = data.phone_number || '';
-        isEditingPhone = false;
-        await showAlert('Numero di telefono aggiornato con successo', 'Successo', 'OK', 'success');
-      } else {
-        await showAlert(data.message || 'Errore durante l\'aggiornamento del numero di telefono', 'Errore', 'OK', 'error');
-      }
-    } catch (error) {
-      console.error('Errore durante aggiornamento numero di telefono:', error);
-      await showAlert('Errore durante l\'aggiornamento del numero di telefono', 'Errore', 'OK', 'error');
-    } finally {
-      isSavingPhone = false;
-    }
   }
   
   async function saveUsername() {
@@ -543,18 +462,91 @@
   let isExporting = false;
   
   async function handleExportData() {
-    if (!$isAuthenticatedStore) {
-      // Se non autenticato, esporta solo dati locali
-      const exportData = {
-        user: $userStore,
-        chats: $chats,
-        settings: {
-          theme,
-          language
-        },
+    // Mostra avviso che il file contiene informazioni sensibili
+    const confirmed = await showConfirm(
+      '⚠️ ATTENZIONE: Il file di esportazione contiene informazioni personali e sensibili:\n\n' +
+      '• Cronologia completa delle chat\n' +
+      '• Credenziali account (username, email, token)\n' +
+      '• Licenza piano di abbonamento\n\n' +
+      'Mantieni questo file al sicuro e non condividerlo con nessuno.\n\n' +
+      'Vuoi procedere con l\'esportazione?',
+      'Esportazione Dati Personali',
+      'Esporta',
+      'Annulla',
+      'warning'
+    );
+    
+    if (!confirmed) return;
+    
+    isExporting = true;
+    try {
+      // Prepara i dati per l'esportazione
+      const currentAccount = getCurrentAccount();
+      const token = getToken();
+      
+      // Prepara le credenziali account
+      const accountCredentials = {
+        username: $authUser?.username || currentAccount?.username || 'N/A',
+        email: $authUser?.email || currentAccount?.email || 'N/A',
+        userId: $authUser?.id || currentAccount?.userId || 'N/A',
+        authToken: token || 'N/A',
         exportDate: new Date().toISOString()
       };
       
+      // Prepara la cronologia chat completa
+      const chatHistory = $chats.map(chat => ({
+        id: chat.id,
+        title: chat.title,
+        projectId: chat.projectId || null,
+        isTemporary: chat.isTemporary || false,
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt,
+        messages: chat.messages ? chat.messages.map(msg => ({
+          id: msg.id,
+          type: msg.type,
+          content: msg.content,
+          hidden: msg.hidden || false,
+          timestamp: msg.timestamp || msg.createdAt
+        })) : []
+      }));
+      
+      // Prepara la licenza piano di abbonamento
+      const subscriptionLicense = {
+        active: $userStore.subscription?.active || false,
+        plan: $userStore.subscription?.plan || 'free',
+        subscriptionKey: $userStore.subscription?.key || null,
+        expiresAt: $userStore.subscription?.expiresAt || null,
+        startedAt: $userStore.subscription?.startedAt || null
+      };
+      
+      // Crea l'oggetto di esportazione completo
+      const exportData = {
+        warning: '⚠️ FILE PERSONALE E RISERVATO ⚠️\n\n' +
+                 'Questo file contiene informazioni personali e sensibili:\n' +
+                 '• Cronologia completa delle chat\n' +
+                 '• Credenziali account (username, email, token di autenticazione)\n' +
+                 '• Licenza piano di abbonamento\n\n' +
+                 'NON CONDIVIDERE QUESTO FILE CON NESSUNO.\n' +
+                 'Mantieni questo file al sicuro e protetto.',
+        exportInfo: {
+          exportDate: new Date().toISOString(),
+          exportVersion: '1.0',
+          appName: 'Nebula AI'
+        },
+        accountCredentials: accountCredentials,
+        chatHistory: {
+          totalChats: chatHistory.length,
+          chats: chatHistory
+        },
+        subscriptionLicense: subscriptionLicense,
+        settings: {
+          theme: theme,
+          uiStyle: uiStyle,
+          language: language
+        }
+      };
+      
+      // Crea e scarica il file
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -565,27 +557,17 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      await showAlert('Dati esportati con successo!', 'Esportazione completata', 'OK', 'success');
-      return;
-    }
-    
-    isExporting = true;
-    try {
-      // Crea la richiesta di export
-      const result = await createDataExport();
-      
-      if (result.success) {
-        // Scarica i dati
-        const downloadResult = await downloadDataExport(result.exportToken);
-        
-        if (downloadResult.success) {
-          await showAlert('Dati esportati con successo! Il link per il download sarà valido per 7 giorni.', 'Esportazione completata', 'OK', 'success');
-        } else {
-          await showAlert(downloadResult.message || 'Errore nel download dei dati', 'Errore', 'OK', 'error');
-        }
-      } else {
-        await showAlert(result.message || 'Errore nella creazione dell\'export', 'Errore', 'OK', 'error');
-      }
+      await showAlert(
+        '✅ Dati esportati con successo!\n\n' +
+        'Il file contiene:\n' +
+        '• Cronologia completa delle chat\n' +
+        '• Credenziali account\n' +
+        '• Licenza piano di abbonamento\n\n' +
+        '⚠️ Ricorda: questo file è personale e contiene informazioni sensibili. Mantienilo al sicuro.',
+        'Esportazione completata',
+        'OK',
+        'success'
+      );
     } catch (error) {
       await showAlert('Errore durante l\'esportazione dei dati', 'Errore', 'OK', 'error');
       console.error('Errore export:', error);
@@ -785,7 +767,6 @@
       loadSubscription();
       // Carica i dati se la sezione profilo è già attiva
       if (activeSection === 'profilo') {
-        loadPhoneNumber();
         loadUsername();
       }
     }
@@ -808,12 +789,13 @@
       
       <div class="modal-body-container">
         <!-- Sidebar -->
-        <aside class="settings-sidebar">
+        <aside class="settings-sidebar" bind:this={sidebarRef}>
           {#each sections as section}
             <button
               class="sidebar-item"
               class:active={activeSection === section.id}
               on:click={() => selectSection(section.id)}
+              data-section={section.id}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d={section.icon} />
@@ -1045,52 +1027,6 @@
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">{$t('phoneNumber')}</div>
-              <div class="setting-value">
-                {#if isEditingPhone}
-                  <div class="phone-edit-container">
-                    <input 
-                      type="tel" 
-                      class="phone-input" 
-                      bind:value={phoneInput} 
-                      placeholder={$t('phoneNumber')}
-                      disabled={isSavingPhone}
-                    />
-                    <div class="phone-edit-actions">
-                      <button 
-                        class="phone-save-button" 
-                        on:click={savePhoneNumber} 
-                        disabled={isSavingPhone}
-                      >
-                        {isSavingPhone ? get(t)('save') + '...' : get(t)('save')}
-                      </button>
-                      <button 
-                        class="phone-cancel-button" 
-                        on:click={cancelEditingPhone}
-                        disabled={isSavingPhone}
-                      >
-                        {$t('cancel')}
-                      </button>
-                    </div>
-                  </div>
-                {:else}
-                  <div class="phone-display-container">
-                    <span>{phoneNumber || '-'}</span>
-                    <button 
-                      class="phone-edit-button" 
-                      on:click={startEditingPhone}
-                      title={$t('edit') + ' ' + get(t)('phoneNumber')}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                      </svg>
-                    </button>
-                  </div>
-                {/if}
-              </div>
-            </div>
-            
-            <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
               <div class="setting-label">Password</div>
               <div class="setting-value">
                 {#if isEditingPassword}
@@ -1148,11 +1084,6 @@
                   </div>
                 {/if}
               </div>
-            </div>
-            
-            <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">{$t('disconnectAllDevices')}</div>
-              <button class="danger-button" on:click={handleDisconnect}>{$t('disconnect')}</button>
             </div>
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
@@ -1245,7 +1176,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 1004;
     padding: 20px;
     animation: backdropFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -1253,7 +1184,9 @@
   @media (max-width: 768px) {
     .modal-backdrop {
       padding: 0;
-      align-items: stretch;
+      align-items: flex-end;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
     }
   }
 
@@ -1282,9 +1215,10 @@
   @media (max-width: 768px) {
     .modal-content {
       max-width: 100%;
-      max-height: 100vh;
-      height: 100vh;
-      border-radius: 0;
+      max-height: 90vh;
+      height: 90vh;
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
     }
   }
 
@@ -1298,6 +1232,19 @@
       transform: scale(1) translateY(0);
     }
   }
+  
+  @media (max-width: 768px) {
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  }
 
   .modal-header {
     display: flex;
@@ -1306,21 +1253,37 @@
     padding: 20px 24px;
     border-bottom: 1px solid var(--border-color);
     animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
+    flex-shrink: 0;
+    position: relative;
   }
   
   @media (max-width: 768px) {
     .modal-header {
-      padding: 16px;
+      padding: 16px 20px;
+      border-bottom: none;
+    }
+    
+    .modal-header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--border-color);
     }
     
     .modal-title {
-      font-size: 18px;
+      font-size: 20px;
+      font-weight: 700;
     }
     
     .close-button {
       min-width: 44px;
       min-height: 44px;
-      padding: 8px;
+      padding: 10px;
+      border-radius: 50%;
+      background-color: var(--bg-tertiary);
     }
   }
 
@@ -1365,6 +1328,14 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+    min-height: 0;
+  }
+  
+  @media (max-width: 768px) {
+    .modal-body-container {
+      flex-direction: column;
+      overflow: hidden;
+    }
   }
 
   .settings-sidebar {
@@ -1375,6 +1346,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    flex-shrink: 0;
   }
   
   @media (max-width: 768px) {
@@ -1382,15 +1354,67 @@
       width: 100%;
       border-right: none;
       border-bottom: 1px solid var(--border-color);
-      padding: 8px;
+      padding: 12px 16px;
       flex-direction: row;
       overflow-x: auto;
+      overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      gap: 12px;
+      background-color: var(--bg-secondary);
+      scroll-snap-type: x mandatory;
+      scroll-padding: 0 16px;
+      position: relative;
+      scroll-behavior: smooth;
     }
     
+    .settings-sidebar::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Rimuovi i gradienti - non funzionano bene con sticky */
+    
     .sidebar-item {
-      padding: 10px 16px;
+      padding: 12px 24px;
       white-space: nowrap;
+      flex-shrink: 0;
+      border-radius: 24px;
+      min-width: fit-content;
+      font-size: 14px;
+      font-weight: 500;
+      scroll-snap-align: center;
+      scroll-snap-stop: always;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    
+    .sidebar-item.active {
+      background-color: var(--accent-blue);
+      color: white;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      transform: scale(1.05);
+    }
+    
+    .sidebar-item.active::before {
+      display: none;
+    }
+    
+    .sidebar-item:active {
+      transform: scale(0.95);
+    }
+    
+    .sidebar-item:hover:not(.active) {
+      transform: none;
+      background-color: var(--hover-bg);
+    }
+    
+    .sidebar-item svg {
+      width: 16px;
+      height: 16px;
       flex-shrink: 0;
     }
   }
@@ -1450,33 +1474,76 @@
     flex: 1;
     padding: 32px;
     overflow-y: auto;
+    overflow-x: hidden;
   }
   
   @media (max-width: 768px) {
     .settings-content {
-      padding: 16px;
+      padding: 20px 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     
     .setting-section {
-      margin-bottom: 24px;
+      margin-bottom: 32px;
     }
     
     .setting-row {
       flex-direction: column;
       align-items: flex-start;
-      gap: 12px;
+      gap: 16px;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+    
+    .setting-label {
+      font-size: 15px;
+      font-weight: 600;
+      width: 100%;
+    }
+    
+    .setting-value {
+      width: 100%;
+      font-size: 14px;
     }
     
     .setting-actions {
       width: 100%;
       flex-direction: column;
+      gap: 12px;
     }
     
     .manage-button,
     .danger-button,
     .view-button {
       width: 100%;
-      min-height: 44px;
+      min-height: 48px;
+      font-size: 15px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    
+    .theme-buttons {
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .theme-button {
+      padding: 20px;
+      border-radius: 16px;
+      font-size: 15px;
+    }
+    
+    .setting-select {
+      width: 100%;
+      max-width: 100%;
+      padding: 14px 16px;
+      font-size: 15px;
+      border-radius: 12px;
     }
   }
 
@@ -1763,6 +1830,30 @@
     margin-bottom: 24px;
   }
   
+  @media (max-width: 768px) {
+    .subscription-status {
+      margin-bottom: 20px;
+    }
+    
+    .subscription-badge {
+      width: 100%;
+      padding: 16px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      border-radius: 16px;
+    }
+    
+    .badge-label {
+      font-size: 18px;
+    }
+    
+    .badge-status {
+      font-size: 13px;
+      padding: 6px 12px;
+    }
+  }
+  
   .subscription-badge {
     display: inline-flex;
     align-items: center;
@@ -1846,6 +1937,39 @@
     gap: 8px;
     min-width: 250px;
   }
+  
+  @media (max-width: 768px) {
+    .phone-edit-container {
+      width: 100%;
+      min-width: 100%;
+    }
+    
+    .phone-input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 15px;
+      border-radius: 12px;
+    }
+    
+    .phone-edit-actions {
+      width: 100%;
+      gap: 12px;
+    }
+    
+    .phone-save-button,
+    .phone-cancel-button {
+      flex: 1;
+      padding: 14px;
+      font-size: 15px;
+      border-radius: 12px;
+      min-height: 48px;
+    }
+    
+    .phone-display-container {
+      width: 100%;
+      justify-content: space-between;
+    }
+  }
 
   .phone-input {
     padding: 8px 12px;
@@ -1914,28 +2038,5 @@
     cursor: not-allowed;
   }
 
-  @media (max-width: 768px) {
-    .modal-backdrop {
-      padding: 0;
-    }
-
-    .modal-content {
-      max-width: 100%;
-      max-height: 100vh;
-      border-radius: 0;
-      height: 100vh;
-    }
-
-    .settings-sidebar {
-      width: 160px;
-    }
-
-    .settings-content {
-      padding: 20px 16px;
-    }
-
-    .theme-buttons {
-      flex-direction: column;
-    }
-  }
+  /* Rimuovi stili duplicati - già gestiti sopra */
 </style>
