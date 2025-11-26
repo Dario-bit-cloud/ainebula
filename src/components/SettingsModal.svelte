@@ -15,6 +15,7 @@
   
   let activeSection = 'generale';
   let theme = 'system';
+  let uiStyle = 'material';
   let language = 'system';
   let phoneNumber = '';
   let isEditingPhone = false;
@@ -50,6 +51,13 @@
       applyTheme(savedTheme);
     }
     
+    // Carica stile UI salvato
+    const savedUIStyle = localStorage.getItem('nebula-ui-style');
+    if (savedUIStyle) {
+      uiStyle = savedUIStyle;
+      applyUIStyle(savedUIStyle);
+    }
+    
     // Carica lingua salvata
     const savedLanguage = localStorage.getItem('nebula-language');
     if (savedLanguage) {
@@ -78,6 +86,7 @@
   
   function applyTheme(newTheme) {
     const root = document.documentElement;
+    const body = document.body;
     if (newTheme === 'light') {
       root.style.setProperty('--bg-primary', '#ffffff');
       root.style.setProperty('--bg-secondary', '#f5f5f5');
@@ -85,6 +94,7 @@
       root.style.setProperty('--text-primary', '#171717');
       root.style.setProperty('--text-secondary', '#525252');
       root.style.setProperty('--border-color', '#d4d4d4');
+      body.setAttribute('data-theme', 'light');
     } else if (newTheme === 'dark') {
       root.style.setProperty('--bg-primary', '#171717');
       root.style.setProperty('--bg-secondary', '#1f1f1f');
@@ -92,6 +102,7 @@
       root.style.setProperty('--text-primary', '#ffffff');
       root.style.setProperty('--text-secondary', '#a0a0a0');
       root.style.setProperty('--border-color', '#3a3a3a');
+      body.setAttribute('data-theme', 'dark');
     } else {
       // Sistema - usa preferenza sistema
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -102,6 +113,7 @@
         root.style.setProperty('--text-primary', '#ffffff');
         root.style.setProperty('--text-secondary', '#a0a0a0');
         root.style.setProperty('--border-color', '#3a3a3a');
+        body.setAttribute('data-theme', 'dark');
       } else {
         root.style.setProperty('--bg-primary', '#ffffff');
         root.style.setProperty('--bg-secondary', '#f5f5f5');
@@ -109,6 +121,7 @@
         root.style.setProperty('--text-primary', '#171717');
         root.style.setProperty('--text-secondary', '#525252');
         root.style.setProperty('--border-color', '#d4d4d4');
+        body.setAttribute('data-theme', 'light');
       }
     }
   }
@@ -117,6 +130,21 @@
     theme = newTheme;
     localStorage.setItem('nebula-theme', newTheme);
     applyTheme(newTheme);
+  }
+  
+  function applyUIStyle(newStyle) {
+    const body = document.body;
+    if (newStyle === 'liquid') {
+      body.classList.add('liquid-glass');
+    } else {
+      body.classList.remove('liquid-glass');
+    }
+  }
+  
+  function handleUIStyleChange(newStyle) {
+    uiStyle = newStyle;
+    localStorage.setItem('nebula-ui-style', newStyle);
+    applyUIStyle(newStyle);
   }
   
   function handleLanguageChange() {
@@ -841,6 +869,36 @@
                     <line x1="12" y1="17" x2="12" y2="21"/>
                   </svg>
                   <span>{$t('system')}</span>
+                </button>
+              </div>
+            </div>
+            
+            <div class="setting-section" class:section-visible={activeSection === 'generale'}>
+              <h3 class="setting-title">Stile Interfaccia</h3>
+              <div class="theme-buttons">
+                <button 
+                  class="theme-button" 
+                  class:active={uiStyle === 'material'}
+                  on:click={() => handleUIStyleChange('material')}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                  </svg>
+                  <span>Material Design</span>
+                </button>
+                <button 
+                  class="theme-button" 
+                  class:active={uiStyle === 'liquid'}
+                  on:click={() => handleUIStyleChange('liquid')}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+                    <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
+                  </svg>
+                  <span>Liquid Glass</span>
                 </button>
               </div>
             </div>

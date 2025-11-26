@@ -1,6 +1,7 @@
 import './app.css';
 import './styles/material-design-3.css';
 import './styles/ios-ui.css';
+import './styles/liquid-glass.css';
 import App from './App.svelte';
 import { isIOS } from './utils/platform.js';
 
@@ -8,6 +9,9 @@ import { isIOS } from './utils/platform.js';
 function initTheme() {
   const savedTheme = localStorage.getItem('nebula-theme') || 'system';
   const root = document.documentElement;
+  const body = document.body;
+  
+  // Applica tema colore
   if (savedTheme === 'light') {
     root.style.setProperty('--bg-primary', '#ffffff');
     root.style.setProperty('--bg-secondary', '#f5f5f5');
@@ -15,6 +19,7 @@ function initTheme() {
     root.style.setProperty('--text-primary', '#171717');
     root.style.setProperty('--text-secondary', '#525252');
     root.style.setProperty('--border-color', '#d4d4d4');
+    body.setAttribute('data-theme', 'light');
   } else if (savedTheme === 'dark') {
     root.style.setProperty('--bg-primary', '#171717');
     root.style.setProperty('--bg-secondary', '#1f1f1f');
@@ -22,6 +27,7 @@ function initTheme() {
     root.style.setProperty('--text-primary', '#ffffff');
     root.style.setProperty('--text-secondary', '#a0a0a0');
     root.style.setProperty('--border-color', '#3a3a3a');
+    body.setAttribute('data-theme', 'dark');
   } else {
     // Sistema - usa preferenza sistema
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -32,6 +38,7 @@ function initTheme() {
       root.style.setProperty('--text-primary', '#ffffff');
       root.style.setProperty('--text-secondary', '#a0a0a0');
       root.style.setProperty('--border-color', '#3a3a3a');
+      body.setAttribute('data-theme', 'dark');
     } else {
       root.style.setProperty('--bg-primary', '#ffffff');
       root.style.setProperty('--bg-secondary', '#f5f5f5');
@@ -39,7 +46,16 @@ function initTheme() {
       root.style.setProperty('--text-primary', '#171717');
       root.style.setProperty('--text-secondary', '#525252');
       root.style.setProperty('--border-color', '#d4d4d4');
+      body.setAttribute('data-theme', 'light');
     }
+  }
+  
+  // Applica stile UI (Material Design o Liquid Glass)
+  const savedUIStyle = localStorage.getItem('nebula-ui-style') || 'material';
+  if (savedUIStyle === 'liquid') {
+    body.classList.add('liquid-glass');
+  } else {
+    body.classList.remove('liquid-glass');
   }
 }
 

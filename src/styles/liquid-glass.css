@@ -1,0 +1,147 @@
+/* Liquid Glass Design System */
+:root {
+  /* Liquid Glass Colors */
+  --lg-glass-bg: rgba(255, 255, 255, 0.05);
+  --lg-glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --lg-glass-border: rgba(255, 255, 255, 0.1);
+  --lg-glass-shadow: rgba(0, 0, 0, 0.1);
+  
+  /* Dark theme glass */
+  --lg-glass-bg-dark: rgba(0, 0, 0, 0.2);
+  --lg-glass-bg-hover-dark: rgba(0, 0, 0, 0.3);
+  --lg-glass-border-dark: rgba(255, 255, 255, 0.1);
+  
+  /* Light theme glass */
+  --lg-glass-bg-light: rgba(255, 255, 255, 0.7);
+  --lg-glass-bg-hover-light: rgba(255, 255, 255, 0.8);
+  --lg-glass-border-light: rgba(0, 0, 0, 0.1);
+}
+
+/* Apply Liquid Glass style */
+body.liquid-glass {
+  /* Backdrop blur effect */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+body.liquid-glass * {
+  /* Smooth transitions */
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Glass surfaces */
+body.liquid-glass .sidebar,
+body.liquid-glass .modal-content,
+body.liquid-glass .top-bar,
+body.liquid-glass .user-section {
+  background: var(--lg-glass-bg) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--lg-glass-border) !important;
+  box-shadow: 0 8px 32px 0 var(--lg-glass-shadow) !important;
+}
+
+/* Glass buttons */
+body.liquid-glass button,
+body.liquid-glass .nav-item,
+body.liquid-glass .chat-item {
+  background: var(--lg-glass-bg) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--lg-glass-border) !important;
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1) !important;
+}
+
+body.liquid-glass button:hover,
+body.liquid-glass .nav-item:hover,
+body.liquid-glass .chat-item:hover {
+  background: var(--lg-glass-bg-hover) !important;
+  box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+/* Glass inputs */
+body.liquid-glass input,
+body.liquid-glass textarea,
+body.liquid-glass select {
+  background: var(--lg-glass-bg) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--lg-glass-border) !important;
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.1) !important;
+}
+
+body.liquid-glass input:focus,
+body.liquid-glass textarea:focus,
+body.liquid-glass select:focus {
+  background: var(--lg-glass-bg-hover) !important;
+  box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.15) !important;
+  border-color: var(--accent-blue) !important;
+}
+
+/* Glass modals */
+body.liquid-glass .modal-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.3) !important;
+}
+
+body.liquid-glass .modal-content {
+  background: var(--lg-glass-bg) !important;
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--lg-glass-border) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Glass cards */
+body.liquid-glass .chat-item,
+body.liquid-glass .project-folder,
+body.liquid-glass .user-info {
+  background: var(--lg-glass-bg) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--lg-glass-border) !important;
+}
+
+/* Glass dropdowns */
+body.liquid-glass .model-dropdown,
+body.liquid-glass .move-menu {
+  background: var(--lg-glass-bg) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--lg-glass-border) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Theme-specific adjustments */
+@media (prefers-color-scheme: dark) {
+  body.liquid-glass {
+    --lg-glass-bg: var(--lg-glass-bg-dark);
+    --lg-glass-bg-hover: var(--lg-glass-bg-hover-dark);
+    --lg-glass-border: var(--lg-glass-border-dark);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  body.liquid-glass {
+    --lg-glass-bg: var(--lg-glass-bg-light);
+    --lg-glass-bg-hover: var(--lg-glass-bg-hover-light);
+    --lg-glass-border: var(--lg-glass-border-light);
+  }
+}
+
+/* Override for dark theme when explicitly set */
+body.liquid-glass[data-theme="dark"] {
+  --lg-glass-bg: var(--lg-glass-bg-dark);
+  --lg-glass-bg-hover: var(--lg-glass-bg-hover-dark);
+  --lg-glass-border: var(--lg-glass-border-dark);
+}
+
+/* Override for light theme when explicitly set */
+body.liquid-glass[data-theme="light"] {
+  --lg-glass-bg: var(--lg-glass-bg-light);
+  --lg-glass-bg-hover: var(--lg-glass-bg-hover-light);
+  --lg-glass-border: var(--lg-glass-border-light);
+}
+

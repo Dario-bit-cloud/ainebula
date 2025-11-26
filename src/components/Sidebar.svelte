@@ -379,15 +379,15 @@
         </svg>
       </button>
     </div>
-  {/if}
-  
-  <!-- Logo in alto -->
-  <div class="sidebar-header">
-    <div class="sidebar-logo">
-      <img src="/logo.png" alt="Nebula AI" class="logo-img" />
-      <span class="logo-text">Nebula AI</span>
+  {:else}
+    <!-- Logo in alto solo su desktop -->
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="/logo.png" alt="Nebula AI" class="logo-img" />
+        <span class="logo-text">Nebula AI</span>
+      </div>
     </div>
-  </div>
+  {/if}
   
   <nav class="sidebar-nav">
     <!-- Bottone Nuova Chat Prominente -->
@@ -961,7 +961,7 @@
     right: 0;
     bottom: 0;
     background-color: rgba(0, 0, 0, 0.5);
-    z-index: 998;
+    z-index: 1000;
     animation: overlayFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -984,7 +984,7 @@
     min-height: 100%;
     animation: sidebarSlideIn var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
     position: relative;
-    z-index: 999;
+    z-index: 1;
     flex-shrink: 0;
     box-shadow: var(--md-sys-elevation-level1);
   }
@@ -1069,7 +1069,7 @@
       width: 280px;
       max-width: 85vw;
       height: 100vh;
-      z-index: 999;
+      z-index: 1001;
       transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 2px 0 12px rgba(0, 0, 0, 0.5);
