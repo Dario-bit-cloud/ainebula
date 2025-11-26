@@ -9,7 +9,7 @@ export const isSettingsOpen = writable(false);
 export const isProjectModalOpen = writable(false);
 export const isInviteModalOpen = writable(false);
 export const isUserMenuOpen = writable(false);
-export const isSidebarOpen = writable(true);
+export const isSidebarOpen = writable(false);
 export const isPremiumModalOpen = writable(false);
 export const isAISettingsModalOpen = writable(false);
 export const isPromptLibraryModalOpen = writable(false);
@@ -62,8 +62,11 @@ function createMediaQuery(query) {
   const { set, subscribe } = writable(mediaQuery.matches);
   
   // Imposta lo stato iniziale della sidebar in base alla dimensione dello schermo
+  // Su mobile la sidebar è sempre chiusa di default, su desktop aperta
   if (mediaQuery.matches) {
     isSidebarOpen.set(false);
+  } else {
+    isSidebarOpen.set(true);
   }
   
   const handler = (e) => {
