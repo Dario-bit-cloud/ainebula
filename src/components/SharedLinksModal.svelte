@@ -9,7 +9,6 @@
   let isLoading = false;
   let selectedChatId = '';
   let linkTitle = '';
-  let expiresInDays = 30;
   let isCreating = false;
   
   onMount(() => {
@@ -40,7 +39,7 @@
     
     isCreating = true;
     try {
-      const result = await createSharedLink(selectedChatId, linkTitle || null, expiresInDays || null);
+      const result = await createSharedLink(selectedChatId, linkTitle || null);
       if (result.success) {
         await showAlert('Link condiviso creato con successo!', 'Successo', 'OK', 'success');
         linkTitle = '';
@@ -156,16 +155,7 @@
           </div>
           
           <div class="form-group">
-            <label for="expires-days">Scadenza (giorni, opzionale)</label>
-            <input 
-              id="expires-days" 
-              type="number" 
-              bind:value={expiresInDays} 
-              min="1"
-              max="365"
-              class="form-input"
-            />
-            <small>Lascia vuoto per link senza scadenza</small>
+            <small style="color: #a0a0a0; display: block; margin-top: 8px;">I link condivisi scadono automaticamente dopo 50 giorni dalla creazione</small>
           </div>
           
           <button 

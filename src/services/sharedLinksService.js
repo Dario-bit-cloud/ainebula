@@ -54,7 +54,7 @@ export async function getSharedLinks() {
 /**
  * Crea un nuovo link condiviso
  */
-export async function createSharedLink(chatId, title = null, expiresInDays = null) {
+export async function createSharedLink(chatId, title = null) {
   try {
     const token = localStorage.getItem('auth_token');
     
@@ -70,8 +70,7 @@ export async function createSharedLink(chatId, title = null, expiresInDays = nul
       },
       body: JSON.stringify({
         chatId,
-        title,
-        expiresInDays
+        title
       })
     });
     

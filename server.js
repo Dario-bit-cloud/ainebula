@@ -1762,7 +1762,7 @@ app.post('/api/shared-links', authenticateToken, async (req, res) => {
   try {
     await ensureSharedLinksTable();
     
-    const { chatId, title, expiresInDays } = req.body;
+    const { chatId, title } = req.body;
     
     if (!chatId) {
       return res.status(400).json({
@@ -1787,12 +1787,9 @@ app.post('/api/shared-links', authenticateToken, async (req, res) => {
     const shareToken = randomBytes(32).toString('hex');
     const linkId = randomBytes(16).toString('hex');
     
-    // Calcola data di scadenza
-    let expiresAt = null;
-    if (expiresInDays && expiresInDays > 0) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
-    }
+    // Calcola data di scadenza - sempre 50 giorni dalla condivisione
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 50);
     
     await sql`
       INSERT INTO shared_links (
@@ -2149,6 +2146,40 @@ app.delete('/api/chat', authenticateToken, async (req, res) => {
 });
 
 // ==================== FINE ENDPOINT ELIMINAZIONE CHAT ====================
+
+// ==================== JOB PULIZIA AUTOMATICA LINK CONDIVISI ====================
+
+/**
+ * Job di pulizia automatica per eliminare link condivisi scaduti (oltre 50 giorni)
+ * Viene eseguito ogni 24 ore
+ */
+async function cleanupExpiredSharedLinks() {
+  try {
+    await ensureSharedLinksTable();
+    
+    // Calcola la data di 50 giorni fa
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 50);
+    
+    // Elimina link condivisi creati più di 50 giorni fa
+    const result = await sql`
+      DELETE FROM shared_links
+      WHERE created_at < ${cutoffDate.toISOString()}
+    `;
+    
+    log(`🧹 Pulizia link condivisi: eliminati link più vecchi di 50 giorni`);
+  } catch (error) {
+    logError('Errore durante la pulizia automatica dei link condivisi:', error);
+  }
+}
+
+// Esegui la pulizia all'avvio del server
+cleanupExpiredSharedLinks();
+
+// Esegui la pulizia ogni 24 ore (86400000 ms)
+setInterval(cleanupExpiredSharedLinks, 24 * 60 * 60 * 1000);
+
+// ==================== FINE JOB PULIZIA AUTOMATICA ====================
 
 app.listen(PORT, () => {
   if (isDevelopment) {

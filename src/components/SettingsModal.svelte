@@ -1,5 +1,5 @@
 <script>
-  import { isSettingsOpen, isPremiumModalOpen, isMobile, isSidebarOpen } from '../stores/app.js';
+  import { isSettingsOpen, isPremiumModalOpen, isMobile, isSidebarOpen, isSharedLinksModalOpen } from '../stores/app.js';
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
@@ -700,7 +700,7 @@
   }
   
   async function handleManageSharedLinks() {
-    await showAlert('Gestione link condivisi - Funzionalità in arrivo', 'Info', 'OK', 'info');
+    isSharedLinksModalOpen.set(true);
   }
   
   let isLoadingSubscription = false;
