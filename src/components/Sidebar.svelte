@@ -954,15 +954,6 @@
       </div>
       <div class="user-details">
         <div class="username">{$userStore.name || $isAuthenticatedStore ? ($authUser?.username || $t('user')) : $t('user')}</div>
-        <div class="workspace">
-          {#if $isAuthenticatedStore && $authUser?.email}
-            {$authUser.email}
-          {:else if $userStore.email}
-            {$userStore.email}
-          {:else}
-            {$t('noWorkspace')}
-          {/if}
-        </div>
       </div>
     </button>
     <button class="invite-button" on:click={handleInviteClick}>

@@ -67,21 +67,9 @@ if (isDevelopment) {
   });
 }
 
-// Compression middleware per ridurre la dimensione delle risposte
-app.use((req, res, next) => {
-  // Comprimi solo risposte JSON e testo
-  if (req.headers['accept-encoding']?.includes('gzip') || req.headers['accept-encoding']?.includes('deflate')) {
-    const originalSend = res.send;
-    res.send = function(data) {
-      if (typeof data === 'string' && data.length > 1024) {
-        // Per risposte grandi, usa compressione semplice
-        res.setHeader('Content-Encoding', 'gzip');
-      }
-      return originalSend.call(this, data);
-    };
-  }
-  next();
-});
+// Compression middleware rimosso - causava ERR_CONTENT_DECODING_FAILED
+// Se necessario, usa il middleware compression di Express: npm install compression
+// app.use(compression());
 
 app.use(express.json());
 

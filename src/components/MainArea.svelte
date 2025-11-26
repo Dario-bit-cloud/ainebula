@@ -2307,7 +2307,7 @@
       padding-bottom: calc(10px + env(safe-area-inset-bottom));
       position: sticky;
       bottom: 0;
-      background-color: var(--bg-primary);
+      background-color: transparent;
       z-index: 100;
     }
 
@@ -2437,7 +2437,7 @@
       padding-bottom: calc(8px + env(safe-area-inset-bottom));
       position: sticky;
       bottom: 0;
-      background-color: var(--bg-primary);
+      background-color: transparent;
       z-index: 100;
     }
 
@@ -2704,8 +2704,8 @@
 
   .input-container {
     padding: 16px 24px;
-    background-color: var(--bg-primary);
-    border-top: 1px solid var(--border-color);
+    background-color: transparent;
+    border-top: none;
     position: relative;
     z-index: 10;
   }
@@ -2890,6 +2890,7 @@
     padding: 12px 16px;
     transition: all 0.2s;
     min-height: 56px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .input-wrapper.input-empty {

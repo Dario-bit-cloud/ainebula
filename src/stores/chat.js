@@ -31,8 +31,22 @@ export async function createNewChat(projectId = null, isTemporary = false) {
   currentChatId.set(newChat.id);
   
   // Salva nel database solo se autenticato E non è temporanea
-  if (get(isAuthenticatedStore) && !isTemporary) {
-    await saveChatToDatabase(newChat);
+  if (!isTemporary) {
+    const isAuthenticated = get(isAuthenticatedStore);
+    const token = localStorage.getItem('auth_token');
+    
+    if (isAuthenticated && token) {
+      try {
+        await saveChatToDatabase(newChat);
+      } catch (error) {
+        console.error('❌ [CHAT STORE] Errore durante salvataggio nuova chat:', error);
+        // Salva in localStorage come backup
+        saveChatsToStorage();
+      }
+    } else {
+      // Salva in localStorage se non autenticato o token non disponibile
+      saveChatsToStorage();
+    }
   }
   // Non salvare chat temporanee vuote in localStorage
   // Verranno salvate solo quando avranno almeno un messaggio
@@ -57,8 +71,25 @@ export async function moveChatToProject(chatId, projectId) {
       // Salva solo in localStorage per chat temporanee
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
-      // Salva nel database se autenticato e non temporanea
-      await saveChatToDatabase(chat);
+      // Verifica che il token sia disponibile prima di salvare
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        // Salva nel database se autenticato e non temporanea
+        try {
+          const result = await saveChatToDatabase(chat);
+          if (!result.success) {
+            console.warn('⚠️ [CHAT STORE] Salvataggio chat fallito, salvo in localStorage come backup:', result);
+            saveChatsToStorage();
+          }
+        } catch (error) {
+          console.error('❌ [CHAT STORE] Errore durante salvataggio chat:', error);
+          // Salva in localStorage come backup
+          saveChatsToStorage();
+        }
+      } else {
+        console.warn('⚠️ [CHAT STORE] Token non disponibile, salvo in localStorage');
+        saveChatsToStorage();
+      }
     } else {
       // Salva in localStorage se non autenticato
       saveChatsToStorage();
@@ -100,8 +131,25 @@ export async function addMessage(chatId, message) {
       // Salva solo in localStorage per chat temporanee
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
-      // Salva nel database se autenticato e non temporanea
-      await saveChatToDatabase(chat);
+      // Verifica che il token sia disponibile prima di salvare
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        // Salva nel database se autenticato e non temporanea
+        try {
+          const result = await saveChatToDatabase(chat);
+          if (!result.success) {
+            console.warn('⚠️ [CHAT STORE] Salvataggio chat fallito, salvo in localStorage come backup:', result);
+            saveChatsToStorage();
+          }
+        } catch (error) {
+          console.error('❌ [CHAT STORE] Errore durante salvataggio chat:', error);
+          // Salva in localStorage come backup
+          saveChatsToStorage();
+        }
+      } else {
+        console.warn('⚠️ [CHAT STORE] Token non disponibile, salvo in localStorage');
+        saveChatsToStorage();
+      }
     } else {
       // Salva in localStorage se non autenticato
       saveChatsToStorage();
@@ -172,8 +220,25 @@ export async function updateMessage(chatId, messageIndex, updates) {
       // Salva solo in localStorage per chat temporanee
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
-      // Salva nel database se autenticato e non temporanea
-      await saveChatToDatabase(chat);
+      // Verifica che il token sia disponibile prima di salvare
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        // Salva nel database se autenticato e non temporanea
+        try {
+          const result = await saveChatToDatabase(chat);
+          if (!result.success) {
+            console.warn('⚠️ [CHAT STORE] Salvataggio chat fallito, salvo in localStorage come backup:', result);
+            saveChatsToStorage();
+          }
+        } catch (error) {
+          console.error('❌ [CHAT STORE] Errore durante salvataggio chat:', error);
+          // Salva in localStorage come backup
+          saveChatsToStorage();
+        }
+      } else {
+        console.warn('⚠️ [CHAT STORE] Token non disponibile, salvo in localStorage');
+        saveChatsToStorage();
+      }
     } else {
       // Salva in localStorage se non autenticato
       saveChatsToStorage();
@@ -205,8 +270,25 @@ export async function deleteMessage(chatId, messageIndex) {
       // Salva solo in localStorage per chat temporanee
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
-      // Salva nel database se autenticato e non temporanea
-      await saveChatToDatabase(chat);
+      // Verifica che il token sia disponibile prima di salvare
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        // Salva nel database se autenticato e non temporanea
+        try {
+          const result = await saveChatToDatabase(chat);
+          if (!result.success) {
+            console.warn('⚠️ [CHAT STORE] Salvataggio chat fallito, salvo in localStorage come backup:', result);
+            saveChatsToStorage();
+          }
+        } catch (error) {
+          console.error('❌ [CHAT STORE] Errore durante salvataggio chat:', error);
+          // Salva in localStorage come backup
+          saveChatsToStorage();
+        }
+      } else {
+        console.warn('⚠️ [CHAT STORE] Token non disponibile, salvo in localStorage');
+        saveChatsToStorage();
+      }
     } else {
       // Salva in localStorage se non autenticato
       saveChatsToStorage();
@@ -306,35 +388,59 @@ let isLoadingChats = false;
 
 // Sincronizza le chat quando l'utente fa login
 export async function syncChatsOnLogin() {
-  if (!get(isAuthenticatedStore)) {
-    console.log('Utente non autenticato, skip syncChatsOnLogin');
+  console.log('🔄 [CHAT STORE] syncChatsOnLogin chiamato');
+  
+  // Verifica che il token sia disponibile
+  const token = localStorage.getItem('auth_token');
+  if (!token) {
+    console.warn('⚠️ [CHAT STORE] Token non disponibile, skip syncChatsOnLogin');
     return;
+  }
+  
+  // Verifica che l'utente sia autenticato
+  if (!get(isAuthenticatedStore)) {
+    console.log('⚠️ [CHAT STORE] Utente non autenticato, skip syncChatsOnLogin');
+    // Prova comunque se c'è un token (potrebbe essere un problema di timing)
+    if (!token) {
+      return;
+    }
   }
   
   // Evita caricamenti multipli simultanei
   if (isLoadingChats) {
-    console.log('Caricamento chat già in corso, skip');
+    console.log('⏸️ [CHAT STORE] Caricamento chat già in corso, skip');
     return;
   }
   
   isLoadingChats = true;
   
   try {
+    console.log('📥 [CHAT STORE] Inizio caricamento chat dal database...');
+    
     // Prima pulisci le chat esistenti (potrebbero essere chat locali)
     chats.set([]);
     currentChatId.set(null);
     
     // Carica dal database (solo chat non temporanee)
     const result = await getChatsFromDatabase();
-    console.log('Risultato getChatsFromDatabase:', result);
+    console.log('📊 [CHAT STORE] Risultato getChatsFromDatabase:', {
+      success: result.success,
+      chatsCount: result.chats?.length || 0,
+      message: result.message,
+      error: result.error
+    });
     
     let dbChats = [];
     if (result.success && result.chats) {
       // Filtra le chat temporanee dal database (non dovrebbero esserci, ma per sicurezza)
       dbChats = result.chats.filter(chat => !chat.isTemporary);
-      console.log(`Caricate ${dbChats.length} chat dal database (escluse temporanee)`);
+      console.log(`✅ [CHAT STORE] Caricate ${dbChats.length} chat dal database (escluse temporanee)`);
     } else {
-      console.warn('Nessuna chat trovata o errore nel caricamento:', result);
+      console.warn('⚠️ [CHAT STORE] Nessuna chat trovata o errore nel caricamento:', result);
+      // Se c'è un errore, prova comunque a caricare da localStorage
+      if (result.error) {
+        console.error('❌ [CHAT STORE] Errore dettagliato:', result.error);
+      }
     }
     
     // Carica chat temporanee da localStorage
@@ -345,25 +451,32 @@ export async function syncChatsOnLogin() {
         if (stored) {
           const parsed = JSON.parse(stored);
           tempChats = parsed.filter(chat => chat.isTemporary === true);
-          console.log(`Caricate ${tempChats.length} chat temporanee da localStorage`);
+          console.log(`📦 [CHAT STORE] Caricate ${tempChats.length} chat temporanee da localStorage`);
         }
       } catch (error) {
-        console.error('Error loading temporary chats from storage:', error);
+        console.error('❌ [CHAT STORE] Error loading temporary chats from storage:', error);
       }
     }
     
     // Combina chat dal database e chat temporanee
-    chats.set([...dbChats, ...tempChats]);
+    const allChats = [...dbChats, ...tempChats];
+    chats.set(allChats);
+    console.log(`✅ [CHAT STORE] Totale chat caricate: ${allChats.length} (${dbChats.length} dal DB, ${tempChats.length} temporanee)`);
     
     // Migra le chat da localStorage al database (solo se non ci sono già chat nel database)
     // Non migrare chat temporanee
     await migrateChatsFromLocalStorage();
   } catch (error) {
-    console.error('Errore in syncChatsOnLogin:', error);
+    console.error('❌ [CHAT STORE] Errore in syncChatsOnLogin:', error);
     // In caso di errore, prova comunque a migrare da localStorage
-    await migrateChatsFromLocalStorage();
+    try {
+      await migrateChatsFromLocalStorage();
+    } catch (migrationError) {
+      console.error('❌ [CHAT STORE] Errore durante migrazione:', migrationError);
+    }
   } finally {
     isLoadingChats = false;
+    console.log('✅ [CHAT STORE] syncChatsOnLogin completato');
   }
 }
 

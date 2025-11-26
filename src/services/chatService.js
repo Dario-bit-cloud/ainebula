@@ -59,59 +59,93 @@ export async function getChatsFromDatabase() {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Accept-Encoding': 'identity' // Disabilita compressione per evitare ERR_CONTENT_DECODING_FAILED
       }
     });
     
     console.log('📥 [CHAT SERVICE] Risposta ricevuta:', {
       status: response.status,
       statusText: response.statusText,
-      ok: response.ok
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
     });
     
-    let data;
-    const responseText = await response.text();
-    console.log('📄 [CHAT SERVICE] Body risposta (raw):', responseText.substring(0, 200));
-    
-    try {
-      data = JSON.parse(responseText);
-      console.log('✅ [CHAT SERVICE] Chat caricate:', {
-        success: data.success,
-        count: data.chats?.length || 0
-      });
-      
-      // Decrittografa i messaggi se la crittografia è disponibile
-      if (data.success && data.chats && Array.isArray(data.chats)) {
-        const user = getCurrentUser();
-        if (user && user.id) {
-          const encryptionKey = await getEncryptionKeyForUser(user.id);
-          if (encryptionKey) {
-            console.log('🔓 [CHAT SERVICE] Decrittografia messaggi...');
-            for (const chat of data.chats) {
-              if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
-                try {
-                  chat.messages = await decryptMessages(chat.messages, encryptionKey);
-                  console.log(`✅ [CHAT SERVICE] Decrittografati ${chat.messages.length} messaggi per chat ${chat.id}`);
-                } catch (error) {
-                  console.error(`❌ [CHAT SERVICE] Errore decrittografia chat ${chat.id}:`, error);
-                  // Continua anche se la decrittografia fallisce (per retrocompatibilità)
-                }
-              }
-            }
-            console.log('🔓 [CHAT SERVICE] Decrittografia completata');
-          } else {
-            console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
-          }
-        }
-      }
-    } catch (parseError) {
-      console.error('❌ [CHAT SERVICE] Errore parsing JSON:', parseError);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Errore sconosciuto');
+      console.error('❌ [CHAT SERVICE] Risposta non OK:', errorText);
       return {
         success: false,
-        message: 'Errore nel formato della risposta del server',
-        error: `Errore parsing: ${parseError.message}`,
-        rawResponse: responseText
+        message: `Errore server: ${response.status} ${response.statusText}`,
+        error: errorText
       };
+    }
+    
+    let data;
+    let responseText;
+    
+    try {
+      // Prova prima a leggere come JSON direttamente
+      try {
+        data = await response.json();
+        console.log('✅ [CHAT SERVICE] Chat caricate (JSON diretto):', {
+          success: data.success,
+          count: data.chats?.length || 0
+        });
+      } catch (jsonError) {
+        // Se fallisce, prova a leggere come testo e poi parsare
+        console.log('⚠️ [CHAT SERVICE] Tentativo lettura come testo...');
+        responseText = await response.text();
+        console.log('📄 [CHAT SERVICE] Body risposta (raw):', responseText.substring(0, 200));
+        data = JSON.parse(responseText);
+        console.log('✅ [CHAT SERVICE] Chat caricate (parsing testo):', {
+          success: data.success,
+          count: data.chats?.length || 0
+        });
+      }
+    } catch (readError) {
+      console.error('❌ [CHAT SERVICE] Errore lettura risposta:', readError);
+      // Se anche questo fallisce, prova a clonare la risposta
+      try {
+        const clonedResponse = response.clone();
+        responseText = await clonedResponse.text();
+        console.log('📄 [CHAT SERVICE] Body risposta (clonata):', responseText.substring(0, 200));
+        data = JSON.parse(responseText);
+      } catch (cloneError) {
+        console.error('❌ [CHAT SERVICE] Errore anche con clone:', cloneError);
+        return {
+          success: false,
+          message: 'Errore nella lettura della risposta del server',
+          error: readError.message || cloneError.message,
+          errorType: readError.name || cloneError.name
+        };
+      }
+    }
+    
+    // Decrittografa i messaggi se la crittografia è disponibile
+    if (data && data.success && data.chats && Array.isArray(data.chats)) {
+      const user = getCurrentUser();
+      if (user && user.id) {
+        const encryptionKey = await getEncryptionKeyForUser(user.id);
+        if (encryptionKey) {
+          console.log('🔓 [CHAT SERVICE] Decrittografia messaggi...');
+          for (const chat of data.chats) {
+            if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+              try {
+                chat.messages = await decryptMessages(chat.messages, encryptionKey);
+                console.log(`✅ [CHAT SERVICE] Decrittografati ${chat.messages.length} messaggi per chat ${chat.id}`);
+              } catch (error) {
+                console.error(`❌ [CHAT SERVICE] Errore decrittografia chat ${chat.id}:`, error);
+                // Continua anche se la decrittografia fallisce (per retrocompatibilità)
+              }
+            }
+          }
+          console.log('🔓 [CHAT SERVICE] Decrittografia completata');
+        } else {
+          console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
+        }
+      }
     }
     
     return data;

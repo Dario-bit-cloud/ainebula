@@ -59,13 +59,59 @@ export function initAuth() {
 
 // Aggiorna lo store dopo login/registrazione
 export async function setUser(userData) {
-  user.set(userData);
-  isAuthenticatedStore.set(true);
-  // Sincronizza le chat e i progetti dal database
-  await Promise.all([
-    syncChatsOnLogin(),
-    syncProjectsOnLogin()
-  ]);
+  console.log('🔐 [AUTH STORE] setUser chiamato con:', userData);
+  
+  // Verifica che il token sia disponibile
+  const token = localStorage.getItem('auth_token');
+  if (!token) {
+    console.error('❌ [AUTH STORE] Token non disponibile durante setUser');
+    return;
+  }
+  
+  // Carica tutti i dati dell'utente dal server per assicurarsi di avere dati completi
+  try {
+    const { verifySession } = await import('../services/authService.js');
+    const sessionResult = await verifySession();
+    
+    if (sessionResult.success && sessionResult.user) {
+      console.log('✅ [AUTH STORE] Dati utente completi caricati:', sessionResult.user);
+      user.set(sessionResult.user);
+      isAuthenticatedStore.set(true);
+      
+      // Attendi un breve momento per assicurarsi che lo store sia aggiornato
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Sincronizza le chat e i progetti dal database
+      console.log('🔄 [AUTH STORE] Sincronizzazione chat e progetti...');
+      await Promise.all([
+        syncChatsOnLogin(),
+        syncProjectsOnLogin()
+      ]);
+      console.log('✅ [AUTH STORE] Sincronizzazione completata');
+    } else {
+      console.warn('⚠️ [AUTH STORE] verifySession fallito, uso dati parziali');
+      user.set(userData);
+      isAuthenticatedStore.set(true);
+      
+      // Prova comunque a sincronizzare
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await Promise.all([
+        syncChatsOnLogin(),
+        syncProjectsOnLogin()
+      ]);
+    }
+  } catch (error) {
+    console.error('❌ [AUTH STORE] Errore durante setUser:', error);
+    // In caso di errore, usa i dati forniti e prova comunque a sincronizzare
+    user.set(userData);
+    isAuthenticatedStore.set(true);
+    
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await Promise.all([
+      syncChatsOnLogin(),
+      syncProjectsOnLogin()
+    ]);
+  }
 }
 
 // Pulisci lo store dopo logout
