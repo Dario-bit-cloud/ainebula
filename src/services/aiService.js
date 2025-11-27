@@ -9,6 +9,7 @@ import { isAuthenticatedStore } from '../stores/auth.js';
 
 /**
  * Ottiene l'istruzione sulla lingua in base alla lingua selezionata
+ * Nota: Le limitazioni sulla data sono state rimosse - i nuovi modelli possono rispondere correttamente
  */
 function getLanguageInstruction(lang) {
   const spacingInstruction = {
