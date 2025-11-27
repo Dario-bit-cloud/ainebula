@@ -13,13 +13,13 @@ export const API_CONFIG = {
 // };
 
 // Mappatura modelli locali ai modelli API e provider
-// Tutti i modelli usano ora deepseek-r1-0528-qwen3-8b tramite Electron Hub
+// Tutti i modelli usano ora gemini-2.0-flash-lite-001 tramite Electron Hub
 export const MODEL_MAPPING = {
-  'nebula-1.0': { model: 'deepseek-r1-0528-qwen3-8b', provider: 'electronhub' }, // Nebula AI 1.0 - DeepSeek R1
-  'nebula-pro': { model: 'deepseek-r1-0528-qwen3-8b', provider: 'electronhub' }, // Nebula AI Pro - DeepSeek R1
-  'nebula-coder': { model: 'deepseek-r1-0528-qwen3-8b', provider: 'electronhub' }, // Nebula Coder - DeepSeek R1 (specializzato in coding)
-  'nebula-premium-pro': { model: 'deepseek-r1-0528-qwen3-8b', provider: 'electronhub' }, // Nebula AI Premium Pro - DeepSeek R1
-  'nebula-premium-max': { model: 'deepseek-r1-0528-qwen3-8b', provider: 'electronhub' } // Nebula AI Premium Max - DeepSeek R1
+  'nebula-1.0': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula AI 1.0 - Gemini 2.0 Flash Lite
+  'nebula-pro': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula AI Pro - Gemini 2.0 Flash Lite
+  'nebula-coder': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula Coder - Gemini 2.0 Flash Lite (specializzato in coding)
+  'nebula-premium-pro': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula AI Premium Pro - Gemini 2.0 Flash Lite
+  'nebula-premium-max': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' } // Nebula AI Premium Max - Gemini 2.0 Flash Lite
 };
 
 
