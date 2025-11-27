@@ -1,7 +1,7 @@
 // Configurazione API - Electron Hub (default)
 export const API_CONFIG = {
   baseURL: 'https://api.electronhub.ai/v1',
-  apiKey: 'ek-Sb1My10CEAlsrg3EanwhCHOHClJvGWzaW8JocbH6ZEBOOEgPzZ',
+  apiKey: 'ek-EV4Fh5dDIvnR4gHkiK7qPBz2R5mEgnJImbuC03AMTXuZ5Aqhrc',
   timeout: 30000 // 30 secondi
 };
 
