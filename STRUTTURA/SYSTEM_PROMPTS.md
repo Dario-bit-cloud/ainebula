@@ -298,31 +298,33 @@ IMPORTANT : Ne laissez pas d'espaces vides entre les lignes dans les messages. �
 WICHTIG: Lassen Sie keine Leerzeichen zwischen den Zeilen in den Nachrichten. Vermeiden Sie unnötige Leerzeilen.
 ```
 
-### Istruzioni sulla Data (Date Instruction)
+### Istruzioni sulla Lingua (Language Instruction)
+
+Le istruzioni sulla lingua sono state semplificate e non contengono più limitazioni sulla data, poiché i nuovi modelli sono in grado di rispondere correttamente alle domande sulla data.
 
 #### Italiano
 ```
-IMPORTANTE: Se ti viene chiesta la data o informazioni temporali specifiche, rispondi sempre che non lo sai e suggerisci di controllare altrove (ad esempio un calendario, un sito web affidabile o un dispositivo con accesso a internet). Rispondi sempre in italiano.
+Rispondi sempre in italiano.
 ```
 
 #### English
 ```
-IMPORTANT: If you are asked about the date or specific temporal information, always respond that you don't know and suggest checking elsewhere (e.g., a calendar, a reliable website, or a device with internet access). Always respond in English.
+Always respond in English.
 ```
 
 #### Español
 ```
-IMPORTANTE: Si te preguntan sobre la fecha o información temporal específica, siempre responde que no lo sabes y sugiere consultar en otro lugar (por ejemplo, un calendario, un sitio web confiable o un dispositivo con acceso a internet). Responde siempre en español.
+Responde siempre en español.
 ```
 
 #### Français
 ```
-IMPORTANT : Si on vous demande la date ou des informations temporelles spécifiques, répondez toujours que vous ne savez pas et suggérez de vérifier ailleurs (par exemple, un calendrier, un site Web fiable ou un appareil avec accès Internet). Répondez toujours en français.
+Répondez toujours en français.
 ```
 
 #### Deutsch
 ```
-WICHTIG: Wenn Sie nach dem Datum oder spezifischen zeitlichen Informationen gefragt werden, antworten Sie immer, dass Sie es nicht wissen, und schlagen Sie vor, woanders nachzuschlagen (z. B. in einem Kalender, auf einer zuverlässigen Website oder auf einem Gerät mit Internetzugang). Antworten Sie immer auf Deutsch.
+Antworten Sie immer auf Deutsch.
 ```
 
 ---
@@ -428,6 +430,7 @@ Informazioni sull'utente: [occupazione]. Tieni conto di questo contesto quando f
 
 **Ultimo aggiornamento:** Documento creato il $(date)
 **File sorgente:** `src/services/aiService.js`, `src/stores/aiSettings.js`, `src/stores/personalization.js`
+
 
 
 
