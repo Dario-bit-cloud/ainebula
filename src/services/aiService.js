@@ -422,7 +422,13 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
       } else if (response.status === 429) {
         errorMessage = 'Troppe richieste. Limite di rate (5 RPM) raggiunto. Aspetta un attimo e riprova.';
       } else if (response.status === 402) {
-        errorMessage = 'Crediti insufficienti. Piano Free: 0.25 crediti giornalieri disponibili.';
+        // Estrai il messaggio specifico dall'API se disponibile
+        const apiMessage = errorData.detail?.error?.message || errorData.error?.message || '';
+        if (apiMessage.includes('Neutrinos') || apiMessage.includes('Watch ads')) {
+          errorMessage = 'Crediti gratuiti esauriti. Il modello gpt-5-mini:free richiede "Neutrinos" (crediti gratuiti) che si esauriscono durante il giorno. Puoi guardare pubblicità su Electron Hub per ottenere più crediti gratuiti, oppure attendere il reset giornaliero.';
+        } else {
+          errorMessage = 'Crediti insufficienti. Anche i modelli gratuiti hanno limiti giornalieri. Verifica il tuo account Electron Hub per maggiori dettagli.';
+        }
       }
       
       throw new Error(errorMessage);
