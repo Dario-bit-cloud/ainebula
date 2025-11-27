@@ -13,13 +13,13 @@ export const API_CONFIG = {
 // };
 
 // Mappatura modelli locali ai modelli API e provider
-// Tutti i modelli usano ora gpt-5-mini:free tramite Electron Hub
+// Tutti i modelli usano ora gpt-5-nano tramite Electron Hub
 export const MODEL_MAPPING = {
-  'nebula-1.0': { model: 'gpt-5-mini:free', provider: 'electronhub' }, // Nebula AI 1.0 - GPT-5 Mini (gratuito)
-  'nebula-pro': { model: 'gpt-5-mini:free', provider: 'electronhub' }, // Nebula AI Pro - GPT-5 Mini (gratuito)
-  'nebula-coder': { model: 'gpt-5-mini:free', provider: 'electronhub' }, // Nebula Coder - GPT-5 Mini (gratuito, specializzato in coding)
-  'nebula-premium-pro': { model: 'gpt-5-mini:free', provider: 'electronhub' }, // Nebula AI Premium Pro - GPT-5 Mini (gratuito)
-  'nebula-premium-max': { model: 'gpt-5-mini:free', provider: 'electronhub' } // Nebula AI Premium Max - GPT-5 Mini (gratuito)
+  'nebula-1.0': { model: 'gpt-5-nano', provider: 'electronhub' }, // Nebula AI 1.0 - GPT-5 Nano
+  'nebula-pro': { model: 'gpt-5-nano', provider: 'electronhub' }, // Nebula AI Pro - GPT-5 Nano
+  'nebula-coder': { model: 'gpt-5-nano', provider: 'electronhub' }, // Nebula Coder - GPT-5 Nano (specializzato in coding)
+  'nebula-premium-pro': { model: 'gpt-5-nano', provider: 'electronhub' }, // Nebula AI Premium Pro - GPT-5 Nano
+  'nebula-premium-max': { model: 'gpt-5-nano', provider: 'electronhub' } // Nebula AI Premium Max - GPT-5 Nano
 };
 
 
