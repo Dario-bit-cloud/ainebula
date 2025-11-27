@@ -5,6 +5,7 @@ import { availableModels } from '../stores/models.js';
 import { hasPlanOrHigher, hasActiveSubscription } from '../stores/user.js';
 import { getPersonalizationSystemPrompt } from '../stores/personalization.js';
 import { getCurrentLanguage } from '../utils/i18n.js';
+import { isAuthenticatedStore } from '../stores/auth.js';
 
 /**
  * Ottiene l'istruzione sulla lingua in base alla lingua selezionata
@@ -19,11 +20,11 @@ function getLanguageInstruction(lang) {
   };
   
   const instructions = {
-    it: ' IMPORTANTE: Se ti viene chiesta la data o informazioni temporali specifiche, rispondi sempre che non lo sai e suggerisci di controllare altrove (ad esempio un calendario, un sito web affidabile o un dispositivo con accesso a internet). Rispondi sempre in italiano.',
-    en: ' IMPORTANT: If you are asked about the date or specific temporal information, always respond that you don\'t know and suggest checking elsewhere (e.g., a calendar, a reliable website, or a device with internet access). Always respond in English.',
-    es: ' IMPORTANTE: Si te preguntan sobre la fecha o información temporal específica, siempre responde que no lo sabes y sugiere consultar en otro lugar (por ejemplo, un calendario, un sitio web confiable o un dispositivo con acceso a internet). Responde siempre en español.',
-    fr: ' IMPORTANT : Si on vous demande la date ou des informations temporelles spécifiques, répondez toujours que vous ne savez pas et suggérez de vérifier ailleurs (par exemple, un calendrier, un site Web fiable ou un appareil avec accès Internet). Répondez toujours en français.',
-    de: ' WICHTIG: Wenn Sie nach dem Datum oder spezifischen zeitlichen Informationen gefragt werden, antworten Sie immer, dass Sie es nicht wissen, und schlagen Sie vor, woanders nachzuschlagen (z. B. in einem Kalender, auf einer zuverlässigen Website oder auf einem Gerät mit Internetzugang). Antworten Sie immer auf Deutsch.'
+    it: ' Rispondi sempre in italiano.',
+    en: ' Always respond in English.',
+    es: ' Responde siempre en español.',
+    fr: ' Répondez toujours en français.',
+    de: ' Antworten Sie immer auf Deutsch.'
   };
   return (spacingInstruction[lang] || spacingInstruction['it']) + (instructions[lang] || instructions['it']);
 }
@@ -183,7 +184,7 @@ function formatChatHistory(chatHistory, systemPrompt, modelId = null, deepResear
 /**
  * Genera una risposta con streaming utilizzando l'API Electron Hub
  */
-export async function* generateResponseStream(message, modelId = 'nebula-1.0', chatHistory = [], images = [], abortController = null, deepResearch = false) {
+export async function* generateResponseStream(message, modelId = 'nebula-1.0', chatHistory = [], images = [], abortController = null, deepResearch = false, systemPrompt = null) {
   // Verifica se il modello è premium e se l'utente ha l'abbonamento necessario
   const models = get(availableModels);
   const selectedModel = models.find(m => m.id === modelId);
@@ -328,7 +329,8 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     allMessages = [...allMessages, currentMessage];
     
     // Formatta i messaggi per l'API (passa anche modelId per system prompt personalizzato e deepResearch)
-    const formattedMessages = formatChatHistory(allMessages, null, modelId, deepResearch);
+    // Se c'è un system prompt personalizzato (da nebulino), usalo, altrimenti usa quello di default
+    const formattedMessages = formatChatHistory(allMessages, systemPrompt, modelId, deepResearch);
     
     // Ottieni le impostazioni AI
     const settings = get(aiSettings);
@@ -338,15 +340,21 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     const isNebulaCoder = modelId === 'nebula-coder';
     const isPremiumPro = modelId === 'nebula-premium-pro';
     const isPremiumMax = modelId === 'nebula-premium-max';
+    const isNebula15 = modelId === 'nebula-1.0';
     const isAdvancedModel = isNebulaPro || isNebulaCoder || isPremiumPro || isPremiumMax;
     const isPremiumModel = isPremiumPro || isPremiumMax;
+    const isRegistered = get(isAuthenticatedStore);
     
     // Token illimitati per utenti premium, altrimenti 50.000 per modelli avanzati
+    // 15.000 per utenti registrati con Nebula AI 1.5
     let maxTokens;
     if (isPremiumModel && hasActiveSubscription()) {
       maxTokens = 1000000; // Valore molto alto per simulare "illimitati" (le API hanno comunque limiti tecnici)
     } else if (isAdvancedModel) {
       maxTokens = 50000;
+    } else if (isNebula15 && isRegistered) {
+      // 15.000 token per utenti registrati con Nebula AI 1.5
+      maxTokens = 15000;
     } else {
       maxTokens = settings.maxTokens || 2000;
     }
