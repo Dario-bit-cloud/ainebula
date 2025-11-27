@@ -1,4 +1,4 @@
-import { API_CONFIG, LLM7_CONFIG, MODEL_MAPPING } from '../config/api.js';
+import { API_CONFIG, MODEL_MAPPING } from '../config/api.js';
 import { get } from 'svelte/store';
 import { aiSettings } from '../stores/aiSettings.js';
 import { availableModels } from '../stores/models.js';
@@ -198,17 +198,13 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
   }
   
   // Mappa il modello locale al modello API e provider (definito all'inizio per essere disponibile nel catch)
+  // Tutti i modelli usano ora gpt-5-mini:free tramite Electron Hub
   const modelConfig = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-1.0'];
   const apiModel = typeof modelConfig === 'string' ? modelConfig : modelConfig.model;
   const provider = typeof modelConfig === 'string' ? 'electronhub' : (modelConfig.provider || 'electronhub');
   
-  // Seleziona la configurazione API in base al provider
-  let apiConfig;
-  if (provider === 'llm7') {
-    apiConfig = LLM7_CONFIG;
-  } else {
-    apiConfig = API_CONFIG;
-  }
+  // Tutti i modelli usano Electron Hub
+  const apiConfig = API_CONFIG;
   
   try {
     
