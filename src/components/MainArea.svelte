@@ -4,7 +4,7 @@
   import { createEventDispatcher } from 'svelte';
   import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, saveChatsToStorage } from '../stores/chat.js';
   import { selectedModel } from '../stores/models.js';
-  import { hasActiveSubscription } from '../stores/user.js';
+  import { hasActiveSubscription, user as userStore } from '../stores/user.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
   import { availableModels } from '../stores/models.js';
   import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView, isSidebarOpen } from '../stores/app.js';
@@ -45,6 +45,8 @@
   let showPrivacyCard = true;
   let isPrivacyModalOpen = false;
   let mainAreaElement;
+  let selectedMenuOption = null;
+  let deepResearchEnabled = false;
   
   // Variabili per gestione swipe
   let touchStartX = 0;
@@ -474,9 +476,11 @@
     
     const hasText = inputValue.trim().length > 0;
     const hasImages = attachedImages.length > 0;
+    const hasMax = hasActiveSubscription() && $userStore.subscription?.plan === 'max';
+    const hasPro = hasActiveSubscription() && $userStore.subscription?.plan === 'pro';
     
-    // Se ci sono immagini, mostra il modal premium invece di inviare
-    if (hasImages) {
+    // Se ci sono immagini, verifica abbonamento (Pro e Max possono usare immagini)
+    if (hasImages && !hasMax && !hasPro && !hasActiveSubscription()) {
       isPremiumModalOpen.set(true);
       return;
     }
@@ -533,7 +537,8 @@
           $selectedModel, 
           chatHistory,
           [],
-          abortController
+          abortController,
+          deepResearchEnabled
         )) {
           fullResponse += chunk;
           // Normalizza il testo rimuovendo spazi extra alla fine delle righe
@@ -743,7 +748,8 @@
           $selectedModel,
           styleModifier ? modifiedHistory.slice(0, -1) : chatHistory.slice(0, -1),
           [],
-          abortController
+          abortController,
+          deepResearchEnabled
         )) {
           fullResponse += chunk;
           // Normalizza il testo rimuovendo spazi extra alla fine delle righe
@@ -867,6 +873,10 @@
   function handleAttachClick(event) {
     event.stopPropagation();
     showAttachMenu = !showAttachMenu;
+    if (!showAttachMenu) {
+      showMoreOptions = false;
+      selectedMenuOption = null;
+    }
   }
   
   function handleAttachFile() {
@@ -879,42 +889,84 @@
       case 'file':
         handleAttachFile();
         showAttachMenu = false;
+        selectedMenuOption = null;
         break;
       case 'business-info':
         showAlert('Informazioni aziendali - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
+        selectedMenuOption = null;
         break;
       case 'deep-research':
-        showAlert('Deep Research - Funzionalità in arrivo', 'Info', 'OK', 'info');
+        deepResearchEnabled = !deepResearchEnabled;
+        if (deepResearchEnabled) {
+          showAlert('Deep Research attivato: l\'AI approfondirà maggiormente le risposte', 'Deep Research', 'OK', 'success');
+        } else {
+          showAlert('Deep Research disattivato', 'Deep Research', 'OK', 'info');
+        }
         showAttachMenu = false;
+        selectedMenuOption = null;
         break;
       case 'agent-mode':
         showAlert('Modalità agente - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
+        selectedMenuOption = null;
         break;
       case 'create-image':
         showAlert('Crea immagine - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
+        selectedMenuOption = null;
         break;
       case 'more-options':
         showMoreOptions = !showMoreOptions;
+        selectedMenuOption = showMoreOptions ? 'more-options' : null;
         break;
       case 'web-search':
         showAlert('Ricerca sul web - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         showMoreOptions = false;
+        selectedMenuOption = null;
         break;
       case 'canvas':
         showAlert('Canvas - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         showMoreOptions = false;
+        selectedMenuOption = null;
         break;
       case 'study-learn':
         showAlert('Studia e impara - Funzionalità in arrivo', 'Info', 'OK', 'info');
         showAttachMenu = false;
         showMoreOptions = false;
+        selectedMenuOption = null;
         break;
     }
+  }
+  
+  function handleMenuOptionClick(option) {
+    selectedMenuOption = selectedMenuOption === option ? null : option;
+    if (option === 'more-options') {
+      showMoreOptions = selectedMenuOption === 'more-options';
+    } else {
+      handleAttachOption(option);
+    }
+  }
+  
+  function handleMenuOptionMouseEnter(option) {
+    if (option === 'more-options') {
+      showMoreOptions = true;
+      selectedMenuOption = 'more-options';
+    }
+  }
+  
+  function handleMenuOptionMouseLeave() {
+    // Delay per permettere il movimento al sottomenu
+    setTimeout(() => {
+      if (!attachMenuRef?.querySelector('.more-options-menu:hover')) {
+        showMoreOptions = false;
+        if (selectedMenuOption === 'more-options') {
+          selectedMenuOption = null;
+        }
+      }
+    }, 200);
   }
   
   function handleMoreOptionsMouseEnter() {
@@ -934,6 +986,11 @@
   function handleClickOutside(event) {
     if (attachMenuRef && !attachMenuRef.contains(event.target)) {
       showAttachMenu = false;
+      showMoreOptions = false;
+      selectedMenuOption = null;
+    }
+    if (exportMenuRef && !exportMenuRef.contains(event.target)) {
+      showExportMenu = false;
     }
   }
   
@@ -1028,23 +1085,187 @@
   }
   
   // Funzioni per export chat
+  let showExportMenu = false;
+  let exportMenuRef;
+  
   function exportChat(format = 'txt') {
     const chat = $currentChat;
     if (!chat || messages.length === 0) return;
     
+    // Verifica se l'utente ha abbonamento Pro per esportazione avanzata
+    const hasPro = hasActiveSubscription() && $userStore.subscription?.plan === 'pro';
+    const isAdvancedFormat = format === 'pdf' || format === 'json';
+    
+    if (isAdvancedFormat && !hasPro) {
+      showAlert('L\'esportazione in ' + format.toUpperCase() + ' è disponibile solo per utenti Pro. Aggiorna il tuo piano per accedere a questa funzionalità.', 'Funzionalità Premium', 'OK', 'warning');
+      isPremiumModalOpen.set(true);
+      return;
+    }
+    
+    if (format === 'json') {
+      const exportData = {
+        chat: {
+          id: chat.id,
+          title: chat.title,
+          createdAt: chat.createdAt,
+          updatedAt: chat.updatedAt,
+          isTemporary: chat.isTemporary || false
+        },
+        messages: visibleMessages.map(msg => ({
+          id: msg.id,
+          type: msg.type,
+          content: msg.content,
+          timestamp: msg.timestamp || msg.createdAt,
+          hidden: msg.hidden || false
+        })),
+        exportInfo: {
+          exportDate: new Date().toISOString(),
+          exportVersion: '1.0',
+          appName: 'Nebula AI'
+        }
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${chat.title || 'chat'}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    
+    if (format === 'pdf') {
+      // Crea un documento HTML per il PDF
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        showAlert('Impossibile aprire la finestra di stampa. Verifica che i popup non siano bloccati.', 'Errore', 'OK', 'error');
+        return;
+      }
+      
+      let htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>${chat.title || 'Chat Export'}</title>
+          <style>
+            @media print {
+              @page {
+                margin: 2cm;
+              }
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 800px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            h1 {
+              color: #2563eb;
+              border-bottom: 2px solid #2563eb;
+              padding-bottom: 10px;
+            }
+            .meta {
+              color: #666;
+              font-size: 14px;
+              margin-bottom: 30px;
+            }
+            .message {
+              margin-bottom: 30px;
+              padding: 15px;
+              border-radius: 8px;
+            }
+            .message-user {
+              background-color: #f3f4f6;
+              border-left: 4px solid #2563eb;
+            }
+            .message-ai {
+              background-color: #eff6ff;
+              border-left: 4px solid #10b981;
+            }
+            .message-role {
+              font-weight: 600;
+              margin-bottom: 10px;
+              color: #1f2937;
+            }
+            .message-content {
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            .separator {
+              height: 1px;
+              background: #e5e7eb;
+              margin: 20px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${chat.title || 'Nebula AI Chat'}</h1>
+          <div class="meta">
+            <p><strong>Data creazione:</strong> ${new Date(chat.createdAt).toLocaleString('it-IT')}</p>
+            <p><strong>Data esportazione:</strong> ${new Date().toLocaleString('it-IT')}</p>
+            <p><strong>Numero messaggi:</strong> ${visibleMessages.length}</p>
+          </div>
+      `;
+      
+      visibleMessages.forEach((msg, index) => {
+        const role = msg.type === 'user' ? 'User' : 'Nebula AI';
+        const messageClass = msg.type === 'user' ? 'message-user' : 'message-ai';
+        const escapedContent = msg.content
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;')
+          .replace(/\n/g, '<br>');
+        
+        htmlContent += `
+          <div class="message ${messageClass}">
+            <div class="message-role">${role}</div>
+            <div class="message-content">${escapedContent}</div>
+          </div>
+        `;
+        
+        if (index < visibleMessages.length - 1) {
+          htmlContent += '<div class="separator"></div>';
+        }
+      });
+      
+      htmlContent += `
+        </body>
+        </html>
+      `;
+      
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      
+      // Attendi che il contenuto sia caricato prima di stampare
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+      
+      return;
+    }
+    
+    // Formati Markdown e TXT (disponibili per tutti)
     let content = `Nebula AI Chat Export\n`;
     content += `Title: ${chat.title}\n`;
     content += `Date: ${new Date(chat.createdAt).toLocaleString()}\n`;
     content += `${'='.repeat(50)}\n\n`;
     
     if (format === 'markdown') {
-      messages.forEach(msg => {
-        const role = msg.type === 'user' ? '**User**' : '**AI**';
+      visibleMessages.forEach(msg => {
+        const role = msg.type === 'user' ? '**User**' : '**Nebula AI**';
         content += `${role}\n\n${msg.content}\n\n---\n\n`;
       });
     } else {
-      messages.forEach(msg => {
-        const role = msg.type === 'user' ? 'User' : 'AI';
+      visibleMessages.forEach(msg => {
+        const role = msg.type === 'user' ? 'User' : 'Nebula AI';
         content += `[${role}]\n${msg.content}\n\n`;
       });
     }
@@ -1053,9 +1274,18 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${chat.title || 'chat'}-${Date.now()}.${format}`;
+    a.download = `${chat.title || 'chat'}-${Date.now()}.${format === 'markdown' ? 'md' : 'txt'}`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+  
+  function toggleExportMenu() {
+    showExportMenu = !showExportMenu;
+  }
+  
+  function handleExportOption(format) {
+    exportChat(format);
+    showExportMenu = false;
   }
   
   // Funzione per ricerca nella chat corrente
@@ -1378,18 +1608,48 @@
           <path d="M21 21l-4.35-4.35"/>
         </svg>
       </button>
-      <button 
-        class="toolbar-button" 
-        on:click={() => exportChat('markdown')}
-        title="Esporta chat"
-        disabled={messages.length === 0}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-      </button>
+      <div class="export-button-wrapper" bind:this={exportMenuRef}>
+        <button 
+          class="toolbar-button" 
+          on:click={toggleExportMenu}
+          title="Esporta chat"
+          disabled={messages.length === 0}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+        {#if showExportMenu && messages.length > 0}
+          <div class="export-menu">
+            <button class="export-option" on:click={() => handleExportOption('txt')}>
+              <span>Esporta come TXT</span>
+            </button>
+            <button class="export-option" on:click={() => handleExportOption('markdown')}>
+              <span>Esporta come Markdown</span>
+            </button>
+            {#if hasActiveSubscription() && $userStore.subscription?.plan === 'pro'}
+              <button class="export-option premium" on:click={() => handleExportOption('json')}>
+                <span>Esporta come JSON</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                  <path d="M2 17l10 5 10-5"/>
+                  <path d="M2 12l10 5 10-5"/>
+                </svg>
+              </button>
+              <button class="export-option premium" on:click={() => handleExportOption('pdf')}>
+                <span>Esporta come PDF</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                  <path d="M2 17l10 5 10-5"/>
+                  <path d="M2 12l10 5 10-5"/>
+                </svg>
+              </button>
+            {/if}
+          </div>
+        {/if}
+      </div>
     </div>
   {/if}
   <div class="input-container">
@@ -1406,22 +1666,62 @@
             <path d="M21 21l-4.35-4.35"/>
           </svg>
         </button>
-        <button 
-          class="toolbar-button" 
-          on:click={() => exportChat('markdown')}
-          title="Esporta chat"
-          disabled={messages.length === 0}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-        </button>
+        <div class="export-button-wrapper" bind:this={exportMenuRef}>
+          <button 
+            class="toolbar-button" 
+            on:click={toggleExportMenu}
+            title="Esporta chat"
+            disabled={messages.length === 0}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+          {#if showExportMenu && messages.length > 0}
+            <div class="export-menu">
+              <button class="export-option" on:click={() => handleExportOption('txt')}>
+                <span>Esporta come TXT</span>
+              </button>
+              <button class="export-option" on:click={() => handleExportOption('markdown')}>
+                <span>Esporta come Markdown</span>
+              </button>
+              {#if hasActiveSubscription() && $userStore.subscription?.plan === 'pro'}
+                <button class="export-option premium" on:click={() => handleExportOption('json')}>
+                  <span>Esporta come JSON</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                </button>
+                <button class="export-option premium" on:click={() => handleExportOption('pdf')}>
+                  <span>Esporta come PDF</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                </button>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </div>
     {/if}
       {#if attachedImages.length > 0}
         <div class="attached-images">
+          {#if hasActiveSubscription() && $userStore.subscription?.plan === 'max'}
+            <div class="advanced-analysis-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+              <span>Analisi Avanzata Attiva</span>
+            </div>
+          {/if}
           {#each attachedImages as imageItem, index}
             <div class="image-preview" class:selected={selectedImageIndex === index}>
               <img src={imageItem.preview} alt={imageItem.file.name} />
@@ -1503,133 +1803,173 @@
           {/if}
         </div>
       {/if}
-    <div class="input-wrapper" class:input-empty={!inputValue.trim()}>
-      <!-- Pulsanti integrati nell'input (solo quando vuoto) -->
-      {#if !inputValue.trim() && !editingMessageIndex && visibleMessages.length === 0}
-        <div class="input-quick-actions">
-          <!-- Pulsante Prompt temporaneamente nascosto -->
-          <!--
-          <button 
-            class="quick-action-btn" 
-            on:click={() => isPromptLibraryModalOpen.set(true)}
-            title="Libreria prompt"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-              <path d="M2 17l10 5 10-5"/>
-              <path d="M2 12l10 5 10-5"/>
-            </svg>
-            <span>Prompt</span>
-          </button>
-          -->
-        </div>
-      {/if}
-      
-      <div class="attach-button-wrapper" bind:this={attachMenuRef}>
-        <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title={$t('attachFile')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-          </svg>
-        </button>
-        
-        {#if showAttachMenu}
-          <div class="attach-menu">
-            <button class="menu-item" on:click={() => handleAttachOption('file')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-              </svg>
-              <span>Aggiungi foto e file</span>
-            </button>
-            
-            <button class="menu-item" on:click={() => handleAttachOption('business-info')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-              </svg>
-              <span>Informazioni aziendali</span>
-            </button>
-            
-            <button class="menu-item" on:click={() => handleAttachOption('deep-research')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="M21 21l-4.35-4.35"/>
-              </svg>
-              <span>Deep Research</span>
-            </button>
-            
-            <button class="menu-item" on:click={() => handleAttachOption('agent-mode')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-                <circle cx="12" cy="12" r="3" fill="currentColor"/>
-              </svg>
-              <span>Modalità agente</span>
-            </button>
-            
-            <button class="menu-item" on:click={() => handleAttachOption('create-image')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-              <span>Crea immagine</span>
-            </button>
-            
-            <div class="menu-divider"></div>
-            
-            <div 
-              class="menu-item-wrapper"
-              on:mouseenter={handleMoreOptionsMouseEnter}
-              on:mouseleave={handleMoreOptionsMouseLeave}
+    <div class="input-container-wrapper">
+      <div class="input-wrapper" class:input-empty={!inputValue.trim()}>
+        <!-- Pulsanti integrati nell'input (solo quando vuoto) -->
+        {#if !inputValue.trim() && !editingMessageIndex && visibleMessages.length === 0}
+          <div class="input-quick-actions">
+            <!-- Pulsante Prompt temporaneamente nascosto -->
+            <!--
+            <button 
+              class="quick-action-btn" 
+              on:click={() => isPromptLibraryModalOpen.set(true)}
+              title="Libreria prompt"
             >
-              <button class="menu-item" on:click={() => handleAttachOption('more-options')}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="1"/>
-                  <circle cx="19" cy="12" r="1"/>
-                  <circle cx="5" cy="12" r="1"/>
-                </svg>
-                <span>Altre opzioni</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </button>
-              
-              {#if showMoreOptions}
-                <div class="more-options-menu">
-                  <button class="menu-item" on:click={() => handleAttachOption('web-search')}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"/>
-                      <line x1="2" y1="12" x2="22" y2="12"/>
-                      <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
-                    </svg>
-                    <span>Ricerca sul web</span>
-                  </button>
-                  
-                  <button class="menu-item" on:click={() => handleAttachOption('canvas')}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                      <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-                    </svg>
-                    <span>Canvas</span>
-                  </button>
-                  
-                  <button class="menu-item" on:click={() => handleAttachOption('study-learn')}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-                      <line x1="8" y1="7" x2="16" y2="7"/>
-                      <line x1="8" y1="11" x2="16" y2="11"/>
-                      <line x1="8" y1="15" x2="12" y2="15"/>
-                    </svg>
-                    <span>Studia e impara</span>
-                  </button>
-                </div>
-              {/if}
-            </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+              <span>Prompt</span>
+            </button>
+            -->
           </div>
         {/if}
-      </div>
+        
+        <div class="attach-button-wrapper" bind:this={attachMenuRef}>
+          <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title={$t('attachFile')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
+          
+          {#if showAttachMenu}
+            <div class="side-menu">
+              <button 
+                class="side-menu-item" 
+                class:active={selectedMenuOption === 'file'}
+                on:click={() => handleMenuOptionClick('file')}
+                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'file'; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                </svg>
+                <span>Aggiungi foto e file</span>
+              </button>
+              
+              <button 
+                class="side-menu-item" 
+                class:active={selectedMenuOption === 'business-info'}
+                on:click={() => handleMenuOptionClick('business-info')}
+                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'business-info'; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                </svg>
+                <span>Informazioni aziendali</span>
+              </button>
+              
+              <button 
+                class="side-menu-item" 
+                class:active={selectedMenuOption === 'deep-research' || deepResearchEnabled}
+                on:click={() => handleMenuOptionClick('deep-research')}
+                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'deep-research'; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <span>Deep Research</span>
+                {#if deepResearchEnabled}
+                  <span class="deep-research-badge">ON</span>
+                {/if}
+              </button>
+              
+              <button 
+                class="side-menu-item" 
+                class:active={selectedMenuOption === 'agent-mode'}
+                on:click={() => handleMenuOptionClick('agent-mode')}
+                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'agent-mode'; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                  <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                </svg>
+                <span>Modalità agente</span>
+              </button>
+              
+              <button 
+                class="side-menu-item" 
+                class:active={selectedMenuOption === 'create-image'}
+                on:click={() => handleMenuOptionClick('create-image')}
+                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'create-image'; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <span>Crea immagine</span>
+              </button>
+              
+              <div 
+                class="side-menu-item-wrapper"
+                on:mouseenter={() => handleMenuOptionMouseEnter('more-options')}
+                on:mouseleave={handleMenuOptionMouseLeave}
+              >
+                <button 
+                  class="side-menu-item" 
+                  class:active={selectedMenuOption === 'more-options'}
+                  on:click={() => handleMenuOptionClick('more-options')}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="1"/>
+                    <circle cx="19" cy="12" r="1"/>
+                    <circle cx="5" cy="12" r="1"/>
+                  </svg>
+                  <span>Altre opzioni</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+                
+                {#if showMoreOptions}
+                  <div class="more-options-menu">
+                    <button 
+                      class="menu-item" 
+                      on:click={() => handleAttachOption('web-search')}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                      </svg>
+                      <span>Ricerca sul web</span>
+                    </button>
+                    
+                    <button 
+                      class="menu-item" 
+                      on:click={() => handleAttachOption('canvas')}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                      </svg>
+                      <span>Canvas</span>
+                    </button>
+                    
+                    <button 
+                      class="menu-item" 
+                      on:click={() => handleAttachOption('study-learn')}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+                        <line x1="8" y1="7" x2="16" y2="7"/>
+                        <line x1="8" y1="11" x2="16" y2="11"/>
+                        <line x1="8" y1="15" x2="12" y2="15"/>
+                      </svg>
+                      <span>Studia e impara</span>
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        </div>
       <input 
         type="file"
         bind:this={fileInput}
@@ -1642,6 +1982,15 @@
         <div class="edit-mode">
           <span class="edit-label">{$t('editMessage')}</span>
           <button class="edit-cancel" on:click={handleEditCancel}>{$t('cancel')}</button>
+        </div>
+      {/if}
+      {#if deepResearchEnabled}
+        <div class="deep-research-indicator" title="Deep Research attivo: l'AI approfondirà maggiormente le risposte">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <span>Deep Research</span>
         </div>
       {/if}
       <textarea
@@ -1996,6 +2345,56 @@
   .toolbar-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  
+  .export-button-wrapper {
+    position: relative;
+  }
+  
+  .export-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    z-index: 1000;
+    overflow: hidden;
+  }
+  
+  .export-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-align: left;
+  }
+  
+  .export-option:hover {
+    background-color: var(--hover-bg);
+  }
+  
+  .export-option.premium {
+    color: #fbbf24;
+  }
+  
+  .export-option.premium svg {
+    color: #fbbf24;
+    flex-shrink: 0;
+  }
+  
+  .export-option span {
+    flex: 1;
   }
 
   .welcome-message {
@@ -2723,6 +3122,27 @@
     gap: 8px;
     margin-bottom: 8px;
     padding: 0 4px;
+    position: relative;
+  }
+  
+  .advanced-analysis-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.1) 100%);
+    border: 1px solid #f093fb;
+    border-radius: 6px;
+    color: #f093fb;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .advanced-analysis-badge svg {
+    flex-shrink: 0;
   }
 
   .image-preview img {
@@ -2887,6 +3307,81 @@
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  .input-container-wrapper {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+  }
+
+  .side-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px;
+    min-width: 240px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    animation: menuSlideUp 0.2s ease;
+  }
+
+  @keyframes menuSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .side-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    text-align: left;
+  }
+
+  .side-menu-item:hover {
+    background-color: var(--hover-bg);
+  }
+
+  .side-menu-item.active {
+    background-color: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
+
+  .side-menu-item svg {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .side-menu-item:hover svg,
+  .side-menu-item.active svg {
+    color: var(--text-primary);
+  }
+
+  .side-menu-item-wrapper {
+    position: relative;
+  }
+
   .input-wrapper {
     display: flex;
     align-items: center;
@@ -2898,6 +3393,7 @@
     transition: all 0.2s;
     min-height: 56px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+    flex: 1;
   }
 
   .input-wrapper.input-empty {
@@ -3077,6 +3573,38 @@
     animation: menuSlideRight 0.2s ease;
   }
 
+  @media (max-width: 768px) {
+    .side-menu {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: auto;
+      margin: 0;
+      border-radius: 16px 16px 0 0;
+      max-height: 70vh;
+      overflow-y: auto;
+      min-width: auto;
+      width: 100%;
+      animation: menuSlideUp 0.3s ease;
+    }
+
+    .more-options-menu {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: auto;
+      margin: 0;
+      border-radius: 16px 16px 0 0;
+      max-height: 60vh;
+      overflow-y: auto;
+      min-width: auto;
+      width: 100%;
+      animation: menuSlideUp 0.3s ease;
+    }
+  }
+
   @keyframes menuSlideRight {
     from {
       opacity: 0;
@@ -3174,6 +3702,35 @@
   
   .edit-cancel:hover {
     background-color: var(--hover-bg);
+  }
+
+  .deep-research-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    animation: fadeInUp 0.3s ease;
+  }
+
+  .deep-research-indicator svg {
+    flex-shrink: 0;
+  }
+
+  .deep-research-badge {
+    margin-left: auto;
+    padding: 2px 6px;
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
   }
   
   .stop-button {

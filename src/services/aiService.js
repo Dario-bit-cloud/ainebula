@@ -83,7 +83,7 @@ function getSystemPromptForLanguage(modelId, lang) {
 /**
  * Converte la storia della chat nel formato richiesto dall'API OpenAI/Electron Hub
  */
-function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
+function formatChatHistory(chatHistory, systemPrompt, modelId = null, deepResearch = false) {
   const messages = [];
   
   // Messaggio di sistema personalizzabile
@@ -104,6 +104,18 @@ function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
   const personalizationPrompt = getPersonalizationSystemPrompt();
   if (personalizationPrompt) {
     currentSystemPrompt = personalizationPrompt + '\n\n' + currentSystemPrompt;
+  }
+  
+  // Aggiungi istruzioni Deep Research se abilitato
+  if (deepResearch) {
+    const deepResearchInstructions = {
+      it: '\n\nMODO DEEP RESEARCH ATTIVO:\n- Prima di rispondere, prenditi del tempo per pensare approfonditamente alla domanda\n- Analizza il problema da più angolazioni e considera diverse prospettive\n- Fornisci risposte più dettagliate, complete e approfondite del normale\n- Esplora le implicazioni, le conseguenze e le connessioni tra i concetti\n- Fornisci esempi concreti e casi d\'uso quando rilevanti\n- Considera alternative, pro e contro, e punti di vista diversi\n- Non avere fretta: la qualità e la profondità dell\'analisi sono prioritarie rispetto alla velocità',
+      en: '\n\nDEEP RESEARCH MODE ACTIVE:\n- Before responding, take time to think deeply about the question\n- Analyze the problem from multiple angles and consider different perspectives\n- Provide more detailed, complete and in-depth answers than usual\n- Explore implications, consequences and connections between concepts\n- Provide concrete examples and use cases when relevant\n- Consider alternatives, pros and cons, and different viewpoints\n- Don\'t rush: quality and depth of analysis are prioritized over speed',
+      es: '\n\nMODO DEEP RESEARCH ACTIVO:\n- Antes de responder, tómate tiempo para pensar profundamente en la pregunta\n- Analiza el problema desde múltiples ángulos y considera diferentes perspectivas\n- Proporciona respuestas más detalladas, completas y profundas de lo habitual\n- Explora las implicaciones, consecuencias y conexiones entre conceptos\n- Proporciona ejemplos concretos y casos de uso cuando sean relevantes\n- Considera alternativas, pros y contras, y diferentes puntos de vista\n- No tengas prisa: la calidad y profundidad del análisis son prioritarias sobre la velocidad',
+      fr: '\n\nMODE DEEP RESEARCH ACTIF:\n- Avant de répondre, prenez le temps de réfléchir en profondeur à la question\n- Analysez le problème sous plusieurs angles et considérez différentes perspectives\n- Fournissez des réponses plus détaillées, complètes et approfondies que d\'habitude\n- Explorez les implications, conséquences et connexions entre les concepts\n- Fournissez des exemples concrets et des cas d\'usage lorsque pertinent\n- Considérez les alternatives, avantages et inconvénients, et différents points de vue\n- Ne vous précipitez pas: la qualité et la profondeur de l\'analyse sont prioritaires sur la vitesse',
+      de: '\n\nDEEP RESEARCH MODUS AKTIV:\n- Nehmen Sie sich vor der Antwort Zeit, um tief über die Frage nachzudenken\n- Analysieren Sie das Problem aus mehreren Blickwinkeln und betrachten Sie verschiedene Perspektiven\n- Geben Sie detailliertere, vollständigere und tiefgreifendere Antworten als gewöhnlich\n- Erkunden Sie Implikationen, Konsequenzen und Verbindungen zwischen Konzepten\n- Geben Sie konkrete Beispiele und Anwendungsfälle an, wenn relevant\n- Berücksichtigen Sie Alternativen, Vor- und Nachteile und verschiedene Standpunkte\n- Haben Sie keine Eile: Qualität und Tiefe der Analyse haben Priorität vor Geschwindigkeit'
+    };
+    currentSystemPrompt += deepResearchInstructions[lang] || deepResearchInstructions['it'];
   }
   
   messages.push({
@@ -171,7 +183,7 @@ function formatChatHistory(chatHistory, systemPrompt, modelId = null) {
 /**
  * Genera una risposta con streaming utilizzando l'API Electron Hub
  */
-export async function* generateResponseStream(message, modelId = 'nebula-1.0', chatHistory = [], images = [], abortController = null) {
+export async function* generateResponseStream(message, modelId = 'nebula-1.0', chatHistory = [], images = [], abortController = null, deepResearch = false) {
   // Verifica se il modello è premium e se l'utente ha l'abbonamento necessario
   const models = get(availableModels);
   const selectedModel = models.find(m => m.id === modelId);
@@ -315,8 +327,8 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     // Aggiungi il messaggio corrente
     allMessages = [...allMessages, currentMessage];
     
-    // Formatta i messaggi per l'API (passa anche modelId per system prompt personalizzato)
-    const formattedMessages = formatChatHistory(allMessages, null, modelId);
+    // Formatta i messaggi per l'API (passa anche modelId per system prompt personalizzato e deepResearch)
+    const formattedMessages = formatChatHistory(allMessages, null, modelId, deepResearch);
     
     // Ottieni le impostazioni AI
     const settings = get(aiSettings);

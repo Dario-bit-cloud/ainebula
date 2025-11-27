@@ -950,6 +950,72 @@
                     </button>
                   </div>
                 {:else}
+                  {#if subscription?.plan === 'pro' || subscription?.plan === 'max'}
+                    <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                      <div class="setting-info">
+                        <div class="setting-label">Supporto Prioritario</div>
+                        <div class="setting-description">Hai accesso al supporto prioritario. Le tue richieste verranno gestite con priorità.</div>
+                      </div>
+                      <div class="priority-badge">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                          <path d="M2 17l10 5 10-5"/>
+                          <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                        <span>Attivo</span>
+                      </div>
+                    </div>
+                  {/if}
+                  
+                  {#if subscription?.plan === 'max'}
+                    <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                      <div class="setting-info">
+                        <div class="setting-label">Analisi Avanzata Immagini e Documenti</div>
+                        <div class="setting-description">Hai accesso all'analisi avanzata di immagini e documenti con modelli di visione avanzati.</div>
+                      </div>
+                      <div class="priority-badge">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                          <circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        <span>Attivo</span>
+                      </div>
+                    </div>
+                    
+                    <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                      <div class="setting-info">
+                        <div class="setting-label">Accesso Anticipato</div>
+                        <div class="setting-description">Hai accesso anticipato a nuovi modelli e funzionalità prima del rilascio pubblico.</div>
+                      </div>
+                      <div class="priority-badge">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                          <path d="M2 17l10 5 10-5"/>
+                          <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                        <span>Attivo</span>
+                      </div>
+                    </div>
+                    
+                    <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
+                      <div class="setting-info">
+                        <div class="setting-label">API Access</div>
+                        <div class="setting-description">Hai accesso all'API per integrare Nebula AI nelle tue applicazioni.</div>
+                      </div>
+                      <button class="manage-button" on:click={() => {
+                        // Mostra modal o sezione API keys
+                        showAlert('L\'accesso API è incluso nel tuo piano Max. Le API keys possono essere generate dalla sezione API nelle impostazioni avanzate.', 'API Access', 'OK', 'info');
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                          <path d="M2 17l10 5 10-5"/>
+                          <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                        <span>Gestisci API</span>
+                      </button>
+                    </div>
+                  {/if}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                     <div class="setting-info">
                       <div class="setting-label">{$t('manageSubscription')}</div>
@@ -1877,6 +1943,23 @@
   .subscription-badge.max {
     background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
     border-color: #f093fb;
+  }
+  
+  .priority-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+    border: 1px solid #fbbf24;
+    border-radius: 6px;
+    color: #fbbf24;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  
+  .priority-badge svg {
+    flex-shrink: 0;
   }
   
   .badge-label {
