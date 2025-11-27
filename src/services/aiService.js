@@ -424,10 +424,14 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
       } else if (response.status === 402) {
         // Estrai il messaggio specifico dall'API se disponibile
         const apiMessage = errorData.detail?.error?.message || errorData.error?.message || '';
-        if (apiMessage.includes('Neutrinos') || apiMessage.includes('Watch ads')) {
-          errorMessage = 'Crediti gratuiti esauriti. Il modello gpt-5-mini:free richiede "Neutrinos" (crediti gratuiti) che si esauriscono durante il giorno. Puoi guardare pubblicità su Electron Hub per ottenere più crediti gratuiti, oppure attendere il reset giornaliero.';
+        if (apiMessage.includes('Premium model requires a subscription') || apiMessage.includes('requires a subscription')) {
+          errorMessage = 'Il modello gpt-5-nano è un modello premium e richiede un abbonamento attivo su Electron Hub. Verifica il tuo account Electron Hub e assicurati di avere un abbonamento attivo per utilizzare modelli premium.';
+        } else if (apiMessage.includes('Neutrinos') || apiMessage.includes('Watch ads')) {
+          errorMessage = 'Crediti gratuiti esauriti. Il modello richiede "Neutrinos" (crediti gratuiti) che si esauriscono durante il giorno. Puoi guardare pubblicità su Electron Hub per ottenere più crediti gratuiti, oppure attendere il reset giornaliero.';
+        } else if (apiMessage.includes('Insufficient')) {
+          errorMessage = 'Crediti insufficienti. Verifica il tuo account Electron Hub per maggiori dettagli sui crediti disponibili.';
         } else {
-          errorMessage = 'Crediti insufficienti. Anche i modelli gratuiti hanno limiti giornalieri. Verifica il tuo account Electron Hub per maggiori dettagli.';
+          errorMessage = `Crediti insufficienti: ${apiMessage || 'Verifica il tuo account Electron Hub per maggiori dettagli.'}`;
         }
       }
       
