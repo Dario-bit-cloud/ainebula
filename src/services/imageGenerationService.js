@@ -1,4 +1,67 @@
 import { IMAGE_GENERATION_CONFIG } from '../config/api.js';
+import { get } from 'svelte/store';
+import { user as userStore } from '../stores/user.js';
+import { hasActiveSubscription } from '../stores/user.js';
+
+/**
+ * Verifica se l'utente può generare immagini
+ * @returns {Object} { allowed: boolean, message: string }
+ */
+function checkImageGenerationPermission() {
+  try {
+    const user = get(userStore);
+    const hasSubscription = hasActiveSubscription();
+    const subscription = user?.subscription;
+    
+    // Se non ha abbonamento
+    if (!hasSubscription || !subscription || !subscription.active) {
+      return {
+        allowed: false,
+        message: 'La generazione di immagini è disponibile solo per gli utenti con abbonamento Premium. Passa a Premium per sbloccare questa funzionalità!'
+      };
+    }
+    
+    // Verifica se è in trial gratuito (controlla se c'è un campo trial o se expiresAt è molto vicino)
+    const isTrial = subscription.status === 'trial' || 
+                    subscription.status === 'free_trial' || 
+                    (subscription.expiresAt && new Date(subscription.expiresAt) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // Se scade tra meno di 7 giorni potrebbe essere trial
+    
+    if (isTrial) {
+      return {
+        allowed: false,
+        message: 'La generazione di immagini non è disponibile durante la prova gratuita. Attiva un abbonamento Premium per utilizzare questa funzionalità.'
+      };
+    }
+    
+    // Se ha abbonamento attivo ma non è Premium/Max/Pro
+    if (subscription.plan !== 'premium' && subscription.plan !== 'max' && subscription.plan !== 'pro') {
+      return {
+        allowed: false,
+        message: 'La generazione di immagini è disponibile solo per gli utenti con abbonamento Premium. Passa a Premium per sbloccare questa funzionalità!'
+      };
+    }
+    
+    // Se ha abbonamento Premium/Max/Pro attivo
+    if (subscription.active && (subscription.plan === 'premium' || subscription.plan === 'max' || subscription.plan === 'pro')) {
+      return {
+        allowed: true,
+        message: null
+      };
+    }
+    
+    // Default: non permesso
+    return {
+      allowed: false,
+      message: 'La generazione di immagini è disponibile solo per gli utenti con abbonamento Premium attivo.'
+    };
+  } catch (error) {
+    console.error('Errore verifica permessi generazione immagini:', error);
+    return {
+      allowed: false,
+      message: 'Errore di rete: impossibile verificare i permessi. La generazione di immagini è temporaneamente non disponibile.'
+    };
+  }
+}
 
 /**
  * Genera un'immagine da un prompt di testo utilizzando l'API di generazione immagini
@@ -15,6 +78,16 @@ import { IMAGE_GENERATION_CONFIG } from '../config/api.js';
  * Prova a generare un'immagine con un provider specifico
  */
 async function tryGenerateWithProvider(provider, prompt, options, controller) {
+  // Controllo di sicurezza aggiuntivo: verifica permessi anche qui
+  const permissionCheck = checkImageGenerationPermission();
+  if (!permissionCheck.allowed) {
+    // Simula errore di rete per prevenire bypass
+    const networkError = new Error('NETWORK_ERROR');
+    networkError.message = permissionCheck.message;
+    networkError.isPermissionError = true;
+    throw networkError;
+  }
+
   const {
     size = IMAGE_GENERATION_CONFIG.defaultSize,
     quality = IMAGE_GENERATION_CONFIG.defaultQuality,
@@ -94,6 +167,16 @@ export async function generateImage(prompt, options = {}, abortController = null
     throw new Error('Il prompt non può essere vuoto');
   }
 
+  // BLOCCA LA GENERAZIONE: Verifica permessi prima di procedere
+  const permissionCheck = checkImageGenerationPermission();
+  if (!permissionCheck.allowed) {
+    // Simula un errore di rete per prevenire bypass
+    const networkError = new Error('NETWORK_ERROR');
+    networkError.message = permissionCheck.message;
+    networkError.isPermissionError = true;
+    throw networkError;
+  }
+
   // Ordina i provider per priorità
   const providers = [...IMAGE_GENERATION_CONFIG.providers].sort((a, b) => a.priority - b.priority);
 
@@ -148,6 +231,16 @@ export async function generateImage(prompt, options = {}, abortController = null
 
   // Se tutti i provider hanno fallito
   console.error('❌ All image generation providers failed');
+  
+  // Se è un errore di permessi, usa il messaggio personalizzato
+  if (lastError?.isPermissionError) {
+    throw lastError;
+  }
+  
+  // Se è un errore di rete (potrebbe essere un bypass), mostra messaggio di errore di rete
+  if (lastError?.message === 'NETWORK_ERROR' || lastError?.name === 'NetworkError' || lastError?.name === 'TypeError') {
+    throw new Error('Errore di rete: La generazione di immagini non è disponibile. Questa funzionalità è riservata agli utenti Premium.');
+  }
   
   // Messaggio più user-friendly
   if (lastError?.message?.includes('402') || lastError?.message?.includes('Crediti')) {

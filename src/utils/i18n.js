@@ -45,6 +45,8 @@ export const translations = {
     'today': 'Oggi',
     'yesterday': 'Ieri',
     'daysAgo': '{n} giorni fa',
+    'collapseSidebar': 'Comprimi menu',
+    'expandSidebar': 'Espandi menu',
     
     // Settings
     'general': 'Generale',
@@ -260,6 +262,8 @@ export const translations = {
     'today': 'Today',
     'yesterday': 'Yesterday',
     'daysAgo': '{n} days ago',
+    'collapseSidebar': 'Collapse sidebar',
+    'expandSidebar': 'Expand sidebar',
     
     // Settings
     'general': 'General',

@@ -13,13 +13,18 @@ export const API_CONFIG = {
 // };
 
 // Mappatura modelli locali ai modelli API e provider
-// Tutti i modelli usano ora gemini-2.0-flash-lite-001 tramite Electron Hub
+// Tutti i modelli usano ora deepseek-llm-67b-chat tramite Electron Hub
+// DeepSeek LLM 67B Chat - Modello avanzato con 67 miliardi di parametri
+// Supporta: Function Call, High Context (128K tokens)
 export const MODEL_MAPPING = {
-  'nebula-1.0': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula AI 1.0 - Gemini 2.0 Flash Lite
-  'nebula-pro': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula AI Pro - Gemini 2.0 Flash Lite
-  'nebula-coder': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula Coder - Gemini 2.0 Flash Lite (specializzato in coding)
-  'nebula-premium-pro': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' }, // Nebula AI Premium Pro - Gemini 2.0 Flash Lite
-  'nebula-premium-max': { model: 'gemini-2.0-flash-lite-001', provider: 'electronhub' } // Nebula AI Premium Max - Gemini 2.0 Flash Lite
+  'nebula-1.0': { model: 'deepseek-llm-67b-chat', provider: 'electronhub' }, // Nebula AI 1.0 - DeepSeek LLM 67B Chat
+  'nebula-pro': { model: 'deepseek-llm-67b-chat', provider: 'electronhub' }, // Nebula AI Pro - DeepSeek LLM 67B Chat
+  'nebula-coder': { model: 'deepseek-llm-67b-chat', provider: 'electronhub' }, // Nebula Coder - DeepSeek LLM 67B Chat (specializzato in coding)
+  'nebula-search': { model: 'deepseek-llm-67b-chat', provider: 'electronhub', webSearch: true }, // Nebula Search - DeepSeek LLM 67B Chat (con web search)
+  'nebula-search-pro': { model: 'deepseek-llm-67b-chat', provider: 'electronhub', webSearch: true }, // Nebula Search Pro - DeepSeek LLM 67B Chat (con web search avanzato)
+  'nebula-research': { model: 'deepseek-llm-67b-chat', provider: 'electronhub', webSearch: true }, // Nebula Research - DeepSeek LLM 67B Chat (con reasoning e web search)
+  'nebula-premium-pro': { model: 'deepseek-llm-67b-chat', provider: 'electronhub' }, // Nebula AI Premium Pro - DeepSeek LLM 67B Chat
+  'nebula-premium-max': { model: 'deepseek-llm-67b-chat', provider: 'electronhub' } // Nebula AI Premium Max - DeepSeek LLM 67B Chat
 };
 
 

@@ -1,5 +1,6 @@
 import { writable, derived, get } from 'svelte/store';
 import { isAuthenticatedStore } from './auth.js';
+import { isIncognitoMode } from './app.js';
 import { getChatsFromDatabase, saveChatToDatabase, deleteChatFromDatabase, updateChatInDatabase } from '../services/chatService.js';
 
 // Store per le chat
@@ -16,7 +17,7 @@ export const currentChat = derived(
 );
 
 // Funzioni helper
-export async function createNewChat(projectId = null, isTemporary = false) {
+export async function createNewChat(projectId = null) {
   const allChats = get(chats);
   const currentId = get(currentChatId);
   
@@ -42,12 +43,13 @@ export async function createNewChat(projectId = null, isTemporary = false) {
     await deleteChat(chatToDelete.id);
   }
   
+  const incognito = get(isIncognitoMode);
+  
   const newChat = {
     id: Date.now().toString(),
     title: 'Nuova chat',
     messages: [],
     projectId: projectId || null,
-    isTemporary: isTemporary,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -55,8 +57,8 @@ export async function createNewChat(projectId = null, isTemporary = false) {
   chats.update(allChats => [newChat, ...allChats]);
   currentChatId.set(newChat.id);
   
-  // Salva nel database solo se autenticato E non è temporanea
-  if (!isTemporary) {
+  // Salva nel database solo se autenticato E non è in modalità incognito
+  if (!incognito) {
     const isAuthenticated = get(isAuthenticatedStore);
     const token = localStorage.getItem('auth_token');
     
@@ -90,10 +92,11 @@ export async function moveChatToProject(chatId, projectId) {
   
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
+  const incognito = get(isIncognitoMode);
   if (chat) {
-    // Non salvare chat temporanee nel database
-    if (chat.isTemporary) {
-      // Salva solo in localStorage per chat temporanee
+    // Non salvare chat in modalità incognito nel database
+    if (incognito) {
+      // Salva solo in localStorage per chat incognito
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
       // Verifica che il token sia disponibile prima di salvare
@@ -150,10 +153,11 @@ export async function addMessage(chatId, message) {
   // Salva solo se ha almeno un messaggio visibile
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
+  const incognito = get(isIncognitoMode);
   if (chat && chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
-    // Non salvare chat temporanee nel database
-    if (chat.isTemporary) {
-      // Salva solo in localStorage per chat temporanee
+    // Non salvare chat in modalità incognito nel database
+    if (incognito) {
+      // Salva solo in localStorage per chat incognito
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
       // Verifica che il token sia disponibile prima di salvare
@@ -189,7 +193,7 @@ export async function deleteChat(chatId) {
   const chat = allChats.find(c => c.id === chatId);
   if (!chat) return;
   
-  const isTemporary = chat.isTemporary === true;
+  const incognito = get(isIncognitoMode);
   const currentId = get(currentChatId);
   
   // Rimuovi la chat dallo store
@@ -200,8 +204,8 @@ export async function deleteChat(chatId) {
     currentChatId.set(null);
   }
   
-  // Elimina dal database solo se non è temporanea e se autenticato
-  if (!isTemporary && get(isAuthenticatedStore)) {
+  // Elimina dal database solo se non è in modalità incognito e se autenticato
+  if (!incognito && get(isAuthenticatedStore)) {
     try {
       await deleteChatFromDatabase(chatId);
     } catch (error) {
@@ -239,10 +243,11 @@ export async function updateMessage(chatId, messageIndex, updates) {
   
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
+  const incognito = get(isIncognitoMode);
   if (chat) {
-    // Non salvare chat temporanee nel database
-    if (chat.isTemporary) {
-      // Salva solo in localStorage per chat temporanee
+    // Non salvare chat in modalità incognito nel database
+    if (incognito) {
+      // Salva solo in localStorage per chat incognito
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
       // Verifica che il token sia disponibile prima di salvare
@@ -289,10 +294,11 @@ export async function deleteMessage(chatId, messageIndex) {
   
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
+  const incognito = get(isIncognitoMode);
   if (chat) {
-    // Non salvare chat temporanee nel database
-    if (chat.isTemporary) {
-      // Salva solo in localStorage per chat temporanee
+    // Non salvare chat in modalità incognito nel database
+    if (incognito) {
+      // Salva solo in localStorage per chat incognito
       saveChatsToStorage();
     } else if (get(isAuthenticatedStore)) {
       // Verifica che il token sia disponibile prima di salvare
@@ -328,17 +334,20 @@ export function saveChatsToStorage() {
   if (typeof window !== 'undefined') {
     try {
       const allChats = get(chats);
-      // Salva tutte le chat (incluse temporanee) che hanno almeno un messaggio visibile
+      const incognito = get(isIncognitoMode);
+      // Salva tutte le chat che hanno almeno un messaggio visibile
+      // In modalità incognito, salva solo in memoria (non in localStorage persistente)
       const chatsToSave = allChats.filter(chat => {
-        // Per le chat temporanee, salva anche se vuote (per mantenere lo stato)
-        if (chat.isTemporary) {
-          return true; // Salva tutte le chat temporanee
-        }
         // Per le chat normali, salva solo quelle con messaggi
         return chat.messages && 
                chat.messages.length > 0 &&
                chat.messages.some(msg => !msg.hidden);
       });
+      
+      // In modalità incognito, non salvare nulla in localStorage
+      if (incognito) {
+        return;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(chatsToSave));
     } catch (error) {
       console.error('Errore durante salvataggio chat in localStorage:', error);
@@ -374,26 +383,19 @@ export async function loadChats() {
     let dbChats = [];
     let localChats = [];
     
-    // Carica sempre da localStorage per le chat temporanee
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          // Filtra solo le chat temporanee da localStorage
-          localChats = parsed.filter(chat => chat.isTemporary === true);
-        }
-      } catch (error) {
-        console.error('Error loading temporary chats from storage:', error);
-      }
+    const incognito = get(isIncognitoMode);
+    
+    // In modalità incognito, non caricare chat dal database
+    if (incognito) {
+      chats.set([]);
+      return;
     }
     
     if (get(isAuthenticatedStore)) {
-      // Carica dal database (solo chat non temporanee)
+      // Carica dal database
       const result = await getChatsFromDatabase();
       if (result.success && result.chats) {
-        // Filtra le chat temporanee dal database (non dovrebbero esserci, ma per sicurezza)
-        dbChats = result.chats.filter(chat => !chat.isTemporary);
+        dbChats = result.chats;
       }
     } else {
       // Carica tutte le chat da localStorage se non autenticato
@@ -401,8 +403,8 @@ export async function loadChats() {
       return; // loadChatsFromStorage già imposta le chat
     }
     
-    // Combina chat dal database e chat temporanee da localStorage
-    chats.set([...dbChats, ...localChats]);
+    // Imposta le chat dal database
+    chats.set(dbChats);
   } finally {
     isLoadingChats = false;
   }
@@ -446,7 +448,16 @@ export async function syncChatsOnLogin() {
     chats.set([]);
     currentChatId.set(null);
     
-    // Carica dal database (solo chat non temporanee)
+    const incognito = get(isIncognitoMode);
+    
+    // In modalità incognito, non caricare chat dal database
+    if (incognito) {
+      chats.set([]);
+      console.log('🔒 [CHAT STORE] Modalità incognito attiva, nessuna chat caricata');
+      return;
+    }
+    
+    // Carica dal database
     const result = await getChatsFromDatabase();
     console.log('📊 [CHAT STORE] Risultato getChatsFromDatabase:', {
       success: result.success,
@@ -457,36 +468,18 @@ export async function syncChatsOnLogin() {
     
     let dbChats = [];
     if (result.success && result.chats) {
-      // Filtra le chat temporanee dal database (non dovrebbero esserci, ma per sicurezza)
-      dbChats = result.chats.filter(chat => !chat.isTemporary);
-      console.log(`✅ [CHAT STORE] Caricate ${dbChats.length} chat dal database (escluse temporanee)`);
+      dbChats = result.chats;
+      console.log(`✅ [CHAT STORE] Caricate ${dbChats.length} chat dal database`);
     } else {
       console.warn('⚠️ [CHAT STORE] Nessuna chat trovata o errore nel caricamento:', result);
-      // Se c'è un errore, prova comunque a caricare da localStorage
       if (result.error) {
         console.error('❌ [CHAT STORE] Errore dettagliato:', result.error);
       }
     }
     
-    // Carica chat temporanee da localStorage
-    let tempChats = [];
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          tempChats = parsed.filter(chat => chat.isTemporary === true);
-          console.log(`📦 [CHAT STORE] Caricate ${tempChats.length} chat temporanee da localStorage`);
-        }
-      } catch (error) {
-        console.error('❌ [CHAT STORE] Error loading temporary chats from storage:', error);
-      }
-    }
-    
-    // Combina chat dal database e chat temporanee
-    const allChats = [...dbChats, ...tempChats];
-    chats.set(allChats);
-    console.log(`✅ [CHAT STORE] Totale chat caricate: ${allChats.length} (${dbChats.length} dal DB, ${tempChats.length} temporanee)`);
+    // Imposta le chat dal database
+    chats.set(dbChats);
+    console.log(`✅ [CHAT STORE] Totale chat caricate: ${dbChats.length}`);
     
     // Migra le chat da localStorage al database (solo se non ci sono già chat nel database)
     // Non migrare chat temporanee
@@ -540,9 +533,8 @@ export async function migrateChatsFromLocalStorage() {
     
     // Salva ogni chat locale nel database
     for (const chat of localChats) {
-      // Salta chat temporanee - non migrarle al database
-      if (chat.isTemporary) {
-        console.log(`⏭️ Chat temporanea ${chat.id} non migrata al database`);
+      // Salta chat senza messaggi
+      if (!chat.messages || chat.messages.length === 0) {
         continue;
       }
       

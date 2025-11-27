@@ -1,7 +1,6 @@
 <script>
   import { promptTemplates, savedPrompts, savePrompt, updatePrompt, deletePrompt, duplicatePrompt, fillPromptTemplate, extractVariables, incrementUsageCount, exportPrompts, importPrompts } from '../stores/promptLibrary.js';
-  import { isPromptLibraryModalOpen, selectedPrompt } from '../stores/app.js';
-  import { isMobile } from '../stores/app.js';
+  import { isPromptLibraryModalOpen, selectedPrompt, isMobile, isSidebarOpen } from '../stores/app.js';
   import { createEventDispatcher } from 'svelte';
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
   
@@ -60,6 +59,11 @@
     editingPromptId = null;
     viewingPrompt = null;
     resetNewPrompt();
+  }
+  
+  // Chiudi la sidebar quando si apre il popup su mobile
+  $: if ($isPromptLibraryModalOpen && $isMobile) {
+    isSidebarOpen.set(false);
   }
   
   function handleBackdropClick(event) {
@@ -232,7 +236,7 @@
 
 {#if $isPromptLibraryModalOpen}
   <div class="modal-backdrop" on:click={handleBackdropClick} on:keydown={(e) => e.key === 'Escape' && !showVariablesDialog && closeModal()}>
-    <div class="modal-content" class:modal-mobile={$isMobile}>
+    <div class="modal-content">
       <div class="modal-header">
         <h2>Libreria Prompt</h2>
         <div class="header-actions">
@@ -508,18 +512,32 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
-    animation: backdropFadeIn 0.3s ease;
+    animation: backdropFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @media (max-width: 768px) {
+    .modal-backdrop {
+      padding: 0;
+      align-items: flex-end;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+    }
   }
 
   @keyframes backdropFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   .modal-content {
@@ -533,12 +551,41 @@
     display: flex;
     flex-direction: column;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    animation: modalSlideIn 0.4s ease;
+    animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @media (max-width: 768px) {
+    .modal-content {
+      max-width: 100%;
+      max-height: 90vh;
+      height: 90vh;
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+    }
   }
 
   @keyframes modalSlideIn {
-    from { opacity: 0; transform: scale(0.95) translateY(20px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  
+  @media (max-width: 768px) {
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
   }
 
   .modal-header {
@@ -547,6 +594,38 @@
     justify-content: space-between;
     padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    position: relative;
+  }
+  
+  @media (max-width: 768px) {
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: none;
+    }
+    
+    .modal-header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--border-color);
+    }
+    
+    .modal-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    
+    .close-button {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 10px;
+      border-radius: 50%;
+      background-color: var(--bg-tertiary);
+    }
   }
 
   .modal-header h2 {
@@ -583,14 +662,20 @@
   .close-button {
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     cursor: pointer;
     padding: 4px;
-    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 4px;
   }
 
   .close-button:hover {
-    color: var(--text-primary);
+    opacity: 0.7;
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: rotate(90deg);
   }
 
   .modal-body {
@@ -1160,14 +1245,10 @@
   }
 
   @media (max-width: 768px) {
-    .modal-content.modal-mobile {
-      max-width: 100%;
-      max-height: 100vh;
-      border-radius: 0;
-      height: 100vh;
-    }
-    .modal-header, .modal-body {
+    .modal-body {
       padding: 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .controls-row {
       flex-direction: column;

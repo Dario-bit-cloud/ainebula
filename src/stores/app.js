@@ -10,10 +10,12 @@ export const isProjectModalOpen = writable(false);
 export const isInviteModalOpen = writable(false);
 export const isUserMenuOpen = writable(false);
 export const isSidebarOpen = writable(false);
+export const isSidebarCollapsed = writable(false);
 export const isPremiumModalOpen = writable(false);
 export const isAISettingsModalOpen = writable(false);
 export const isPromptLibraryModalOpen = writable(false);
 export const selectedPrompt = writable(null);
+export const isNebuliniModalOpen = writable(false);
 export const isShortcutsModalOpen = writable(false);
 export const isReportBugModalOpen = writable(false);
 export const isPersonalizationModalOpen = writable(false);
@@ -24,6 +26,9 @@ export const isReleaseNotesModalOpen = writable(false);
 export const isTermsModalOpen = writable(false);
 export const isDownloadAppModalOpen = writable(false);
 export const isWorkspaceSettingsModalOpen = writable(false);
+
+// Store per modalità incognito
+export const isIncognitoMode = writable(false);
 
 // Stores per i dialoghi personalizzati
 export const confirmDialogState = writable({

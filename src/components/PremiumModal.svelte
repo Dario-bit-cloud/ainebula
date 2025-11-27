@@ -1,4 +1,5 @@
 <script>
+  import { onMount, onDestroy } from 'svelte';
   import { isPremiumModalOpen } from '../stores/app.js';
   import { isMobile } from '../stores/app.js';
   import { user } from '../stores/user.js';
@@ -6,12 +7,36 @@
   import { showAlert } from '../services/dialogService.js';
   
   let selectedPlan = 'monthly'; // 'monthly' o 'yearly'
+  let selectedDuration = 1; // Durata in mesi
   let showPaymentForm = false;
   let couponCode = '';
   let couponApplied = false;
   let couponDiscount = 0;
   let isProcessing = false;
   let isActivating = false;
+  let plansContainerRef;
+  
+  // Opzioni di durata disponibili (in mesi)
+  const durationOptions = [
+    { value: 1, label: '1 mese', months: 1 },
+    { value: 2, label: '2 mesi', months: 2 },
+    { value: 3, label: '3 mesi', months: 3 },
+    { value: 6, label: '6 mesi', months: 6 },
+    { value: 12, label: '1 anno', months: 12 },
+    { value: 24, label: '2 anni', months: 24 },
+    { value: 60, label: '5 anni', months: 60 }
+  ];
+  
+  // Sconti progressivi in base alla durata
+  const durationDiscounts = {
+    1: 0,    // Nessuno sconto per 1 mese
+    2: 5,    // 5% di sconto per 2 mesi
+    3: 10,   // 10% di sconto per 3 mesi
+    6: 15,   // 15% di sconto per 6 mesi
+    12: 20,  // 20% di sconto per 1 anno
+    24: 30,  // 30% di sconto per 2 anni
+    60: 40   // 40% di sconto per 5 anni
+  };
   
   // Dati del form di pagamento
   let paymentData = {
@@ -29,8 +54,7 @@
   const plans = {
     monthly: {
       name: 'Pro',
-      price: 30,
-      period: 'mese',
+      basePrice: 30, // Prezzo mensile base
       badge: 'Popolare',
       description: 'Accesso completo a Nebula AI Premium Pro e tutte le funzionalità avanzate.',
       features: [
@@ -45,8 +69,7 @@
     },
     yearly: {
       name: 'Massimo',
-      price: 300,
-      period: 'mese',
+      basePrice: 300, // Prezzo mensile base
       badge: null,
       description: 'Il piano completo con accesso a tutti i modelli premium e funzionalità esclusive.',
       features: [
@@ -64,10 +87,32 @@
     }
   };
   
+  // Calcola il prezzo base per la durata selezionata
+  function getBasePriceForDuration() {
+    const plan = plans[selectedPlan];
+    const durationOption = durationOptions.find(d => d.value === selectedDuration);
+    if (!durationOption) return plan.basePrice;
+    
+    return plan.basePrice * durationOption.months;
+  }
+  
+  // Calcola lo sconto per la durata selezionata
+  function getDurationDiscount() {
+    return durationDiscounts[selectedDuration] || 0;
+  }
+  
+  // Calcola il prezzo con sconto durata
+  function getPriceWithDurationDiscount() {
+    const basePrice = getBasePriceForDuration();
+    const discount = getDurationDiscount();
+    return basePrice * (1 - discount / 100);
+  }
+  
   function closeModal() {
     isPremiumModalOpen.set(false);
     showPaymentForm = false;
     selectedPlan = 'monthly';
+    selectedDuration = 1;
     couponCode = '';
     couponApplied = false;
     couponDiscount = 0;
@@ -84,6 +129,12 @@
   
   function selectPlan(plan) {
     selectedPlan = plan;
+    // Su mobile, scrolla al piano selezionato prima di aprire il form
+    if ($isMobile && plansContainerRef && !showPaymentForm) {
+      setTimeout(() => {
+        scrollToPlan(plan);
+      }, 100);
+    }
     showPaymentForm = true;
   }
   
@@ -169,12 +220,28 @@
   }
   
   function calculateTotal() {
-    const plan = plans[selectedPlan];
-    let total = plan.price;
+    let total = getPriceWithDurationDiscount();
     if (couponApplied && couponDiscount > 0) {
       total = total - (total * couponDiscount / 100);
     }
     return Math.max(0, total).toFixed(2); // Non può essere negativo
+  }
+  
+  // Formatta la durata per la visualizzazione
+  function formatDuration(months) {
+    if (months === 1) return '1 mese';
+    if (months < 12) return `${months} mesi`;
+    if (months === 12) return '1 anno';
+    if (months === 24) return '2 anni';
+    if (months === 60) return '5 anni';
+    return `${months} mesi`;
+  }
+  
+  // Calcola il risparmio rispetto al prezzo mensile
+  function calculateSavings() {
+    const basePrice = getBasePriceForDuration();
+    const discountedPrice = getPriceWithDurationDiscount();
+    return basePrice - discountedPrice;
   }
   
   $: finalPrice = parseFloat(calculateTotal());
@@ -233,8 +300,10 @@
     
     // Attiva abbonamento premium
     const planType = selectedPlan === 'monthly' ? 'pro' : 'max';
+    const durationOption = durationOptions.find(d => d.value === selectedDuration);
+    const months = durationOption ? durationOption.months : 1;
     const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + (selectedPlan === 'monthly' ? 1 : 1)); // 1 mese per entrambi
+    expiresAt.setMonth(expiresAt.getMonth() + months);
     
     // Genera una chiave univoca per l'abbonamento
     const subscriptionKey = `NEBULA-${selectedPlan.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
@@ -285,11 +354,85 @@
   function goBack() {
     showPaymentForm = false;
   }
+  
+  function handlePlansScroll() {
+    if (!$isMobile || !plansContainerRef) return;
+    
+    // Trova il piano più vicino al centro durante lo scroll
+    const container = plansContainerRef;
+    const containerCenter = container.scrollLeft + container.offsetWidth / 2;
+    const planCards = container.querySelectorAll('.plan-card');
+    
+    let closestCard = null;
+    let closestDistance = Infinity;
+    
+    planCards.forEach((card) => {
+      const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+      const distance = Math.abs(cardCenter - containerCenter);
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestCard = card;
+      }
+    });
+    
+    if (closestCard) {
+      const planType = closestCard.getAttribute('data-plan');
+      if (planType && planType !== selectedPlan) {
+        selectedPlan = planType;
+      }
+    }
+  }
+  
+  function scrollToPlan(planType) {
+    if (!plansContainerRef || !$isMobile) return;
+    
+    const planCard = plansContainerRef.querySelector(`[data-plan="${planType}"]`);
+    if (planCard) {
+      const container = plansContainerRef;
+      const cardLeft = planCard.offsetLeft;
+      const cardWidth = planCard.offsetWidth;
+      const containerWidth = container.offsetWidth;
+      const scrollLeft = container.scrollLeft;
+      const cardCenter = cardLeft + cardWidth / 2;
+      const containerCenter = scrollLeft + containerWidth / 2;
+      const scrollTo = scrollLeft + (cardCenter - containerCenter);
+      
+      container.scrollTo({
+        left: scrollTo,
+        behavior: 'smooth'
+      });
+    }
+  }
+  
+  // Gestisci listener per lo scroll dei piani
+  let scrollListenerAdded = false;
+  
+  // Aggiungi listener quando plansContainerRef è disponibile
+  $: if (plansContainerRef && $isMobile && !scrollListenerAdded) {
+    plansContainerRef.addEventListener('scroll', handlePlansScroll, { passive: true });
+    scrollListenerAdded = true;
+  }
+  
+  // Rimuovi listener quando il componente viene distrutto
+  onDestroy(() => {
+    if (plansContainerRef && scrollListenerAdded) {
+      plansContainerRef.removeEventListener('scroll', handlePlansScroll);
+      scrollListenerAdded = false;
+    }
+  });
+  
+  // Scrolla al piano selezionato quando il modal si apre su mobile
+  $: if ($isPremiumModalOpen && $isMobile && selectedPlan && plansContainerRef && !showPaymentForm) {
+    setTimeout(() => {
+      scrollToPlan(selectedPlan);
+    }, 300);
+  }
 </script>
 
   {#if $isPremiumModalOpen}
   <div class="modal-backdrop" role="button" tabindex="-1" on:click={handleBackdropClick} on:keydown={(e) => e.key === 'Escape' && closeModal()}>
-    <div class="modal-content" class:modal-mobile={$isMobile} role="dialog" aria-modal="true" aria-labelledby="premium-modal-title">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="premium-modal-title">
       <div class="modal-header">
         <div class="premium-icon">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -313,16 +456,16 @@
           <div class="plans-selection">
             <p class="section-description">Scegli il piano che fa per te</p>
             
-            <div class="plans-grid">
-              <div class="plan-card" class:selected={selectedPlan === 'monthly'} role="button" tabindex="0" on:click={() => selectPlan('monthly')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('monthly'))}>
+            <div class="plans-grid" bind:this={plansContainerRef} on:scroll={handlePlansScroll}>
+              <div class="plan-card" class:selected={selectedPlan === 'monthly'} data-plan="monthly" role="button" tabindex="0" on:click={() => selectPlan('monthly')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('monthly'))}>
                 {#if plans.monthly.badge}
                   <div class="plan-badge">{plans.monthly.badge}</div>
                 {/if}
                 <div class="plan-header">
                   <h3>{plans.monthly.name}</h3>
                   <div class="plan-price">
-                    <span class="price-amount">€{plans.monthly.price.toFixed(2)}</span>
-                    <span class="price-period">/{plans.monthly.period}</span>
+                    <span class="price-amount">€{plans.monthly.basePrice.toFixed(2)}</span>
+                    <span class="price-period">/mese</span>
                   </div>
                 </div>
                 <p class="plan-description">{plans.monthly.description}</p>
@@ -339,15 +482,15 @@
                 <button class="select-plan-button">Ottieni Pro</button>
               </div>
               
-              <div class="plan-card" class:selected={selectedPlan === 'yearly'} role="button" tabindex="0" on:click={() => selectPlan('yearly')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('yearly'))}>
+              <div class="plan-card" class:selected={selectedPlan === 'yearly'} data-plan="yearly" role="button" tabindex="0" on:click={() => selectPlan('yearly')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('yearly'))}>
                 {#if plans.yearly.badge}
                   <div class="plan-badge">{plans.yearly.badge}</div>
                 {/if}
                 <div class="plan-header">
                   <h3>{plans.yearly.name}</h3>
                   <div class="plan-price">
-                    <span class="price-amount">€{plans.yearly.price.toFixed(2)}</span>
-                    <span class="price-period">/{plans.yearly.period}</span>
+                    <span class="price-amount">€{plans.yearly.basePrice.toFixed(2)}</span>
+                    <span class="price-period">/mese</span>
                   </div>
                 </div>
                 <p class="plan-description">{plans.yearly.description}</p>
@@ -364,6 +507,56 @@
                 <button class="select-plan-button">Ottieni Massimo</button>
               </div>
             </div>
+            
+            <!-- Selezione Durata -->
+            <div class="duration-selection">
+              <h3 class="duration-title">Scegli la durata dell'abbonamento</h3>
+              <p class="duration-description">Più paghi in anticipo, più risparmi!</p>
+              <div class="duration-options">
+                {#each durationOptions as option}
+                  <button
+                    type="button"
+                    class="duration-button"
+                    class:active={selectedDuration === option.value}
+                    on:click={() => selectedDuration = option.value}
+                  >
+                    <span class="duration-label">{option.label}</span>
+                    {#if durationDiscounts[option.value] > 0}
+                      <span class="duration-discount-badge">-{durationDiscounts[option.value]}%</span>
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+              
+              {#if selectedPlan && selectedDuration}
+                <div class="duration-preview">
+                  <div class="preview-row">
+                    <span>Prezzo base ({formatDuration(durationOptions.find(d => d.value === selectedDuration)?.months || 1)}):</span>
+                    <span>€{getBasePriceForDuration().toFixed(2)}</span>
+                  </div>
+                  {#if getDurationDiscount() > 0}
+                    <div class="preview-row discount">
+                      <span>Sconto durata ({getDurationDiscount()}%):</span>
+                      <span>-€{calculateSavings().toFixed(2)}</span>
+                    </div>
+                  {/if}
+                  <div class="preview-row total">
+                    <span>Totale:</span>
+                    <span>€{getPriceWithDurationDiscount().toFixed(2)}</span>
+                  </div>
+                  {#if getDurationDiscount() > 0}
+                    <div class="savings-info">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                      </svg>
+                      <span>Risparmi €{calculateSavings().toFixed(2)} pagando in anticipo!</span>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
           </div>
         {:else}
           <!-- Form di Pagamento -->
@@ -378,13 +571,23 @@
                     <span>{plans[selectedPlan].name}</span>
                   </div>
                   <div class="summary-row">
-                    <span>Prezzo:</span>
-                    <span>€{plans[selectedPlan].price.toFixed(2)}</span>
+                    <span>Durata:</span>
+                    <span>{formatDuration(durationOptions.find(d => d.value === selectedDuration)?.months || 1)}</span>
                   </div>
+                  <div class="summary-row">
+                    <span>Prezzo base:</span>
+                    <span>€{getBasePriceForDuration().toFixed(2)}</span>
+                  </div>
+                  {#if getDurationDiscount() > 0}
+                    <div class="summary-row discount">
+                      <span>Sconto durata ({getDurationDiscount()}%):</span>
+                      <span>-€{calculateSavings().toFixed(2)}</span>
+                    </div>
+                  {/if}
                   {#if couponApplied}
                     <div class="summary-row discount">
-                      <span>Sconto ({couponDiscount}%):</span>
-                      <span>-€{(plans[selectedPlan].price * couponDiscount / 100).toFixed(2)}</span>
+                      <span>Sconto coupon ({couponDiscount}%):</span>
+                      <span>-€{(getPriceWithDurationDiscount() * couponDiscount / 100).toFixed(2)}</span>
                     </div>
                   {/if}
                   <div class="summary-row total">
@@ -576,18 +779,31 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1001;
     padding: 20px;
-    animation: backdropFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: backdropFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @media (max-width: 768px) {
+    .modal-backdrop {
+      padding: 0;
+      align-items: flex-end;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+    }
   }
 
   @keyframes backdropFadeIn {
+    from {
+      opacity: 0;
+    }
     to {
-      background-color: rgba(0, 0, 0, 0.7);
+      opacity: 1;
     }
   }
 
@@ -604,6 +820,16 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  
+  @media (max-width: 768px) {
+    .modal-content {
+      max-width: 100%;
+      max-height: 90vh;
+      height: 90vh;
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+    }
+  }
 
   @keyframes modalSlideIn {
     from {
@@ -615,6 +841,19 @@
       transform: scale(1) translateY(0);
     }
   }
+  
+  @media (max-width: 768px) {
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  }
 
   .modal-header {
     display: flex;
@@ -623,6 +862,37 @@
     padding: 16px 20px;
     border-bottom: 1px solid var(--border-color);
     position: relative;
+    flex-shrink: 0;
+  }
+  
+  @media (max-width: 768px) {
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: none;
+    }
+    
+    .modal-header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--border-color);
+    }
+    
+    .modal-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    
+    .close-button {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 10px;
+      border-radius: 50%;
+      background-color: var(--bg-tertiary);
+    }
   }
 
   .premium-icon {
@@ -643,19 +913,20 @@
   .close-button {
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     cursor: pointer;
     padding: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 4px;
   }
 
   .close-button:hover {
-    color: var(--text-primary);
-    background-color: var(--hover-bg);
+    opacity: 0.7;
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: rotate(90deg);
   }
 
   .modal-body {
@@ -677,6 +948,27 @@
     gap: 16px;
     margin-bottom: 0;
   }
+  
+  @media (max-width: 768px) {
+    .plans-grid {
+      display: flex;
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      gap: 16px;
+      scroll-snap-type: x mandatory;
+      scroll-padding: 0 16px;
+      scroll-behavior: smooth;
+      padding: 0 16px;
+    }
+    
+    .plans-grid::-webkit-scrollbar {
+      display: none;
+    }
+  }
 
   .plan-card {
     background-color: var(--bg-tertiary);
@@ -686,6 +978,16 @@
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+  }
+  
+  @media (max-width: 768px) {
+    .plan-card {
+      min-width: calc(100vw - 64px);
+      max-width: calc(100vw - 64px);
+      flex-shrink: 0;
+      scroll-snap-align: center;
+      scroll-snap-stop: always;
+    }
   }
 
   .plan-card:hover {
@@ -1152,29 +1454,156 @@
     line-height: 1.5;
   }
 
+  /* Duration Selection */
+  .duration-selection {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .duration-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+  }
+
+  .duration-description {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 20px 0;
+  }
+
+  .duration-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .duration-button {
+    flex: 1;
+    min-width: 100px;
+    padding: 12px 16px;
+    background-color: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+  }
+
+  .duration-button:hover {
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .duration-button.active {
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+  }
+
+  .duration-label {
+    font-weight: 600;
+  }
+
+  .duration-discount-badge {
+    font-size: 11px;
+    color: #10b981;
+    background-color: rgba(16, 185, 129, 0.1);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+
+  .duration-preview {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .preview-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .preview-row.discount {
+    color: #10b981;
+  }
+
+  .preview-row.total {
+    font-weight: 600;
+    font-size: 18px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 8px;
+    margin-bottom: 12px;
+  }
+
+  .savings-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%);
+    border: 1px solid #10b981;
+    border-radius: 6px;
+    color: #10b981;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .savings-info svg {
+    flex-shrink: 0;
+  }
+
   @media (max-width: 768px) {
-    .modal-backdrop {
-      padding: 0;
+    .duration-options {
+      flex-direction: row;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-bottom: 8px;
     }
-
-    .modal-content.modal-mobile {
-      max-width: 100%;
-      max-height: 100vh;
-      height: 100vh;
-      border-radius: 0;
-      margin: 0;
+    
+    .duration-options::-webkit-scrollbar {
+      display: none;
     }
-
-    .modal-header {
-      padding: 20px 16px;
+    
+    .duration-button {
+      min-width: 90px;
+      flex-shrink: 0;
     }
+    
+    .duration-selection {
+      margin-top: 24px;
+      padding-top: 20px;
+    }
+  }
 
+  @media (max-width: 768px) {
     .modal-body {
-      padding: 20px 16px;
+      padding: 20px 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
-
-    .plans-grid {
-      grid-template-columns: 1fr;
+    
+    .plans-selection {
+      padding: 0 16px;
     }
 
     .payment--options {

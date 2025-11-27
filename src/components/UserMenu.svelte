@@ -1,12 +1,13 @@
 <script>
   import { user as authUser } from '../stores/auth.js';
-  import { isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
+  import { isUserMenuOpen, isSidebarOpen, isMobile, isIncognitoMode } from '../stores/app.js';
   import { logout } from '../services/authService.js';
   import { clearUser, setUser as setAuthUser } from '../stores/auth.js';
   import { accounts, currentAccountId, getCurrentAccount, getOtherAccounts, switchAccount, removeAccount } from '../stores/accounts.js';
   import { isAuthModalOpen } from '../stores/app.js';
   import { showConfirm, showAlert } from '../services/dialogService.js';
   import { get } from 'svelte/store';
+  import { createNewChat } from '../stores/chat.js';
   
   let hoveredItem = null;
   let activeSubmenu = null;
@@ -170,6 +171,9 @@
   }
   
   async function handleSwitchAccount(account) {
+    // Disattiva modalità incognito quando si cambia account
+    isIncognitoMode.set(false);
+    
     // Cambia account
     switchAccount(account.id);
     
@@ -203,6 +207,18 @@
   
   function toggleAccountList() {
     showAccountList = !showAccountList;
+  }
+  
+  async function toggleIncognitoMode() {
+    const currentIncognito = get(isIncognitoMode);
+    isIncognitoMode.set(!currentIncognito);
+    
+    // Se si attiva la modalità incognito, crea una nuova chat
+    if (!currentIncognito) {
+      await createNewChat();
+    }
+    
+    isUserMenuOpen.set(false);
   }
 </script>
 
@@ -238,14 +254,42 @@
           </button>
         </div>
         
-        <!-- Lista account (se ci sono altri account) -->
-        {#if showAccountList && $accounts.length > 1}
+        <!-- Lista account e modalità incognito -->
+        {#if showAccountList}
           <div class="accounts-section">
             <div class="accounts-header">Account disponibili</div>
+            
+            <!-- Modalità Incognito -->
+            <button 
+              class="account-item incognito-item"
+              class:active={$isIncognitoMode}
+              on:click={toggleIncognitoMode}
+            >
+              <div class="account-avatar-small incognito-avatar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 12l2 2 4-4"/>
+                  <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                  <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                  <path d="M12 3c0 1-1 3-3 3S6 4 6 3s1-3 3-3 3 2 3 3"/>
+                  <path d="M12 21c0-1 1-3 3-3s3 2 3 3-1 3-3 3-3-2-3-3"/>
+                </svg>
+              </div>
+              <div class="account-details">
+                <div class="account-username">Incognito</div>
+                <div class="account-email">Chat temporanee</div>
+              </div>
+              {#if $isIncognitoMode}
+                <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              {/if}
+            </button>
+            
+            <!-- Account registrati -->
             {#each $accounts as account}
               <button 
                 class="account-item"
-                class:active={account.id === $currentAccountId}
+                class:active={account.id === $currentAccountId && !$isIncognitoMode}
                 on:click={() => handleSwitchAccount(account)}
               >
                 <div class="account-avatar-small">
@@ -255,7 +299,7 @@
                   <div class="account-username">{account.username}</div>
                   <div class="account-email">{account.email}</div>
                 </div>
-                {#if account.id === $currentAccountId}
+                {#if account.id === $currentAccountId && !$isIncognitoMode}
                   <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
@@ -481,6 +525,19 @@
   .account-item.active {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
+  }
+  
+  .incognito-item {
+    border: 1px solid var(--border-color);
+  }
+  
+  .incognito-item.active {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent-blue);
+  }
+  
+  .incognito-avatar {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
   }
   
   .account-avatar-small {

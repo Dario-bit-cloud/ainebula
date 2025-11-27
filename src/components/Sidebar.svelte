@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { selectedModel, setModel } from '../stores/models.js';
-  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isMobile } from '../stores/app.js';
+  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isSidebarCollapsed, isMobile, isNebuliniModalOpen, isPromptLibraryModalOpen } from '../stores/app.js';
   import { projects, updateProject, deleteProject, syncProjectsOnLogin, loadProjects } from '../stores/projects.js';
   import { showConfirm } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
@@ -167,9 +167,22 @@
         break;
       case 'library':
         showSearchInput = false;
-        sidebarView.set('library');
-        activeItem = 'library';
-        showChatList = true;
+        // Su mobile, apri il modal invece di mostrare nella sidebar
+        if ($isMobile) {
+          isPromptLibraryModalOpen.set(true);
+          isSidebarOpen.set(false);
+        } else {
+          sidebarView.set('library');
+          activeItem = 'library';
+          showChatList = true;
+        }
+        break;
+      case 'nebulini':
+        showSearchInput = false;
+        isNebuliniModalOpen.set(true);
+        if ($isMobile) {
+          isSidebarOpen.set(false);
+        }
         break;
       case 'projects':
         showSearchInput = false;
@@ -225,6 +238,17 @@
 
   function closeSidebar() {
     isSidebarOpen.set(false);
+  }
+  
+  // Chiudi automaticamente la ricerca quando si comprime la sidebar
+  $: {
+    if ($isSidebarCollapsed && !$isMobile && showSearchInput) {
+      showSearchInput = false;
+      searchInput = '';
+      searchQuery.set('');
+      sidebarView.set('chat');
+      activeItem = null;
+    }
   }
   
   async function handleDeleteChat(event, chatId) {
@@ -365,7 +389,7 @@
   <div class="sidebar-overlay" on:click={closeSidebar}></div>
 {/if}
 
-<aside class="sidebar" class:sidebar-open={$isSidebarOpen} class:sidebar-mobile={$isMobile}>
+<aside class="sidebar" class:sidebar-open={$isSidebarOpen} class:sidebar-mobile={$isMobile} class:collapsed={$isSidebarCollapsed && !$isMobile}>
   {#if $isMobile}
     <div class="sidebar-header-mobile">
       <div class="sidebar-logo">
@@ -386,6 +410,15 @@
         <img src="/logo.png" alt="Nebula AI" class="logo-img" />
         <span class="logo-text">Nebula AI</span>
       </div>
+      <button class="collapse-toggle-btn" on:click={() => isSidebarCollapsed.update(v => !v)} title={$isSidebarCollapsed ? $t('expandSidebar') : $t('collapseSidebar')}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          {#if $isSidebarCollapsed}
+            <polyline points="9 18 15 12 9 6"/>
+          {:else}
+            <polyline points="15 18 9 12 15 6"/>
+          {/if}
+        </svg>
+      </button>
     </div>
   {/if}
   
@@ -394,30 +427,38 @@
     <div class="new-chat-wrapper" on:click={() => handleMenuClick('new-chat')}>
       <div class="new-chat-glow"></div>
       <button class="new-chat-button" role="button">
-        {$t('newChat')}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 10 10"
-          height="10"
-          width="10"
-          fill="none"
-          class="new-chat-arrow"
-        >
-          <path
-            d="M0 5h7"
-            class="arrow-line"
-          ></path>
-          <path
-            d="M1 1l4 4-4 4"
-            class="arrow-path"
-          ></path>
-        </svg>
+        {#if !$isSidebarCollapsed || $isMobile}
+          {$t('newChat')}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 10 10"
+            height="10"
+            width="10"
+            fill="none"
+            class="new-chat-arrow"
+          >
+            <path
+              d="M0 5h7"
+              class="arrow-line"
+            ></path>
+            <path
+              d="M1 1l4 4-4 4"
+              class="arrow-path"
+            ></path>
+          </svg>
+        {:else}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        {/if}
       </button>
     </div>
     
     {#each [
       { id: 'search', label: $t('searchChats'), icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
       { id: 'library', label: $t('library'), icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+      { id: 'nebulini', label: 'Nebulini', icon: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
       { id: 'projects', label: $t('projects'), icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
     ] as item}
       <div class="nav-item-wrapper">
@@ -426,12 +467,20 @@
             <button 
               class="nav-item search-button" 
               class:active={activeItem === 'search'}
-              on:click={() => handleMenuClick('search')}
+              class:disabled={$isSidebarCollapsed && !$isMobile}
+              on:click={() => {
+                if (!($isSidebarCollapsed && !$isMobile)) {
+                  handleMenuClick('search');
+                }
+              }}
+              title={$isSidebarCollapsed && !$isMobile ? $t('expandSidebar') : item.label}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d={item.icon} />
               </svg>
-              <span>{item.label}</span>
+              {#if !$isSidebarCollapsed || $isMobile}
+                <span>{item.label}</span>
+              {/if}
             </button>
           {:else}
             <div class="search-group-animated">
@@ -483,8 +532,10 @@
                 <path d={item.icon} />
               </svg>
             {/if}
-            <span>{item.label}</span>
-            {#if item.id === 'projects'}
+            {#if !$isSidebarCollapsed || $isMobile}
+              <span>{item.label}</span>
+            {/if}
+            {#if item.id === 'projects' && (!$isSidebarCollapsed || $isMobile)}
               <button 
                 class="plus-icon-button" 
                 on:click|stopPropagation={() => isProjectModalOpen.set(true)}
@@ -952,18 +1003,22 @@
           <path d="M2 12l10 5 10-5"/>
         </svg>
       </div>
-      <div class="user-details">
-        <div class="username">{$userStore.name || $isAuthenticatedStore ? ($authUser?.username || $t('user')) : $t('user')}</div>
-      </div>
+      {#if !$isSidebarCollapsed || $isMobile}
+        <div class="user-details">
+          <div class="username">{$userStore.name || $isAuthenticatedStore ? ($authUser?.username || $t('user')) : $t('user')}</div>
+        </div>
+      {/if}
     </button>
-    <button class="invite-button" on:click={handleInviteClick}>
+    <button class="invite-button" on:click={handleInviteClick} title={$isSidebarCollapsed && !$isMobile ? $t('inviteAndEarn') : ''}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
         <path d="M23 21v-2a4 4 0 00-3-3.87"/>
         <path d="M16 3.13a4 4 0 010 7.75"/>
       </svg>
-      <span>{$t('inviteAndEarn')}</span>
+      {#if !$isSidebarCollapsed || $isMobile}
+        <span>{$t('inviteAndEarn')}</span>
+      {/if}
     </button>
   </div>
 </aside>
@@ -1002,6 +1057,11 @@
     z-index: 1;
     flex-shrink: 0;
     box-shadow: var(--md-sys-elevation-level1);
+    transition: width var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
+  }
+  
+  .sidebar.collapsed {
+    width: 72px;
   }
   
   .sidebar-header {
@@ -1009,6 +1069,13 @@
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: padding var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
+  }
+  
+  .sidebar.collapsed .sidebar-header {
+    padding: 20px 12px;
     justify-content: center;
   }
   
@@ -1030,6 +1097,40 @@
     font-family: var(--md-sys-typescale-title-large-font);
     color: var(--md-sys-color-on-surface);
     letter-spacing: var(--md-sys-typescale-title-large-tracking);
+    transition: opacity var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  
+  .sidebar.collapsed .logo-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+  }
+  
+  .collapse-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--md-sys-color-on-surface-variant);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--md-sys-shape-corner-small);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+  
+  .collapse-toggle-btn:hover {
+    background-color: var(--md-sys-color-surface-container-high);
+    opacity: 1;
+  }
+  
+  .sidebar.collapsed .collapse-toggle-btn {
+    position: absolute;
+    right: 8px;
   }
 
   @keyframes sidebarSlideIn {
@@ -1274,6 +1375,17 @@
     transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
     z-index: 1;
     box-shadow: var(--md-sys-elevation-level1);
+    gap: 8px;
+  }
+  
+  .sidebar.collapsed .new-chat-button {
+    padding: 12px;
+    min-width: 48px;
+    width: 48px;
+  }
+  
+  .sidebar.collapsed .new-chat-button svg {
+    margin: 0;
   }
   
   .new-chat-button:hover {
@@ -1330,6 +1442,24 @@
     position: relative;
     text-align: left;
     flex-shrink: 0;
+    transform: translateX(0);
+  }
+  
+  .sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: 10px;
+    min-width: 48px;
+    width: 48px;
+  }
+  
+  .sidebar.collapsed .nav-item span {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  
+  .sidebar.collapsed .nav-item:hover {
     transform: translateX(0);
   }
 
@@ -1402,6 +1532,13 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    transition: opacity var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+  }
+  
+  .sidebar.collapsed .chat-list {
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
   }
 
   .nav-item-wrapper {
@@ -1423,6 +1560,10 @@
     position: relative;
     width: 100%;
     animation: searchSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .sidebar.collapsed .search-group-animated {
+    display: none;
   }
 
   @keyframes searchSlideIn {
@@ -1845,6 +1986,11 @@
     background-color: var(--bg-secondary);
     position: relative;
     z-index: 10;
+    transition: padding var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+  }
+  
+  .sidebar.collapsed .user-section {
+    padding: 12px 8px;
   }
 
   .user-info {
@@ -1860,6 +2006,17 @@
     cursor: pointer;
     transition: background-color 0.2s;
     min-width: 0;
+  }
+  
+  .sidebar.collapsed .user-info {
+    justify-content: center;
+    padding: 8px;
+  }
+  
+  .sidebar.collapsed .user-details {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
   }
 
   .user-info:hover {
@@ -1922,6 +2079,20 @@
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     transform: translateY(0);
     min-width: 0;
+    justify-content: center;
+  }
+  
+  .sidebar.collapsed .invite-button {
+    padding: 10px;
+    min-width: 48px;
+    width: 48px;
+  }
+  
+  .sidebar.collapsed .invite-button span {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
   }
 
   .invite-button:hover {
