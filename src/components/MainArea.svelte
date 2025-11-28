@@ -367,6 +367,11 @@
         textareaRef.removeEventListener('focus', keyboardHandlers.handleTextareaFocus);
         textareaRef.removeEventListener('blur', keyboardHandlers.handleKeyboardClose);
       }
+      
+      // Rimuovi listener viewport resize
+      if (keyboardHandlers.handleViewportResize && 'visualViewport' in window) {
+        window.visualViewport.removeEventListener('resize', keyboardHandlers.handleViewportResize);
+      }
       if (keyboardHandlers.handleViewportResize) {
         if (window.visualViewport) {
           window.visualViewport.removeEventListener('resize', keyboardHandlers.handleViewportResize);
@@ -407,37 +412,77 @@
     }
   }
   
-  // Funzioni per gestione tastiera virtuale su mobile
+  // Funzioni per gestione tastiera virtuale su mobile (ottimizzate)
   let keyboardHandlers = {
     handleTextareaFocus: null,
     handleKeyboardClose: null,
     handleViewportResize: null
   };
   
+  let keyboardHeight = 0;
+  let originalViewportHeight = 0;
+  
   function handleKeyboardOpen() {
     if (!$isMobile) return;
+    
+    // Salva altezza viewport originale
+    if (originalViewportHeight === 0) {
+      originalViewportHeight = window.innerHeight;
+    }
+    
+    // Calcola altezza tastiera
+    const currentHeight = window.innerHeight;
+    keyboardHeight = originalViewportHeight - currentHeight;
     
     // Scrolla per assicurarsi che l'input sia visibile
     setTimeout(() => {
       if (textareaRef) {
-        textareaRef.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        // Usa scrollIntoView con opzioni ottimizzate
+        textareaRef.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center', 
+          inline: 'nearest' 
+        });
       }
       // Scrolla anche i messaggi per mostrare l'input
       scrollToBottom(false);
-    }, 300);
+    }, 200); // Ridotto da 300ms per risposta più veloce
   }
   
   function handleKeyboardClose() {
     if (!$isMobile) return;
+    
     // Quando la tastiera si chiude, ripristina lo scroll
     setTimeout(() => {
       scrollToBottom(false);
+      keyboardHeight = 0;
+      // Ripristina viewport height se necessario
+      if (originalViewportHeight > 0 && window.innerHeight >= originalViewportHeight * 0.9) {
+        originalViewportHeight = 0;
+      }
     }, 100);
   }
   
   function handleTextareaFocus() {
     if ($isMobile) {
       handleKeyboardOpen();
+    }
+  }
+  
+  // Gestione resize viewport (per tastiera virtuale)
+  function handleViewportResize() {
+    if (!$isMobile) return;
+    
+    const currentHeight = window.innerHeight;
+    const heightDiff = originalViewportHeight - currentHeight;
+    
+    // Se la differenza è significativa (>150px), probabilmente la tastiera è aperta
+    if (heightDiff > 150 && originalViewportHeight > 0) {
+      keyboardHeight = heightDiff;
+      handleKeyboardOpen();
+    } else if (heightDiff < 50 && keyboardHeight > 0) {
+      // Tastiera chiusa
+      handleKeyboardClose();
     }
   }
   

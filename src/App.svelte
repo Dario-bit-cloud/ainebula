@@ -548,6 +548,9 @@
   @media (max-width: 768px) {
     .main-layout {
       width: 100%;
+      /* Supporto safe area per iOS */
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
 
     .app-container {
@@ -556,6 +559,9 @@
       width: 100vw;
       height: 100vh;
       height: 100dvh; /* Dynamic viewport height per mobile */
+      /* Supporto safe area per iOS */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
     }
   }
 
@@ -563,6 +569,13 @@
   @media (max-width: 768px) {
     .app-container {
       overflow-x: hidden;
+      /* Touch action ottimizzato */
+      touch-action: pan-y pinch-zoom;
+    }
+    
+    /* Ottimizzazioni performance mobile */
+    .app-container * {
+      -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
     }
   }
 </style>

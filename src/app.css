@@ -52,13 +52,23 @@ body {
   color: var(--text-primary);
   overflow: hidden;
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height per mobile */
+  /* Supporto safe area per iOS */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 #app {
   width: 100%;
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height per mobile */
   display: flex;
   flex-direction: column;
+  /* Supporto safe area per iOS */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Animazioni globali */
@@ -153,6 +163,24 @@ button, a, input, select, textarea {
     overflow-scrolling: touch;
   }
   
+  /* Touch target sizes - minimo 44x44px per accessibilità */
+  button, a, input[type="button"], input[type="submit"], .clickable {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation; /* Riduce delay tap su mobile */
+  }
+  
+  /* Prevenzione zoom su input focus */
+  input, textarea, select {
+    font-size: 16px !important; /* Previene zoom automatico su iOS */
+  }
+  
+  /* Ottimizzazioni performance mobile */
+  * {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    -webkit-touch-callout: none; /* Disabilita menu contestuale su long press */
+  }
+  
   /* Reduce animation complexity on mobile */
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -167,6 +195,27 @@ button, a, input, select, textarea {
     to {
       opacity: 1;
       transform: translate3d(0, 0, 0);
+    }
+  }
+  
+  /* Ottimizzazioni scroll per liste lunghe */
+  .messages-container,
+  .chat-list,
+  .sidebar-content {
+    contain: layout style paint;
+    will-change: scroll-position;
+  }
+  
+  /* Riduci ombre e blur su mobile per performance */
+  * {
+    filter: none !important; /* Rimuovi filtri pesanti su mobile */
+  }
+  
+  /* Backdrop filter solo se supportato e performante */
+  @supports (backdrop-filter: blur(10px)) {
+    .ios-device * {
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
   }
 }

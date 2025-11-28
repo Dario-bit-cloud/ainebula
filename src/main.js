@@ -5,6 +5,12 @@ import './styles/liquid-glass.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
 import { isIOS } from './utils/platform.js';
+import { 
+  initDynamicViewport, 
+  preventZoomOnInputFocus, 
+  preventPullToRefresh,
+  handleVirtualKeyboard 
+} from './utils/mobile.js';
 
 // Inizializza il tema PRIMA che l'app venga montata per evitare flash
 function initTheme() {
@@ -63,9 +69,21 @@ function initTheme() {
 // Inizializza il tema immediatamente
 initTheme();
 
-// Rileva iOS e applica classe
+// Ottimizzazioni mobile
 if (typeof window !== 'undefined') {
-  // Controlla se c'è un parametro URL o localStorage per forzare iOS
+  // Inizializza viewport dinamico per mobile
+  initDynamicViewport();
+  
+  // Previeni zoom su input focus (iOS Safari)
+  preventZoomOnInputFocus();
+  
+  // Previeni pull-to-refresh su mobile
+  preventPullToRefresh();
+  
+  // Gestisci tastiera virtuale
+  handleVirtualKeyboard();
+  
+  // Rileva iOS e applica classe
   const urlParams = new URLSearchParams(window.location.search);
   const forceIOS = urlParams.get('ios') === 'true' || localStorage.getItem('force-ios') === 'true';
   
@@ -83,7 +101,9 @@ if (typeof window !== 'undefined') {
       document.documentElement.classList.add('ios-device');
       localStorage.setItem('force-ios', 'true');
     }
-    console.log('iOS UI:', !isIOSActive ? 'Attivata' : 'Disattivata');
+    if (import.meta.env.DEV) {
+      console.log('iOS UI:', !isIOSActive ? 'Attivata' : 'Disattivata');
+    }
     // Ricarica per applicare tutti gli stili
     window.location.reload();
   };
