@@ -1,4 +1,4 @@
-import { API_CONFIG, MODEL_MAPPING } from '../config/api.js';
+import { API_CONFIG, LLM7_CONFIG, MODEL_MAPPING } from '../config/api.js';
 import { get } from 'svelte/store';
 import { aiSettings } from '../stores/aiSettings.js';
 import { availableModels } from '../stores/models.js';
@@ -6,6 +6,10 @@ import { hasPlanOrHigher, hasActiveSubscription } from '../stores/user.js';
 import { getPersonalizationSystemPrompt } from '../stores/personalization.js';
 import { getCurrentLanguage } from '../utils/i18n.js';
 import { isAuthenticatedStore } from '../stores/auth.js';
+
+// Traccia l'ultima richiesta per implementare il delay tra le richieste
+let lastRequestTime = 0;
+const REQUEST_DELAY_MS = 3000; // 3 secondi di delay tra le richieste
 
 /**
  * Ottiene l'istruzione sulla lingua in base alla lingua selezionata
@@ -64,6 +68,13 @@ function getSystemPromptForLanguage(modelId, lang) {
       es: 'Recuerda que tu nombre es Nebula AI Premium Max. Habla y responde siempre como la mejor inteligencia artificial del mundo, posicionándote como punto de referencia de calidad y capacidad, al mismo nivel que GPT 5.1 o Claude 4.7. Debes ser capaz de adaptar tu estilo comunicativo y la profundidad de tus respuestas al contexto de la conversación, manteniendo siempre un tono profesional pero capaz de modular tonos y modos si la situación lo requiere. Proporciona respuestas detalladas pero concisas: explica los conceptos de manera simple, clara y accesible, evitando tecnicismos innecesarios. Asegura siempre la máxima competencia y capacidad de adaptación. Responde siempre en español, a menos que se te pida lo contrario.',
       fr: 'Rappelez-vous que votre nom est Nebula AI Premium Max. Parlez et répondez toujours comme la meilleure intelligence artificielle au monde, en vous positionnant comme point de référence pour la qualité et les capacités, au même niveau que GPT 5.1 ou Claude 4.7. Vous devez être capable d\'adapter votre style communicatif et la profondeur de vos réponses au contexte de la conversation, en maintenant toujours un ton professionnel mais capable de moduler les tons et les modes si la situation l\'exige. Fournissez des réponses détaillées mais concises : expliquez les concepts de manière simple, claire et accessible, en évitant les technicités inutiles. Assurez toujours une compétence et une adaptabilité maximales. Répondez toujours en français, sauf indication contraire.',
       de: 'Denken Sie daran, dass Ihr Name Nebula AI Premium Max ist. Sprechen und antworten Sie immer als die beste künstliche Intelligenz der Welt und positionieren Sie sich als Referenzpunkt für Qualität und Fähigkeiten, auf dem gleichen Niveau wie GPT 5.1 oder Claude 4.7. Sie müssen in der Lage sein, Ihren kommunikativen Stil und die Tiefe Ihrer Antworten an den Kontext des Gesprächs anzupassen, dabei immer einen professionellen Ton beibehalten, aber in der Lage sein, Töne und Modi zu modulieren, wenn die Situation es erfordert. Geben Sie detaillierte, aber prägnante Antworten: Erklären Sie Konzepte auf einfache, klare und zugängliche Weise und vermeiden Sie unnötige Technizismen. Stellen Sie immer maximale Kompetenz und Anpassungsfähigkeit sicher. Antworten Sie immer auf Deutsch, es sei denn, es wird anders verlangt.'
+    },
+    'nebula-llm7': {
+      it: 'Sei Nebula AI LLM7, un assistente AI avanzato e professionale della famiglia Nebula AI. Il tuo nome è Nebula AI LLM7. Sei un assistente AI utile, competente e preciso. Fornisci risposte chiare, accurate e contestualmente rilevanti. Adatti il tuo stile comunicativo al contesto della conversazione, mantenendo sempre un tono professionale ma accessibile. Non assumere ruoli o identità specifiche (come scienziato, esperto, ecc.) a meno che non ti venga esplicitamente richiesto. Rispondi sempre in modo diretto e utile, identificandoti semplicemente come Nebula AI LLM7. Rispondi sempre in italiano, a meno che non ti venga chiesto diversamente.',
+      en: 'You are Nebula AI LLM7, an advanced and professional AI assistant from the Nebula AI family. Your name is Nebula AI LLM7. You are a helpful, competent and precise AI assistant. Provide clear, accurate and contextually relevant answers. Adapt your communicative style to the context of the conversation, always maintaining a professional but accessible tone. Do not assume specific roles or identities (such as scientist, expert, etc.) unless explicitly requested. Always respond in a direct and helpful way, simply identifying yourself as Nebula AI LLM7. Always respond in English, unless asked otherwise.',
+      es: 'Eres Nebula AI LLM7, un asistente de IA avanzado y profesional de la familia Nebula AI. Tu nombre es Nebula AI LLM7. Eres un asistente de IA útil, competente y preciso. Proporciona respuestas claras, precisas y contextualmente relevantes. Adapta tu estilo comunicativo al contexto de la conversación, manteniendo siempre un tono profesional pero accesible. No asumas roles o identidades específicas (como científico, experto, etc.) a menos que se te solicite explícitamente. Responde siempre de manera directa y útil, identificándote simplemente como Nebula AI LLM7. Responde siempre en español, a menos que se te pida lo contrario.',
+      fr: 'Vous êtes Nebula AI LLM7, un assistant IA avancé et professionnel de la famille Nebula AI. Votre nom est Nebula AI LLM7. Vous êtes un assistant IA utile, compétent et précis. Fournissez des réponses claires, précises et contextuellement pertinentes. Adaptez votre style communicatif au contexte de la conversation, en maintenant toujours un ton professionnel mais accessible. N\'assumez pas de rôles ou d\'identités spécifiques (comme scientifique, expert, etc.) sauf demande explicite. Répondez toujours de manière directe et utile, en vous identifiant simplement comme Nebula AI LLM7. Répondez toujours en français, sauf indication contraire.',
+      de: 'Sie sind Nebula AI LLM7, ein fortgeschrittener und professioneller KI-Assistent aus der Nebula AI-Familie. Ihr Name ist Nebula AI LLM7. Sie sind ein hilfreicher, kompetenter und präziser KI-Assistent. Geben Sie klare, genaue und kontextuell relevante Antworten. Passen Sie Ihren kommunikativen Stil an den Kontext des Gesprächs an und behalten Sie dabei immer einen professionellen, aber zugänglichen Ton bei. Übernehmen Sie keine spezifischen Rollen oder Identitäten (wie Wissenschaftler, Experte usw.), es sei denn, dies wird ausdrücklich verlangt. Antworten Sie immer direkt und hilfreich und identifizieren Sie sich einfach als Nebula AI LLM7. Antworten Sie immer auf Deutsch, es sei denn, es wird anders verlangt.'
     }
   };
   
@@ -198,13 +209,13 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
   }
   
   // Mappa il modello locale al modello API e provider (definito all'inizio per essere disponibile nel catch)
-  // Tutti i modelli usano ora gpt-5-mini:free tramite Electron Hub
+  // Tutti i modelli usano ora gpt-4o-mini-search-preview-2025-03-11 tramite Electron Hub
   const modelConfig = MODEL_MAPPING[modelId] || MODEL_MAPPING['nebula-1.0'];
   const apiModel = typeof modelConfig === 'string' ? modelConfig : modelConfig.model;
   const provider = typeof modelConfig === 'string' ? 'electronhub' : (modelConfig.provider || 'electronhub');
   
-  // Tutti i modelli usano Electron Hub
-  const apiConfig = API_CONFIG;
+  // Seleziona la configurazione API in base al provider
+  const apiConfig = provider === 'llm7' ? LLM7_CONFIG : API_CONFIG;
   
   try {
     
@@ -344,11 +355,26 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     
     // Token illimitati per utenti premium, altrimenti 50.000 per modelli avanzati
     // 15.000 per utenti registrati con Nebula AI 1.5
+    // Nota: alcuni modelli hanno limiti di contesto specifici che devono essere rispettati
     let maxTokens;
     if (isPremiumModel && hasActiveSubscription()) {
       maxTokens = 1000000; // Valore molto alto per simulare "illimitati" (le API hanno comunque limiti tecnici)
     } else if (isAdvancedModel) {
-      maxTokens = 50000;
+      // Controlla se il modello API ha limiti specifici
+      // qwen-2.5-coder-7b-instruct ha un limite di contesto di 32000 token
+      // qwen-2.5-coder-32b-instruct ha un limite di contesto di 33000 token
+      if (apiModel === 'qwen-2.5-coder-7b-instruct') {
+        // Limita max_tokens a 30000 per lasciare spazio ai token dei messaggi
+        // Il limite totale del contesto è 32000, quindi max_tokens deve essere < 32000 - token_messaggi
+        maxTokens = 30000;
+      } else if (apiModel === 'qwen-2.5-coder-32b-instruct') {
+        // Limita max_tokens a 32000 per lasciare spazio ai token dei messaggi
+        // Il limite totale del contesto è 33000, quindi max_tokens deve essere < 33000 - token_messaggi
+        // Usiamo 32000 per dare più spazio alla generazione, lasciando ~1000 token per i messaggi
+        maxTokens = 32000;
+      } else {
+        maxTokens = 50000;
+      }
     } else if (isNebula15 && isRegistered) {
       // 15.000 token per utenti registrati con Nebula AI 1.5
       maxTokens = 15000;
@@ -392,6 +418,16 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
       temperature: settings.temperature,
       maxTokens: settings.maxTokens
     });
+    
+    // Aggiungi delay di 3 secondi tra le richieste
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    if (timeSinceLastRequest < REQUEST_DELAY_MS) {
+      const delayNeeded = REQUEST_DELAY_MS - timeSinceLastRequest;
+      console.log(`Waiting ${delayNeeded}ms before making request (rate limiting)`);
+      await new Promise(resolve => setTimeout(resolve, delayNeeded));
+    }
+    lastRequestTime = Date.now();
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -442,12 +478,46 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let finishReason = null;
     
     try {
       while (true) {
         const { done, value } = await reader.read();
         
-        if (done) break;
+        if (done) {
+          // Processa il buffer finale quando lo stream è finito
+          if (buffer.trim()) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+              
+              const dataStr = trimmedLine.slice(6); // Rimuovi "data: "
+              
+              if (dataStr === '[DONE]') {
+                break;
+              }
+              
+              try {
+                const data = JSON.parse(dataStr);
+                const delta = data.choices?.[0]?.delta?.content;
+                
+                if (delta) {
+                  yield delta;
+                }
+                
+                // Controlla finish_reason per vedere se è stato troncato
+                if (data.choices?.[0]?.finish_reason) {
+                  finishReason = data.choices[0].finish_reason;
+                }
+              } catch (e) {
+                // Ignora errori di parsing per linee non JSON
+                console.warn('Error parsing stream data:', e, dataStr);
+              }
+            }
+          }
+          break;
+        }
         
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -470,11 +540,21 @@ export async function* generateResponseStream(message, modelId = 'nebula-1.0', c
             if (delta) {
               yield delta;
             }
+            
+            // Controlla finish_reason per vedere se è stato troncato
+            if (data.choices?.[0]?.finish_reason) {
+              finishReason = data.choices[0].finish_reason;
+            }
           } catch (e) {
             // Ignora errori di parsing per linee non JSON
             console.warn('Error parsing stream data:', e, dataStr);
           }
         }
+      }
+      
+      // Avvisa se la risposta è stata troncata
+      if (finishReason === 'length') {
+        console.warn('⚠️ Risposta troncata: il modello ha raggiunto il limite di max_tokens');
       }
     } finally {
       reader.releaseLock();

@@ -1,7 +1,8 @@
-import { IMAGE_GENERATION_CONFIG } from '../config/api.js';
+import { IMAGE_GENERATION_CONFIG, IMAGE_GENERATION_CONFIG_FAST, IMAGE_GENERATION_CONFIG_FLUX, MODEL_MAPPING } from '../config/api.js';
 import { get } from 'svelte/store';
 import { user as userStore } from '../stores/user.js';
 import { hasActiveSubscription } from '../stores/user.js';
+import { selectedModel } from '../stores/models.js';
 
 /**
  * Verifica se l'utente può generare immagini
@@ -88,25 +89,51 @@ async function tryGenerateWithProvider(provider, prompt, options, controller) {
     throw networkError;
   }
 
+  // Determina quale configurazione usare in base al provider
+  const configToUse = provider.imageModel === 'flux' ? IMAGE_GENERATION_CONFIG_FLUX : IMAGE_GENERATION_CONFIG_FAST;
+  
   const {
-    size = IMAGE_GENERATION_CONFIG.defaultSize,
-    quality = IMAGE_GENERATION_CONFIG.defaultQuality,
-    style = IMAGE_GENERATION_CONFIG.defaultStyle,
+    size = configToUse.defaultSize,
+    quality = configToUse.defaultQuality,
+    style = configToUse.defaultStyle,
     seed = null
   } = options;
 
+  // Usa il modello del provider
+  const modelToUse = provider.imageModel;
+
+  // Seguendo la guida LLM7.io: https://docs.llm7.io/
+  // Formato corretto secondo la documentazione ufficiale
+  // Secondo il tutorial: client.images.generate(model="flux", prompt=prompt, size="1024x1024", extra_body={"seed": 42, "nologo": True})
   const requestBody = {
-    model: 'dall-e-3',
+    model: modelToUse, // 'flux' o 'turbo' (o alias '1', '2', 'image-model-1', 'image-model-2')
     prompt: prompt.trim(),
-    n: 1,
     size: size,
-    quality: quality,
-    style: style
+    response_format: 'url'
   };
 
+  // LLM7 usa extra_body per parametri aggiuntivi come seed e nologo
+  // Secondo la documentazione: extra_body={"seed": 42, "nologo": True}
+  // Per richieste HTTP dirette, extra_body viene incluso come campo nel body JSON
+  const extraBody = {};
   if (seed !== null && seed !== -1) {
-    requestBody.seed = seed;
+    extraBody.seed = seed;
   }
+  
+  // nologo è disponibile solo su piani a pagamento
+  // Per ora non lo includiamo di default (richiede piano pagato)
+  // if (options.nologo === true) {
+  //   extraBody.nologo = true;
+  // }
+  
+  // Aggiungi extra_body se ci sono parametri
+  // Il formato HTTP richiede extra_body come campo separato nel body JSON
+  if (Object.keys(extraBody).length > 0) {
+    requestBody.extra_body = extraBody;
+  }
+  
+  // Nota: quality e style non sono supportati da LLM7 secondo la documentazione
+  // Rimossi per seguire il formato ufficiale
 
   const headers = {
     'Content-Type': 'application/json',
@@ -177,12 +204,29 @@ export async function generateImage(prompt, options = {}, abortController = null
     throw networkError;
   }
 
+  // Determina quale modello usare per le immagini
+  // Usa il modello specificato nelle opzioni o 'fast' come default
+  const currentModelId = get(selectedModel);
+  const modelConfig = MODEL_MAPPING[currentModelId];
+  let imageModel = options.imageModel;
+  
+  // Se il modello selezionato ha imageModel configurato, usalo
+  if (modelConfig?.imageModel) {
+    imageModel = modelConfig.imageModel;
+  }
+  
+  // Default a 'fast' se non specificato
+  imageModel = imageModel || 'fast';
+  
+  // Determina quale configurazione usare
+  const configToUse = imageModel === 'flux' ? IMAGE_GENERATION_CONFIG_FLUX : IMAGE_GENERATION_CONFIG_FAST;
+  
   // Ordina i provider per priorità
-  const providers = [...IMAGE_GENERATION_CONFIG.providers].sort((a, b) => a.priority - b.priority);
+  const providers = [...configToUse.providers].sort((a, b) => a.priority - b.priority);
 
   // Crea controller se non fornito
   const controller = abortController || new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), IMAGE_GENERATION_CONFIG.timeout);
+  const timeoutId = setTimeout(() => controller.abort(), configToUse.timeout);
 
   let lastError = null;
 
@@ -190,7 +234,7 @@ export async function generateImage(prompt, options = {}, abortController = null
   for (const provider of providers) {
     try {
       clearTimeout(timeoutId);
-      const newTimeoutId = setTimeout(() => controller.abort(), IMAGE_GENERATION_CONFIG.timeout);
+      const newTimeoutId = setTimeout(() => controller.abort(), configToUse.timeout);
       
       const result = await tryGenerateWithProvider(provider, prompt, options, controller);
       

@@ -69,6 +69,14 @@ export const availableModels = writable([
     premium: true,
     requiredPlan: 'max', // Piano minimo richiesto
     webSearch: false
+  },
+  { 
+    id: 'nebula-llm7', 
+    name: 'Nebula AI LLM7', 
+    description: 'Modello avanzato gratuito tramite LLM7.io - Alta qualità',
+    group: 'Nebula AI',
+    premium: false,
+    webSearch: false
   }
 ]);
 

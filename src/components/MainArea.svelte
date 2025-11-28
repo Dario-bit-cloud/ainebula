@@ -139,7 +139,9 @@
         tokenUsagePercentage = 0; // Non mostrare percentuale per token illimitati
         tokenWarning = false;
       } else if (isAdvancedModel) {
-        maxTokens = 50000;
+        // nebula-coder usa qwen-2.5-coder-32b-instruct che ha limite di 33000 token
+        // Usa 32000 per lasciare spazio ai token dei messaggi
+        maxTokens = $selectedModel === 'nebula-coder' ? 32000 : 50000;
         tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
         tokenWarning = tokenUsagePercentage > 80;
       } else if (isNebula15 && isRegistered) {
@@ -164,7 +166,8 @@
       if (hasPremium) {
         maxTokens = Infinity;
       } else if (isAdvancedModel) {
-        maxTokens = 50000;
+        // nebula-coder usa qwen-2.5-coder-32b-instruct che ha limite di 33000 token
+        maxTokens = $selectedModel === 'nebula-coder' ? 31000 : 50000;
       } else if (isNebula15 && isRegistered) {
         // 15.000 token per utenti registrati con Nebula AI 1.5
         maxTokens = 15000;
