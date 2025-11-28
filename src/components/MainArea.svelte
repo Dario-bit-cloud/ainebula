@@ -139,9 +139,9 @@
         tokenUsagePercentage = 0; // Non mostrare percentuale per token illimitati
         tokenWarning = false;
       } else if (isAdvancedModel) {
-        // nebula-coder usa qwen-2.5-coder-32b-instruct che ha limite di 33000 token
-        // Usa 32000 per lasciare spazio ai token dei messaggi
-        maxTokens = $selectedModel === 'nebula-coder' ? 32000 : 50000;
+        // nebula-coder usa gpt-5.1-codex-mini che ha limite di 128K token
+        // Usa 100000 per lasciare spazio ai token dei messaggi
+        maxTokens = $selectedModel === 'nebula-coder' ? 100000 : 50000;
         tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
         tokenWarning = tokenUsagePercentage > 80;
       } else if (isNebula15 && isRegistered) {
@@ -166,8 +166,8 @@
       if (hasPremium) {
         maxTokens = Infinity;
       } else if (isAdvancedModel) {
-        // nebula-coder usa qwen-2.5-coder-32b-instruct che ha limite di 33000 token
-        maxTokens = $selectedModel === 'nebula-coder' ? 31000 : 50000;
+        // nebula-coder usa gpt-5.1-codex-mini che ha limite di 128K token
+        maxTokens = $selectedModel === 'nebula-coder' ? 100000 : 50000;
       } else if (isNebula15 && isRegistered) {
         // 15.000 token per utenti registrati con Nebula AI 1.5
         maxTokens = 15000;
@@ -484,6 +484,11 @@
   }
   
   async function handleSubmit() {
+    // Prevenzione invii multipli
+    if ($isGenerating) {
+      return;
+    }
+    
     // Le funzioni addMessage, updateMessage sono async ma non bloccanti
     // Chiamate senza await per non bloccare l'UI
     if (editingMessageIndex !== null) {
@@ -502,7 +507,11 @@
       return;
     }
     
-    if (hasText && !$isGenerating) {
+    if (!hasText) {
+      return;
+    }
+    
+    try {
       const chatId = $currentChatId || await createNewChat();
       
       const userMessage = { 
@@ -607,6 +616,10 @@
         await tick();
         scrollToBottom();
       }
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      // In caso di errore, resetta tutto
+      isGenerating.set(false);
     }
   }
   
@@ -1445,20 +1458,6 @@
             </div>
             <div class="welcome-logo">
               <img src="/logo.png" alt="Nebula AI" />
-            </div>
-          </div>
-          
-          <!-- Beta Testing Notice -->
-          <div class="beta-notice-card">
-            <div class="beta-notice-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-            </div>
-            <div class="beta-notice-text">
-              <strong>Versione Beta</strong>
-              <span>Stiamo ancora testando e migliorando Nebula AI. Se noti problemi o hai suggerimenti, faccelo sapere!</span>
             </div>
           </div>
           
@@ -2542,52 +2541,6 @@
   .privacy-card:active {
     transform: translateY(0);
   }
-
-  .beta-notice-card {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 12px;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .beta-notice-card:hover {
-    border-color: rgba(245, 158, 11, 0.5);
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.15) 100%);
-  }
-
-  .beta-notice-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #f59e0b;
-    flex-shrink: 0;
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  .beta-notice-text {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-  }
-
-  .beta-notice-text strong {
-    font-size: 14px;
-    font-weight: 600;
-    color: #f59e0b;
-    letter-spacing: 0.3px;
-  }
-
-  .beta-notice-text span {
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-  }
   
   .privacy-card-header {
     display: flex;
@@ -2747,29 +2700,6 @@
     .welcome-logo {
       width: 80px;
       height: 80px;
-    }
-
-    .beta-notice-card {
-      padding: 12px 16px;
-      gap: 10px;
-    }
-
-    .beta-notice-text strong {
-      font-size: 13px;
-    }
-
-    .beta-notice-text span {
-      font-size: 12px;
-    }
-
-    .beta-notice-icon {
-      width: 18px;
-      height: 18px;
-    }
-
-    .beta-notice-icon svg {
-      width: 18px;
-      height: 18px;
     }
     
     .privacy-card {

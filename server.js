@@ -127,6 +127,69 @@ log('✅ Database URL configurato');
 
 const sql = neon(connectionString);
 
+// Limite nascosto di 50MB per la cronologia chat per utente
+const MAX_CHAT_HISTORY_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+
+/**
+ * Applica il limite di 50MB alla cronologia chat dell'utente
+ * Rimuove automaticamente i messaggi più vecchi se il limite viene superato
+ */
+async function enforceChatHistoryLimit(userId) {
+  try {
+    // Calcola la dimensione totale dei messaggi per l'utente
+    const sizeResult = await sql`
+      SELECT COALESCE(SUM(octet_length(content)), 0) as total_size
+      FROM messages m
+      INNER JOIN chats c ON m.chat_id = c.id
+      WHERE c.user_id = ${userId}
+    `;
+    
+    const totalSize = parseInt(sizeResult[0]?.total_size || 0);
+    
+    // Se la dimensione supera il limite, rimuovi i messaggi più vecchi
+    if (totalSize > MAX_CHAT_HISTORY_SIZE) {
+      logWarn(`⚠️ [CHAT LIMIT] Utente ${userId} ha superato il limite: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+      
+      // Ottieni i messaggi ordinati per timestamp (più vecchi prima)
+      const messagesToDelete = await sql`
+        SELECT m.id, m.chat_id, octet_length(m.content) as size
+        FROM messages m
+        INNER JOIN chats c ON m.chat_id = c.id
+        WHERE c.user_id = ${userId}
+        ORDER BY m.timestamp ASC, m.id ASC
+      `;
+      
+      let currentSize = totalSize;
+      let deletedCount = 0;
+      
+      // Elimina i messaggi più vecchi fino a scendere sotto il limite
+      for (const msg of messagesToDelete) {
+        if (currentSize <= MAX_CHAT_HISTORY_SIZE) {
+          break;
+        }
+        
+        await sql`DELETE FROM messages WHERE id = ${msg.id}`;
+        currentSize -= parseInt(msg.size || 0);
+        deletedCount++;
+      }
+      
+      // Se una chat rimane senza messaggi, elimina anche la chat
+      await sql`
+        DELETE FROM chats c
+        WHERE c.user_id = ${userId}
+        AND NOT EXISTS (
+          SELECT 1 FROM messages m WHERE m.chat_id = c.id
+        )
+      `;
+      
+      log(`✅ [CHAT LIMIT] Rimossi ${deletedCount} messaggi vecchi. Nuova dimensione: ${(currentSize / 1024 / 1024).toFixed(2)}MB`);
+    }
+  } catch (error) {
+    logError('❌ [CHAT LIMIT] Errore nell\'applicazione del limite:', error);
+    // Non bloccare il salvataggio se c'è un errore nel controllo del limite
+  }
+}
+
 // Endpoint per testare la connessione
 app.get('/api/db/test', async (req, res) => {
   try {
@@ -1010,6 +1073,9 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
         }
       }
     }
+    
+    // Applica limite di 50MB per utente (nascosto)
+    await enforceChatHistoryLimit(req.user.id);
     
     res.json({
       success: true,

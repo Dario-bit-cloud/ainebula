@@ -136,3 +136,4 @@ Quando sei pronto, puoi iniziare a usare le runes nei nuovi componenti per una r
 **L'aggiornamento è completo e il progetto è pronto per utilizzare Svelte 5!** 🎉
 
 
+

@@ -1,297 +1,157 @@
-import { IMAGE_GENERATION_CONFIG, IMAGE_GENERATION_CONFIG_FAST, IMAGE_GENERATION_CONFIG_FLUX, MODEL_MAPPING } from '../config/api.js';
-import { get } from 'svelte/store';
-import { user as userStore } from '../stores/user.js';
-import { hasActiveSubscription } from '../stores/user.js';
-import { selectedModel } from '../stores/models.js';
-
 /**
- * Verifica se l'utente può generare immagini
- * @returns {Object} { allowed: boolean, message: string }
+ * Servizio per la generazione di immagini usando Pollinations.AI
+ * API Documentation: https://github.com/pollinations/pollinations
  */
-function checkImageGenerationPermission() {
-  try {
-    const user = get(userStore);
-    const hasSubscription = hasActiveSubscription();
-    const subscription = user?.subscription;
-    
-    // Se non ha abbonamento
-    if (!hasSubscription || !subscription || !subscription.active) {
-      return {
-        allowed: false,
-        message: 'La generazione di immagini è disponibile solo per gli utenti con abbonamento Premium. Passa a Premium per sbloccare questa funzionalità!'
-      };
-    }
-    
-    // Verifica se è in trial gratuito (controlla se c'è un campo trial o se expiresAt è molto vicino)
-    const isTrial = subscription.status === 'trial' || 
-                    subscription.status === 'free_trial' || 
-                    (subscription.expiresAt && new Date(subscription.expiresAt) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // Se scade tra meno di 7 giorni potrebbe essere trial
-    
-    if (isTrial) {
-      return {
-        allowed: false,
-        message: 'La generazione di immagini non è disponibile durante la prova gratuita. Attiva un abbonamento Premium per utilizzare questa funzionalità.'
-      };
-    }
-    
-    // Se ha abbonamento attivo ma non è Premium/Max/Pro
-    if (subscription.plan !== 'premium' && subscription.plan !== 'max' && subscription.plan !== 'pro') {
-      return {
-        allowed: false,
-        message: 'La generazione di immagini è disponibile solo per gli utenti con abbonamento Premium. Passa a Premium per sbloccare questa funzionalità!'
-      };
-    }
-    
-    // Se ha abbonamento Premium/Max/Pro attivo
-    if (subscription.active && (subscription.plan === 'premium' || subscription.plan === 'max' || subscription.plan === 'pro')) {
-      return {
-        allowed: true,
-        message: null
-      };
-    }
-    
-    // Default: non permesso
-    return {
-      allowed: false,
-      message: 'La generazione di immagini è disponibile solo per gli utenti con abbonamento Premium attivo.'
-    };
-  } catch (error) {
-    console.error('Errore verifica permessi generazione immagini:', error);
-    return {
-      allowed: false,
-      message: 'Errore di rete: impossibile verificare i permessi. La generazione di immagini è temporaneamente non disponibile.'
-    };
-  }
-}
+
+const POLLINATIONS_API_BASE = 'https://image.pollinations.ai';
 
 /**
- * Genera un'immagine da un prompt di testo utilizzando l'API di generazione immagini
+ * Modelli disponibili su Pollinations.AI
+ */
+export const AVAILABLE_MODELS = [
+  { value: 'flux', label: 'Flux (Default - High Quality)' },
+  { value: 'turbo', label: 'Turbo (Fast)' },
+  { value: 'stable-diffusion', label: 'Stable Diffusion' },
+  { value: 'kontext', label: 'Kontext (Image-to-Image)' }
+];
+
+/**
+ * Dimensioni supportate
+ */
+export const AVAILABLE_SIZES = [
+  { value: '1024x1024', label: 'Square (1024x1024)' },
+  { value: '1920x1080', label: 'Landscape (1920x1080)' },
+  { value: '1080x1920', label: 'Portrait (1080x1920)' },
+  { value: '1280x720', label: 'HD (1280x720)' },
+  { value: '1920x1080', label: 'Full HD (1920x1080)' }
+];
+
+/**
+ * Genera un'immagine usando Pollinations.AI
  * @param {string} prompt - Il prompt di testo per generare l'immagine
  * @param {Object} options - Opzioni per la generazione
- * @param {string} options.size - Dimensioni dell'immagine (1024x1024, 1024x1792, 1792x1024)
- * @param {string} options.quality - Qualità dell'immagine ('standard' o 'hd')
- * @param {string} options.style - Stile dell'immagine ('vivid' o 'natural')
- * @param {number} options.seed - Seed per la generazione (opzionale)
+ * @param {string} options.model - Modello da usare (flux, turbo, stable-diffusion, kontext)
+ * @param {number} options.width - Larghezza in pixel
+ * @param {number} options.height - Altezza in pixel
+ * @param {number} options.seed - Seed per risultati consistenti (opzionale)
+ * @param {boolean} options.enhance - Migliora automaticamente il prompt (default: false)
+ * @param {boolean} options.private - Nascondi l'immagine dai feed pubblici (default: false)
+ * @param {string} options.image - URL dell'immagine per image-to-image (solo con modello kontext)
  * @param {AbortController} abortController - Controller per annullare la richiesta
- * @returns {Promise<Object>} Oggetto con l'URL dell'immagine generata e il prompt utilizzato
+ * @returns {Promise<Object>} Oggetto con l'URL dell'immagine generata e metadati
  */
-/**
- * Prova a generare un'immagine con un provider specifico
- */
-async function tryGenerateWithProvider(provider, prompt, options, controller) {
-  // Controllo di sicurezza aggiuntivo: verifica permessi anche qui
-  const permissionCheck = checkImageGenerationPermission();
-  if (!permissionCheck.allowed) {
-    // Simula errore di rete per prevenire bypass
-    const networkError = new Error('NETWORK_ERROR');
-    networkError.message = permissionCheck.message;
-    networkError.isPermissionError = true;
-    throw networkError;
-  }
-
-  // Determina quale configurazione usare in base al provider
-  const configToUse = provider.imageModel === 'flux' ? IMAGE_GENERATION_CONFIG_FLUX : IMAGE_GENERATION_CONFIG_FAST;
-  
-  const {
-    size = configToUse.defaultSize,
-    quality = configToUse.defaultQuality,
-    style = configToUse.defaultStyle,
-    seed = null
-  } = options;
-
-  // Usa il modello del provider
-  const modelToUse = provider.imageModel;
-
-  // Seguendo la guida LLM7.io: https://docs.llm7.io/
-  // Formato corretto secondo la documentazione ufficiale
-  // Secondo il tutorial: client.images.generate(model="flux", prompt=prompt, size="1024x1024", extra_body={"seed": 42, "nologo": True})
-  const requestBody = {
-    model: modelToUse, // 'flux' o 'turbo' (o alias '1', '2', 'image-model-1', 'image-model-2')
-    prompt: prompt.trim(),
-    size: size,
-    response_format: 'url'
-  };
-
-  // LLM7 usa extra_body per parametri aggiuntivi come seed e nologo
-  // Secondo la documentazione: extra_body={"seed": 42, "nologo": True}
-  // Per richieste HTTP dirette, extra_body viene incluso come campo nel body JSON
-  const extraBody = {};
-  if (seed !== null && seed !== -1) {
-    extraBody.seed = seed;
-  }
-  
-  // nologo è disponibile solo su piani a pagamento
-  // Per ora non lo includiamo di default (richiede piano pagato)
-  // if (options.nologo === true) {
-  //   extraBody.nologo = true;
-  // }
-  
-  // Aggiungi extra_body se ci sono parametri
-  // Il formato HTTP richiede extra_body come campo separato nel body JSON
-  if (Object.keys(extraBody).length > 0) {
-    requestBody.extra_body = extraBody;
-  }
-  
-  // Nota: quality e style non sono supportati da LLM7 secondo la documentazione
-  // Rimossi per seguire il formato ufficiale
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${provider.apiKey}`
-  };
-
-  console.log(`Trying image generation with ${provider.name}:`, {
-    url: `${provider.baseURL}/images/generations`,
-    prompt: prompt
-  });
-
-  const response = await fetch(`${provider.baseURL}/images/generations`, {
-    method: 'POST',
-    headers: headers,
-    body: JSON.stringify(requestBody),
-    signal: controller.signal
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    let errorData;
-    try {
-      errorData = JSON.parse(errorText);
-    } catch (e) {
-      errorData = { error: { message: errorText || `HTTP ${response.status}: ${response.statusText}` } };
-    }
-
-    // Se è un errore di crediti (402) o autenticazione (401), prova il prossimo provider
-    if (response.status === 402 || response.status === 401) {
-      throw new Error('PROVIDER_ERROR'); // Errore speciale per indicare di provare il prossimo provider
-    }
-
-    // Per altri errori, lancia l'errore normale
-    const errorMessage = errorData.error?.message || `API Error: ${response.status} ${response.statusText}`;
-    throw new Error(errorMessage);
-  }
-
-  const data = await response.json();
-  
-  if (!data.data || !data.data[0] || !data.data[0].url) {
-    throw new Error('Risposta API non valida: URL immagine non trovato');
-  }
-
-  return {
-    imageUrl: data.data[0].url,
-    prompt: data.data[0].revised_prompt || prompt,
-    originalPrompt: prompt,
-    size: size,
-    quality: quality,
-    style: style,
-    seed: seed,
-    provider: provider.name
-  };
-}
-
 export async function generateImage(prompt, options = {}, abortController = null) {
   if (!prompt || !prompt.trim()) {
     throw new Error('Il prompt non può essere vuoto');
   }
 
-  // BLOCCA LA GENERAZIONE: Verifica permessi prima di procedere
-  const permissionCheck = checkImageGenerationPermission();
-  if (!permissionCheck.allowed) {
-    // Simula un errore di rete per prevenire bypass
-    const networkError = new Error('NETWORK_ERROR');
-    networkError.message = permissionCheck.message;
-    networkError.isPermissionError = true;
-    throw networkError;
+  const {
+    model = 'flux',
+    width = 1024,
+    height = 1024,
+    seed = null,
+    enhance = false,
+    private: isPrivate = false,
+    image = null // Per image-to-image
+  } = options;
+
+  // Valida il modello
+  const validModels = AVAILABLE_MODELS.map(m => m.value);
+  if (!validModels.includes(model)) {
+    throw new Error(`Modello non valido: ${model}. Modelli disponibili: ${validModels.join(', ')}`);
   }
 
-  // Determina quale modello usare per le immagini
-  // Usa il modello specificato nelle opzioni o 'fast' come default
-  const currentModelId = get(selectedModel);
-  const modelConfig = MODEL_MAPPING[currentModelId];
-  let imageModel = options.imageModel;
+  // Per image-to-image, il modello deve essere kontext
+  if (image && model !== 'kontext') {
+    throw new Error('Il modello kontext è richiesto per image-to-image generation');
+  }
+
+  // Crea l'URL con il prompt codificato
+  const encodedPrompt = encodeURIComponent(prompt.trim());
+  const url = new URL(`${POLLINATIONS_API_BASE}/prompt/${encodedPrompt}`);
+
+  // Aggiungi i parametri
+  url.searchParams.set('model', model);
+  url.searchParams.set('width', width.toString());
+  url.searchParams.set('height', height.toString());
   
-  // Se il modello selezionato ha imageModel configurato, usalo
-  if (modelConfig?.imageModel) {
-    imageModel = modelConfig.imageModel;
+  if (seed !== null && seed !== undefined) {
+    url.searchParams.set('seed', seed.toString());
   }
   
-  // Default a 'fast' se non specificato
-  imageModel = imageModel || 'fast';
+  if (enhance) {
+    url.searchParams.set('enhance', 'true');
+  }
   
-  // Determina quale configurazione usare
-  const configToUse = imageModel === 'flux' ? IMAGE_GENERATION_CONFIG_FLUX : IMAGE_GENERATION_CONFIG_FAST;
-  
-  // Ordina i provider per priorità
-  const providers = [...configToUse.providers].sort((a, b) => a.priority - b.priority);
+  if (isPrivate) {
+    url.searchParams.set('private', 'true');
+  }
+
+  // Per image-to-image
+  if (image) {
+    url.searchParams.set('image', image);
+  }
+
+  console.log(`Generating image with Pollinations.AI:`, {
+    model,
+    width,
+    height,
+    prompt: prompt.substring(0, 50) + '...'
+  });
 
   // Crea controller se non fornito
   const controller = abortController || new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), configToUse.timeout);
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minuti timeout
 
-  let lastError = null;
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'Accept': 'image/*'
+      }
+    });
 
-  // Prova ogni provider in ordine di priorità
-  for (const provider of providers) {
-    try {
-      clearTimeout(timeoutId);
-      const newTimeoutId = setTimeout(() => controller.abort(), configToUse.timeout);
-      
-      const result = await tryGenerateWithProvider(provider, prompt, options, controller);
-      
-      clearTimeout(newTimeoutId);
-      
-      console.log(`✅ Image generated successfully with ${provider.name}:`, {
-        url: result.imageUrl,
-        revisedPrompt: result.prompt
-      });
+    clearTimeout(timeoutId);
 
-      return result;
-    } catch (error) {
-      clearTimeout(timeoutId);
+    if (!response.ok) {
+      const errorText = await response.text();
       
-      console.warn(`⚠️ Provider ${provider.name} failed:`, error.message);
+      // Gestisci errori specifici
+      if (response.status === 429) {
+        throw new Error('Troppe richieste. Attendi qualche secondo e riprova. (Rate limit: 1 richiesta ogni 15s per utenti anonimi)');
+      }
       
-      // Se è un errore di provider (402/401), continua con il prossimo
-      if (error.message === 'PROVIDER_ERROR') {
-        lastError = error;
-        continue;
+      if (response.status === 400) {
+        throw new Error('Richiesta non valida. Controlla il prompt e i parametri.');
       }
 
-      // Se è un errore di abort, lancialo immediatamente
-      if (error.name === 'AbortError') {
-        throw new Error('Generazione immagine interrotta dall\'utente.');
-      }
-
-      // Se è l'ultimo provider, lancia l'errore
-      if (provider === providers[providers.length - 1]) {
-        lastError = error;
-        break;
-      }
-
-      // Altrimenti continua con il prossimo provider
-      lastError = error;
+      throw new Error(`Errore API: ${response.status} ${response.statusText}. ${errorText}`);
     }
-  }
 
-  // Se tutti i provider hanno fallito
-  console.error('❌ All image generation providers failed');
-  
-  // Se è un errore di permessi, usa il messaggio personalizzato
-  if (lastError?.isPermissionError) {
-    throw lastError;
-  }
-  
-  // Se è un errore di rete (potrebbe essere un bypass), mostra messaggio di errore di rete
-  if (lastError?.message === 'NETWORK_ERROR' || lastError?.name === 'NetworkError' || lastError?.name === 'TypeError') {
-    throw new Error('Errore di rete: La generazione di immagini non è disponibile. Questa funzionalità è riservata agli utenti Premium.');
-  }
-  
-  // Messaggio più user-friendly
-  if (lastError?.message?.includes('402') || lastError?.message?.includes('Crediti')) {
-    throw new Error('Tutti i provider di generazione immagini hanno esaurito i crediti. Riprova più tardi o contatta il supporto.');
-  }
+    // Pollinations.AI restituisce direttamente l'immagine
+    const imageBlob = await response.blob();
+    const imageUrl = URL.createObjectURL(imageBlob);
 
-  throw new Error(`Errore nella generazione dell'immagine: ${lastError?.message || 'Tutti i provider hanno fallito'}`);
+    return {
+      imageUrl,
+      blob: imageBlob, // Mantieni il blob per il download
+      prompt: prompt,
+      model,
+      width,
+      height,
+      seed: seed || null,
+      provider: 'Pollinations.AI'
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Generazione immagine interrotta dall\'utente.');
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -303,20 +163,40 @@ export async function generateImage(prompt, options = {}, abortController = null
  * @returns {Promise<Array>} Array di oggetti con le immagini generate
  */
 export async function generateMultipleImages(prompt, count = 1, options = {}, abortController = null) {
-  if (count <= 0 || count > 4) {
-    throw new Error('Il numero di immagini deve essere tra 1 e 4');
+  if (count <= 0 || count > 10) {
+    throw new Error('Il numero di immagini deve essere tra 1 e 10');
   }
 
   const images = [];
+  const controller = abortController || new AbortController();
+
   for (let i = 0; i < count; i++) {
     try {
-      const result = await generateImage(prompt, options, abortController);
-      images.push(result);
+      // Aggiungi delay tra le richieste per rispettare i rate limits
+      // Pollinations.AI ha un rate limit di 1 richiesta ogni 15s per utenti anonimi
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 16000)); // 16 secondi per sicurezza
+      }
+
+      const result = await generateImage(prompt, {
+        ...options,
+        seed: options.seed ? options.seed + i : null // Varia il seed per ogni immagine
+      }, controller);
+
+      images.push({
+        ...result,
+        index: i + 1
+      });
     } catch (error) {
-      // Se una generazione fallisce, aggiungi l'errore all'array
+      if (error.name === 'AbortError' || controller.signal.aborted) {
+        throw new Error('Generazione interrotta');
+      }
+
+      console.error(`Errore generazione immagine ${i + 1}:`, error);
+      
       images.push({
         error: error.message,
-        index: i
+        index: i + 1
       });
     }
   }
@@ -324,3 +204,34 @@ export async function generateMultipleImages(prompt, count = 1, options = {}, ab
   return images;
 }
 
+/**
+ * Ottiene la lista dei modelli disponibili
+ * @returns {Promise<Array>} Array di modelli disponibili
+ */
+export async function getAvailableModels() {
+  try {
+    const response = await fetch(`${POLLINATIONS_API_BASE}/models`);
+    if (!response.ok) {
+      // Se l'endpoint non è disponibile, ritorna i modelli hardcoded
+      return AVAILABLE_MODELS;
+    }
+    const models = await response.json();
+    return models.map(model => ({
+      value: model,
+      label: model.charAt(0).toUpperCase() + model.slice(1)
+    }));
+  } catch (error) {
+    console.warn('Impossibile recuperare i modelli, uso lista predefinita:', error);
+    return AVAILABLE_MODELS;
+  }
+}
+
+/**
+ * Converte una dimensione stringa (es. "1024x1024") in oggetto width/height
+ * @param {string} sizeString - Stringa nel formato "widthxheight"
+ * @returns {Object} Oggetto con width e height
+ */
+export function parseSize(sizeString) {
+  const [width, height] = sizeString.split('x').map(Number);
+  return { width, height };
+}

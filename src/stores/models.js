@@ -1,86 +1,87 @@
 import { writable } from 'svelte/store';
 
-// Store per i modelli disponibili
+// Store per i modelli disponibili - Selezione ottimizzata
 export const availableModels = writable([
-  { 
-    id: 'nebula-1.0', 
-    name: 'Nebula AI 1.5', 
-    description: 'Modello base versatile e intelligente per conversazioni',
+  // ========== NEBULA - GRATUITI ==========
+  {
+    id: 'gpt-4o-mini',
+    name: 'Nebula 4o-mini',
+    description: 'Modello versatile e avanzato. Supporta testo e immagini, ideale per la maggior parte delle conversazioni quotidiane.',
     group: 'Nebula AI',
     premium: false,
-    webSearch: false
+    webSearch: false,
+    vision: true,
+    functionCall: true,
+    reasoning: false,
+    contextLength: 128000
   },
-  { 
-    id: 'nebula-pro', 
-    name: 'Nebula AI Pro', 
-    description: 'Modello avanzato per risposte dettagliate',
+  {
+    id: 'o3-mini',
+    name: 'Nebula o3-mini',
+    description: 'Modello reasoning ottimizzato per STEM, matematica e coding. Eccelle in problem solving complessi e analisi approfondite.',
     group: 'Nebula AI',
     premium: false,
-    webSearch: false
+    webSearch: false,
+    vision: false,
+    functionCall: true,
+    reasoning: true,
+    contextLength: 200000
   },
-  { 
-    id: 'nebula-coder', 
-    name: 'Nebula Coder', 
-    description: 'Specializzato in programmazione e sviluppo software',
+  {
+    id: 'gpt-5.1-codex-mini',
+    name: 'Nebula Codex Mini',
+    description: 'Modello specializzato per coding e software engineering. Eccelle in programmazione, debugging e sviluppo software. 400K token context window.',
     group: 'Nebula AI',
     premium: false,
-    webSearch: false
+    webSearch: false,
+    vision: true,
+    functionCall: true,
+    reasoning: true,
+    contextLength: 400000
   },
-  { 
-    id: 'nebula-search', 
-    name: 'Nebula Search', 
-    description: 'Modello con ricerca web in tempo reale - Informazioni aggiornate dal web',
-    group: 'Nebula Search',
+  {
+    id: 'gpt-4o-search-preview-2025-03-11',
+    name: 'Nebula 4o Search',
+    description: 'Modello specializzato per ricerca web in tempo reale. Addestrato per comprendere ed eseguire query di ricerca web, ideale per informazioni aggiornate.',
+    group: 'Nebula AI',
     premium: false,
-    webSearch: true
+    webSearch: true,
+    vision: true,
+    functionCall: true,
+    reasoning: false,
+    contextLength: 128000
   },
-  { 
-    id: 'nebula-search-pro', 
-    name: 'Nebula Search Pro', 
-    description: 'Modello avanzato con ricerca web - Richiede abbonamento Pro',
-    group: 'Nebula Search',
+  
+  // ========== NEBULA - PREMIUM ==========
+  {
+    id: 'gpt-4.1',
+    name: 'Nebula 4.1',
+    description: 'Flagship model per istruzioni avanzate, software engineering e ragionamento a lungo contesto. 1M token context window.',
+    group: 'Nebula Premium',
     premium: true,
     requiredPlan: 'pro',
-    webSearch: true
+    webSearch: false,
+    vision: true,
+    functionCall: true,
+    reasoning: false,
+    contextLength: 1000000
   },
-  { 
-    id: 'nebula-research', 
-    name: 'Nebula Research', 
-    description: 'Modello con reasoning e ricerca web avanzata - Richiede abbonamento Max',
-    group: 'Nebula Search',
+  {
+    id: 'o3',
+    name: 'Nebula o3',
+    description: 'Il modello reasoning più potente. Eccelle in matematica, scienza, coding e ragionamento visivo. Massima precisione e capacità analitiche.',
+    group: 'Nebula Premium',
     premium: true,
     requiredPlan: 'max',
-    webSearch: true
-  },
-  { 
-    id: 'nebula-premium-pro', 
-    name: 'Nebula AI Premium Pro', 
-    description: 'Modello premium avanzato - Richiede abbonamento Pro',
-    group: 'Nebula AI Premium',
-    premium: true,
-    requiredPlan: 'pro', // Piano minimo richiesto
-    webSearch: false
-  },
-  { 
-    id: 'nebula-premium-max', 
-    name: 'Nebula AI Premium Max', 
-    description: 'Modello premium massimo - Richiede abbonamento Massimo',
-    group: 'Nebula AI Premium',
-    premium: true,
-    requiredPlan: 'max', // Piano minimo richiesto
-    webSearch: false
-  },
-  { 
-    id: 'nebula-llm7', 
-    name: 'Nebula AI LLM7', 
-    description: 'Modello avanzato gratuito tramite LLM7.io - Alta qualità',
-    group: 'Nebula AI',
-    premium: false,
-    webSearch: false
+    webSearch: false,
+    vision: true,
+    functionCall: true,
+    reasoning: true,
+    contextLength: 200000
   }
 ]);
 
-export const selectedModel = writable('nebula-1.0');
+export const selectedModel = writable('gpt-4o-mini');
 
 export function setModel(modelId) {
   selectedModel.set(modelId);

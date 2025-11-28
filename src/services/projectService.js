@@ -124,12 +124,15 @@ export async function saveProjectToDatabase(project) {
       return { success: false, message: 'Non autenticato' };
     }
     
+    // Tronca l'icon a 100 caratteri per rispettare il limite del database
+    const icon = project.icon ? (project.icon.length > 100 ? project.icon.substring(0, 100) : project.icon) : null;
+    
     const requestBody = {
       id: project.id,
       name: project.name,
       description: project.description || null,
       color: project.color || null,
-      icon: project.icon || null
+      icon: icon
     };
     
     console.log('📤 [PROJECT SERVICE] Invio richiesta POST:', {

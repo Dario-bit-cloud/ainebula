@@ -140,7 +140,6 @@
             Nebula AI 1.5
           {/if}
         </span>
-        <span class="beta-badge">BETA</span>
         <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="6 9 12 15 18 9"/>
         </svg>
@@ -166,6 +165,32 @@
                         {model.requiredPlan === 'pro' ? 'PRO' : 'MAX'}
                       </span>
                     {/if}
+                    {#if model.vision}
+                      <span class="feature-badge vision-badge" title="Vision - Supporta analisi immagini">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        Vision
+                      </span>
+                    {/if}
+                    {#if model.reasoning}
+                      <span class="feature-badge reasoning-badge" title="Reasoning - Supporta ragionamento avanzato">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                        Reasoning
+                      </span>
+                    {/if}
+                    {#if model.functionCall}
+                      <span class="feature-badge function-badge" title="Function Calling - Supporta chiamate a funzioni">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        Functions
+                      </span>
+                    {/if}
                     {#if model.webSearch}
                       <span class="web-search-badge" title="Ricerca web in tempo reale">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -178,6 +203,9 @@
                   </div>
                   {#if model.description}
                     <div class="model-description">{model.description}</div>
+                  {/if}
+                  {#if model.contextLength}
+                    <div class="model-context">Context: {Math.floor(model.contextLength / 1000)}K tokens</div>
                   {/if}
                 </div>
                 {#if model.id === $selectedModel}
@@ -397,42 +425,6 @@
     color: var(--md-sys-color-on-surface);
   }
 
-  .beta-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1;
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-    margin-left: 6px;
-    animation: pulse 2s ease-in-out infinite;
-    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
-  }
-
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.9;
-      transform: scale(1.05);
-    }
-  }
-
-  @media (max-width: 768px) {
-    .beta-badge {
-      font-size: 8px;
-      padding: 1px 4px;
-      margin-left: 4px;
-    }
-  }
-
   .dropdown-icon {
     color: var(--text-secondary);
   }
@@ -604,6 +596,45 @@
     height: 10px;
   }
   
+  .feature-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1;
+    margin-left: 6px;
+    color: white;
+  }
+  
+  .feature-badge svg {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .vision-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .reasoning-badge {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+  
+  .function-badge {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  }
+  
+  .model-context {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    opacity: 0.8;
+  }
+  
   @media (max-width: 768px) {
     .premium-badge {
       display: inline-flex !important;
@@ -612,6 +643,12 @@
     }
     
     .web-search-badge {
+      display: inline-flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    
+    .feature-badge {
       display: inline-flex !important;
       visibility: visible !important;
       opacity: 1 !important;

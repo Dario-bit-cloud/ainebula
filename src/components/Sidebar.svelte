@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { selectedModel, setModel } from '../stores/models.js';
-  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isSidebarCollapsed, isMobile, isNebuliniModalOpen, isPromptLibraryModalOpen } from '../stores/app.js';
+  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isSidebarCollapsed, isMobile, isNebuliniModalOpen, isPromptLibraryModalOpen, isImageGeneratorOpen } from '../stores/app.js';
   import { projects, updateProject, deleteProject, syncProjectsOnLogin, loadProjects } from '../stores/projects.js';
   import { showConfirm } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
@@ -193,6 +193,12 @@
           loadProjects().catch(err => {
             console.error('Errore caricamento progetti:', err);
           });
+        }
+        break;
+      case 'image-generator':
+        isImageGeneratorOpen.set(true);
+        if ($isMobile) {
+          isSidebarOpen.set(false);
         }
         break;
     }
@@ -459,6 +465,7 @@
       { id: 'search', label: $t('searchChats'), icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
       { id: 'library', label: $t('library'), icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
       { id: 'nebulini', label: 'Nebulini', icon: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
+      { id: 'image-generator', label: '🎨 Image Generator', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
       { id: 'projects', label: $t('projects'), icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' }
     ] as item}
       <div class="nav-item-wrapper">

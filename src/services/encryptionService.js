@@ -258,7 +258,8 @@ export async function getEncryptionKeyForUser(userId) {
     const storedKeyData = localStorage.getItem(storageKey);
     
     if (!storedKeyData) {
-      console.warn('⚠️ [ENCRYPTION] Nessuna chiave trovata per l\'utente');
+      // Chiave non trovata - comportamento normale per nuovi utenti o utenti che non hanno ancora generato una chiave
+      // I messaggi verranno salvati in chiaro finché l'utente non genera una chiave
       return null;
     }
     

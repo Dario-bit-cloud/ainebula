@@ -180,13 +180,18 @@ export default async function handler(req, res) {
 
     // POST - Crea un nuovo progetto
     if (req.method === 'POST') {
-      const { id, name, description, color, icon } = req.body;
+      let { id, name, description, color, icon } = req.body;
       
       if (!id || !name) {
         return res.status(400).json({
           success: false,
           message: 'ID e nome sono obbligatori'
         });
+      }
+      
+      // Tronca l'icon a 100 caratteri per rispettare il limite del database
+      if (icon && icon.length > 100) {
+        icon = icon.substring(0, 100);
       }
       
       // Verifica se il progetto esiste già
@@ -224,13 +229,18 @@ export default async function handler(req, res) {
 
     // PATCH - Aggiorna un progetto esistente
     if (req.method === 'PATCH') {
-      const { id, name, description, color, icon } = req.body;
+      let { id, name, description, color, icon } = req.body;
       
       if (!id) {
         return res.status(400).json({
           success: false,
           message: 'ID progetto è obbligatorio'
         });
+      }
+      
+      // Tronca l'icon a 100 caratteri per rispettare il limite del database
+      if (icon !== undefined && icon !== null && icon.length > 100) {
+        icon = icon.substring(0, 100);
       }
       
       // Verifica che il progetto esista e appartenga all'utente

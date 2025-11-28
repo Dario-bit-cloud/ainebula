@@ -4,7 +4,7 @@
   import MainArea from './components/MainArea.svelte';
   import UserMenu from './components/UserMenu.svelte';
   // Lazy load modals per ridurre il bundle iniziale
-  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen, isHelpCenterModalOpen, isReleaseNotesModalOpen, isTermsModalOpen, isDownloadAppModalOpen, isWorkspaceSettingsModalOpen, isNebuliniModalOpen } from './stores/app.js';
+  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen, isHelpCenterModalOpen, isReleaseNotesModalOpen, isTermsModalOpen, isDownloadAppModalOpen, isWorkspaceSettingsModalOpen, isNebuliniModalOpen, isImageGeneratorOpen } from './stores/app.js';
   import { initAuth, user, isAuthenticatedStore, isLoading } from './stores/auth.js';
   import { logout } from './services/authService.js';
   import { clearUser } from './stores/auth.js';
@@ -17,7 +17,7 @@
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
   let PromptLibraryModal, ShortcutsModal, ReportBugModal, PersonalizationModal, AuthModal, SharedLinksModal;
-  let HelpCenterModal, ReleaseNotesModal, TermsModal, DownloadAppModal, WorkspaceSettingsModal, NebuliniModal;
+  let HelpCenterModal, ReleaseNotesModal, TermsModal, DownloadAppModal, WorkspaceSettingsModal, NebuliniModal, ImageGeneratorModal;
   // Dialog components (always loaded)
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AlertDialog from './components/AlertDialog.svelte';
@@ -144,6 +144,13 @@
     }
   }
   
+  async function loadImageGeneratorModal() {
+    if (!ImageGeneratorModal) {
+      const module = await import('./components/ImageGeneratorModal.svelte');
+      ImageGeneratorModal = module.default;
+    }
+  }
+  
   // Precarica modals quando vengono aperti
   $: if ($isSettingsOpen && !SettingsModal) {
     loadSettingsModal();
@@ -195,6 +202,9 @@
   }
   $: if ($isNebuliniModalOpen && !NebuliniModal) {
     loadNebuliniModal();
+  }
+  $: if ($isImageGeneratorOpen && !ImageGeneratorModal) {
+    loadImageGeneratorModal();
   }
   
   function handlePromptSelect(event) {
@@ -397,13 +407,6 @@
     // Precarica SettingsModal dato che è un componente importante
     loadSettingsModal();
     
-    // Controlla se il banner beta è stato chiuso
-    const bannerDismissed = localStorage.getItem('beta-banner-dismissed');
-    if (bannerDismissed === 'true') {
-      const banner = document.querySelector('.beta-banner');
-      if (banner) banner.style.display = 'none';
-    }
-    
     // Inizializza il tema all'avvio
     const savedTheme = localStorage.getItem('nebula-theme') || 'system';
     const root = document.documentElement;
@@ -458,31 +461,6 @@
 </script>
 
 <div class="app-container">
-  <!-- Beta Testing Banner -->
-  <div class="beta-banner">
-    <div class="beta-banner-content">
-      <div class="beta-banner-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-      </div>
-      <div class="beta-banner-text">
-        <strong>Versione Beta</strong>
-        <span>Questa applicazione è attualmente in fase di testing. Potrebbero verificarsi problemi o interruzioni del servizio. Il tuo feedback è prezioso!</span>
-      </div>
-      <button class="beta-banner-close" on:click={() => {
-        const banner = document.querySelector('.beta-banner');
-        if (banner) banner.style.display = 'none';
-        localStorage.setItem('beta-banner-dismissed', 'true');
-      }} title="Chiudi">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-  </div>
   <div class="main-layout">
     <Sidebar />
     <MainArea on:openAuth={handleOpenAuth} />
@@ -539,6 +517,9 @@
   {#if $isNebuliniModalOpen && NebuliniModal}
     <svelte:component this={NebuliniModal} on:select={handleNebulinoSelect} />
   {/if}
+  {#if $isImageGeneratorOpen && ImageGeneratorModal}
+    <svelte:component this={ImageGeneratorModal} />
+  {/if}
   
   <!-- Dialog components -->
   <ConfirmDialog />
@@ -554,132 +535,6 @@
     height: 100dvh; /* Dynamic viewport height per mobile */
     width: 100%;
     overflow: hidden;
-  }
-
-  .beta-banner {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-    z-index: 1001;
-    position: relative;
-    animation: slideDown 0.3s ease-out;
-  }
-
-  .beta-banner-content {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    max-width: 1400px;
-    width: 100%;
-    justify-content: center;
-  }
-
-  .beta-banner-icon {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  .beta-banner-text {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-    text-align: center;
-  }
-
-  .beta-banner-text strong {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-  }
-
-  .beta-banner-text span {
-    font-size: 12px;
-    opacity: 0.95;
-    line-height: 1.4;
-  }
-
-  .beta-banner-close {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 6px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-
-  .beta-banner-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
-  }
-
-  .beta-banner-close:active {
-    transform: scale(0.95);
-  }
-
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.8;
-      transform: scale(1.1);
-    }
-  }
-
-  @media (max-width: 768px) {
-    .beta-banner {
-      padding: 10px 12px;
-    }
-
-    .beta-banner-content {
-      gap: 8px;
-    }
-
-    .beta-banner-text {
-      gap: 2px;
-    }
-
-    .beta-banner-text strong {
-      font-size: 13px;
-    }
-
-    .beta-banner-text span {
-      font-size: 11px;
-    }
-
-    .beta-banner-icon {
-      display: none; /* Nascondi icona su mobile per risparmiare spazio */
-    }
-  }
-
-  @media (max-width: 480px) {
-    .beta-banner-text span {
-      display: none; /* Nascondi testo descrittivo su schermi molto piccoli */
-    }
   }
 
   .main-layout {

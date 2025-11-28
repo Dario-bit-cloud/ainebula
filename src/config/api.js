@@ -13,19 +13,35 @@ export const LLM7_CONFIG = {
 };
 
 // Mappatura modelli locali ai modelli API e provider
-// Tutti i modelli usano ora gpt-4o-mini-search-preview-2025-03-11 tramite Electron Hub
-// OpenAI GPT-4o-mini Search Preview - Modello con ricerca web in tempo reale
-// Supporta: Vision, Function Call, High Context (128K tokens), Web Search
+// Tutti i modelli usano Electron Hub come provider
 export const MODEL_MAPPING = {
-  'nebula-1.0': { model: 'gpt-4o-mini-search-preview-2025-03-11', provider: 'electronhub' }, // Nebula AI 1.0 - GPT-4o-mini Search Preview
-  'nebula-pro': { model: 'ministral-3b', provider: 'electronhub' }, // Nebula AI Pro - Ministral 3B
-  'nebula-coder': { model: 'qwen-2.5-coder-32b-instruct', provider: 'electronhub' }, // Nebula Coder - Qwen 2.5 Coder 32B Instruct (specializzato in coding)
-  'nebula-search': { model: 'gpt-4o-mini-search-preview-2025-03-11', provider: 'electronhub', webSearch: true }, // Nebula Search - GPT-4o-mini Search Preview (con web search)
-  'nebula-search-pro': { model: 'gpt-4o-mini-search-preview-2025-03-11', provider: 'electronhub', webSearch: true }, // Nebula Search Pro - GPT-4o-mini Search Preview (con web search avanzato)
-  'nebula-research': { model: 'gpt-4o-mini-search-preview-2025-03-11', provider: 'electronhub', webSearch: true }, // Nebula Research - GPT-4o-mini Search Preview (con reasoning e web search)
-  'nebula-premium-pro': { model: 'gpt-4o-mini-search-preview-2025-03-11', provider: 'electronhub' }, // Nebula AI Premium Pro - GPT-4o-mini Search Preview
-  'nebula-premium-max': { model: 'gpt-4o-mini-search-preview-2025-03-11', provider: 'electronhub' }, // Nebula AI Premium Max - GPT-4o-mini Search Preview
-  'nebula-llm7': { model: 'default', provider: 'llm7' } // Nebula AI LLM7 - Modello gratuito tramite LLM7.io (selettore default)
+  // OpenAI - Flagship Models
+  'gpt-4.1': { model: 'gpt-4.1', provider: 'electronhub' },
+  'gpt-4o': { model: 'gpt-4o', provider: 'electronhub' },
+  'o3': { model: 'o3', provider: 'electronhub' },
+  'o4-mini': { model: 'o4-mini', provider: 'electronhub' },
+  
+  // OpenAI - Mini Models
+  'gpt-4.1-mini': { model: 'gpt-4.1-mini', provider: 'electronhub' },
+  'gpt-4.1-nano': { model: 'gpt-4.1-nano', provider: 'electronhub' },
+  'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'electronhub' },
+  'o3-mini': { model: 'o3-mini', provider: 'electronhub' },
+  
+  // OpenAI - Code Models
+  'gpt-5.1-codex-mini': { model: 'gpt-5.1-codex-mini', provider: 'electronhub' },
+  
+  // OpenAI - Open Source
+  'gpt-oss-120b': { model: 'gpt-oss-120b', provider: 'electronhub' },
+  'gpt-oss-20b': { model: 'gpt-oss-20b', provider: 'electronhub' },
+  
+  // OpenAI - Search Models
+  'gpt-4o-mini-search-preview': { model: 'gpt-4o-mini-search-preview-2025-03-11', provider: 'electronhub' },
+  'gpt-4o-search-preview': { model: 'gpt-4o-search-preview-2025-03-11', provider: 'electronhub' },
+  'gpt-4o-search-preview-2025-03-11': { model: 'gpt-4o-search-preview-2025-03-11', provider: 'electronhub' },
+  'o3-mini-online': { model: 'o3-mini-online', provider: 'electronhub' },
+  
+  // OpenAI - Legacy
+  'gpt-3.5-turbo': { model: 'gpt-3.5-turbo', provider: 'electronhub' }
 };
 
 // Configurazione per la generazione di immagini - Modello Fast
