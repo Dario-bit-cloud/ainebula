@@ -251,3 +251,11 @@ CREATE TABLE IF NOT EXISTS passkeys (
 CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkeys(user_id);
 CREATE INDEX IF NOT EXISTS idx_passkeys_credential_id ON passkeys(credential_id);
 
+-- Indici compositi per ottimizzare query comuni
+CREATE INDEX IF NOT EXISTS idx_chats_user_id_updated_at ON chats(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chats_user_id_temporary ON chats(user_id, is_temporary);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id_timestamp ON messages(chat_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id_hidden ON messages(chat_id, hidden);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id_expires_at ON sessions(user_id, expires_at);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id_status_expires ON subscriptions(user_id, status, expires_at);
+

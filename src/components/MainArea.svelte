@@ -13,10 +13,13 @@
   import { renderMarkdown, initCodeCopyButtons, normalizeTextSpacing } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
   import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
+  import { tokenInfo } from '../stores/tokenInfo.js';
   import PrivacyModal from './PrivacyModal.svelte';
   import { showAlert, showPrompt } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
   import TopBar from './TopBar.svelte';
+  import { throttle } from '../utils/performance.js';
+  import { logError } from '../utils/logger.js';
   
   const dispatch = createEventDispatcher();
   
@@ -97,12 +100,12 @@
   
   // Variabili reattive
   let messages = [];
+  let showError = false;
+  let errorMessage = '';
   let currentChatTokens = 0;
   let maxTokens = 4000;
   let tokenUsagePercentage = 0;
   let tokenWarning = false;
-  let showError = false;
-  let errorMessage = '';
   
   // Usa textarea invece di input
   $: isTextarea = true;
@@ -112,7 +115,7 @@
     try {
       messages = $currentChat?.messages || [];
     } catch (error) {
-      console.error('Error accessing currentChat:', error);
+      logError('Error accessing currentChat:', error);
       messages = [];
     }
   }
@@ -120,63 +123,13 @@
   // Filtra i messaggi nascosti per la visualizzazione
   $: visibleMessages = messages.filter(msg => !msg.hidden);
   
-  // Calcola token per la chat corrente (escludendo messaggi nascosti)
+  // Usa derived store per token info (ottimizzato)
   $: {
-    try {
-      // Filtra i messaggi nascosti dal conteggio token
-      const visibleMessagesForTokens = messages.filter(msg => !msg.hidden);
-      currentChatTokens = visibleMessagesForTokens.length > 0 ? estimateChatTokens(visibleMessagesForTokens) : 0;
-      
-      // Calcola maxTokens: illimitati per modelli premium con abbonamento attivo
-      const isPremiumModel = $selectedModel === 'nebula-premium-pro' || $selectedModel === 'nebula-premium-max';
-      const hasPremium = isPremiumModel && hasActiveSubscription();
-      const isAdvancedModel = $selectedModel === 'nebula-pro' || $selectedModel === 'nebula-coder' || isPremiumModel;
-      const isNebula15 = $selectedModel === 'nebula-1.0';
-      const isRegistered = $isAuthenticatedStore;
-      
-      if (hasPremium) {
-        maxTokens = Infinity; // Token illimitati
-        tokenUsagePercentage = 0; // Non mostrare percentuale per token illimitati
-        tokenWarning = false;
-      } else if (isAdvancedModel) {
-        // nebula-coder usa gpt-5.1-codex-mini che ha limite di 128K token
-        // Usa 100000 per lasciare spazio ai token dei messaggi
-        maxTokens = $selectedModel === 'nebula-coder' ? 100000 : 50000;
-        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-        tokenWarning = tokenUsagePercentage > 80;
-      } else if (isNebula15 && isRegistered) {
-        // 15.000 token per utenti registrati con Nebula AI 1.5
-        maxTokens = 15000;
-        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-        tokenWarning = tokenUsagePercentage > 80;
-      } else {
-        maxTokens = 4000;
-        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-        tokenWarning = tokenUsagePercentage > 80;
-      }
-    } catch (error) {
-      console.error('Error calculating tokens:', error);
-      currentChatTokens = 0;
-      const isPremiumModel = $selectedModel === 'nebula-premium-pro' || $selectedModel === 'nebula-premium-max';
-      const hasPremium = isPremiumModel && hasActiveSubscription();
-      const isAdvancedModel = $selectedModel === 'nebula-pro' || $selectedModel === 'nebula-coder' || isPremiumModel;
-      const isNebula15 = $selectedModel === 'nebula-1.0';
-      const isRegistered = $isAuthenticatedStore;
-      
-      if (hasPremium) {
-        maxTokens = Infinity;
-      } else if (isAdvancedModel) {
-        // nebula-coder usa gpt-5.1-codex-mini che ha limite di 128K token
-        maxTokens = $selectedModel === 'nebula-coder' ? 100000 : 50000;
-      } else if (isNebula15 && isRegistered) {
-        // 15.000 token per utenti registrati con Nebula AI 1.5
-        maxTokens = 15000;
-      } else {
-        maxTokens = 4000;
-      }
-      tokenUsagePercentage = 0;
-      tokenWarning = false;
-    }
+    const info = $tokenInfo;
+    currentChatTokens = info.currentChatTokens;
+    maxTokens = info.maxTokens;
+    tokenUsagePercentage = info.tokenUsagePercentage;
+    tokenWarning = info.tokenWarning;
   }
   
   // Gestisci prompt selezionato dalla libreria
@@ -297,7 +250,7 @@
               const preview = await readFileAsDataURL(file);
               attachedImages = [...attachedImages, { file, preview }];
             } catch (error) {
-              console.error('Error processing pasted image:', error);
+              logError('Error processing pasted image:', error);
             }
           }
         }
@@ -440,6 +393,11 @@
     }
   }
   
+  // Throttled scroll per performance durante streaming
+  const throttledScrollToBottom = throttle(() => {
+    scrollToBottom(false);
+  }, 100); // Max una volta ogni 100ms
+  
   function scrollToTop() {
     if (messagesContainer) {
       messagesContainer.scrollTo({
@@ -571,22 +529,20 @@
           customSystemPrompt
         )) {
           fullResponse += chunk;
-          // Normalizza il testo rimuovendo spazi extra alla fine delle righe
-          const normalizedResponse = normalizeTextSpacing(fullResponse);
-          // Aggiorna il messaggio in tempo reale
-          updateMessage(chatId, messageIndex, { content: normalizedResponse });
+          // Aggiorna il messaggio in tempo reale SENZA normalizzazione (più veloce)
+          updateMessage(chatId, messageIndex, { content: fullResponse });
           await tick();
-          scrollToBottom(false); // Scroll continuo ma non smooth per performance
+          throttledScrollToBottom(); // Scroll throttled per performance
         }
         
-        // Normalizza e salva la risposta finale
+        // Normalizza e salva la risposta finale (solo una volta alla fine)
         const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
         updateMessage(chatId, messageIndex, { content: normalizedFinalResponse });
         
         currentStreamingMessageId = null;
         
       } catch (error) {
-        console.error('Error generating response:', error);
+        logError('Error generating response:', error);
         
         // Rimuovi il messaggio vuoto se è stato interrotto
         const currentChatData = get(currentChat);
@@ -617,7 +573,7 @@
         scrollToBottom();
       }
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
+      logError('Error in handleSubmit:', error);
       // In caso di errore, resetta tutto
       isGenerating.set(false);
     }
@@ -791,17 +747,16 @@
           customSystemPromptForRegen
         )) {
           fullResponse += chunk;
-          // Normalizza il testo rimuovendo spazi extra alla fine delle righe
-          const normalizedResponse = normalizeTextSpacing(fullResponse);
+          // Aggiorna senza normalizzazione durante streaming (più veloce)
           const currentChatData = get(currentChat);
           if (currentChatData && currentChatData.messages.length > 0) {
-            updateMessage(chatId, currentChatData.messages.length - 1, { content: normalizedResponse });
+            updateMessage(chatId, currentChatData.messages.length - 1, { content: fullResponse });
           }
           await tick();
-          scrollToBottom(false);
+          throttledScrollToBottom();
         }
         
-        // Normalizza e salva la risposta finale
+        // Normalizza e salva la risposta finale (solo una volta alla fine)
         const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
         const currentChatData = get(currentChat);
         if (currentChatData && currentChatData.messages.length > 0) {
@@ -810,7 +765,7 @@
         currentStreamingMessageId = null;
         
       } catch (error) {
-        console.error('Error regenerating response:', error);
+        logError('Error regenerating response:', error);
         const currentChatData = get(currentChat);
         if (currentStreamingMessageId && error?.message && error.message.includes('interrotta')) {
           if (currentChatData && currentChatData.messages.length > 0) {
@@ -893,12 +848,15 @@
       );
       if (reason) {
         // Qui potresti inviare la segnalazione a un server
-        console.log('Messaggio segnalato:', {
-          messageIndex,
-          messageId: message.id,
-          content: message.content,
-          reason: reason
-        });
+        // Messaggio segnalato (logging solo in dev)
+        if (import.meta.env.DEV) {
+          console.log('Messaggio segnalato:', {
+            messageIndex,
+            messageId: message.id,
+            content: message.content,
+            reason: reason
+          });
+        }
         await showAlert('Grazie per la segnalazione. Il messaggio è stato segnalato.', 'Segnalazione inviata', 'OK', 'success');
       }
     }
@@ -906,7 +864,10 @@
   
   function handleMessageFeedback(messageIndex, type) {
     // Qui puoi implementare il salvataggio del feedback
-    console.log('Feedback:', { messageIndex, type });
+    // Feedback (logging solo in dev)
+    if (import.meta.env.DEV) {
+      console.log('Feedback:', { messageIndex, type });
+    }
   }
   
   function handleAttachClick(event) {
@@ -1102,11 +1063,14 @@
       const image = attachedImages[targetIndex];
       if (image && image.style) {
         // Qui implementeresti la chiamata API per modificare l'immagine
-        console.log('Creating image with style:', {
-          image: image.preview,
-          style: image.style,
-          description: image.description || imageDescription
-        });
+        // Creating image with style (logging solo in dev)
+        if (import.meta.env.DEV) {
+          console.log('Creating image with style:', {
+            image: image.preview,
+            style: image.style,
+            description: image.description || imageDescription
+          });
+        }
         showAlert(`Immagine modificata con stile: ${imageStyles.find(s => s.id === image.style)?.name}`, 'Immagine modificata', 'OK', 'success');
       } else {
         showAlert('Seleziona uno stile prima di creare', 'Stile non selezionato', 'OK', 'warning');

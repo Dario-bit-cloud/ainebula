@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { neon } from '@neondatabase/serverless';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -67,9 +68,18 @@ if (isDevelopment) {
   });
 }
 
-// Compression middleware rimosso - causava ERR_CONTENT_DECODING_FAILED
-// Se necessario, usa il middleware compression di Express: npm install compression
-// app.use(compression());
+// Compression middleware - configurazione conservativa per evitare errori
+app.use(compression({
+  level: 6, // Livello di compressione (1-9, 6 è un buon compromesso)
+  filter: (req, res) => {
+    // Comprimi solo risposte JSON e testo, non immagini o file binari
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  threshold: 1024 // Comprimi solo se la risposta è > 1KB
+}));
 
 app.use(express.json());
 
