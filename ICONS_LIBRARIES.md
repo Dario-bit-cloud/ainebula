@@ -270,3 +270,4 @@ Per sostituire gli SVG inline esistenti, cerca il path SVG e trova l'icona equiv
 - [Bootstrap Icons](https://icons.getbootstrap.com/)
 - [Octicons](https://primer.style/octicons/)
 
+

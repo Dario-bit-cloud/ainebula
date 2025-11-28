@@ -120,3 +120,4 @@ import * as Sentry from '@sentry/svelte';
 - Installate con `--legacy-peer-deps` per risolvere conflitti
 - Tutte le librerie sono pronte all'uso
 
+

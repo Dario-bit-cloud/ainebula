@@ -528,3 +528,4 @@ async function copyCode(code) {
 4. **Usare svelte-persisted-store** per preferenze utente
 5. **Integrare clipboard-copy** per migliorare la copia del codice
 
+

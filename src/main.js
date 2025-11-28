@@ -2,6 +2,7 @@ import './app.css';
 import './styles/material-design-3.css';
 import './styles/ios-ui.css';
 import './styles/liquid-glass.css';
+import { mount } from 'svelte';
 import App from './App.svelte';
 import { isIOS } from './utils/platform.js';
 
@@ -88,7 +89,7 @@ if (typeof window !== 'undefined') {
   };
 }
 
-const app = new App({
+const app = mount(App, {
   target: document.getElementById('app')
 });
 
