@@ -28,6 +28,14 @@ export function initAuth() {
           syncChatsOnLogin(),
           syncProjectsOnLogin()
         ]);
+        
+        // Processa eventuali dati Patreon pendenti
+        const pendingUserId = localStorage.getItem('patreon_pending_user_id');
+        const pendingToken = localStorage.getItem('patreon_pending_token');
+        if (pendingUserId && pendingToken) {
+          // Trigger evento per processare Patreon (gestito in App.svelte)
+          window.dispatchEvent(new CustomEvent('patreon-pending-process'));
+        }
       } else {
         // Sessione non valida, pulisci tutto
         user.set(null);

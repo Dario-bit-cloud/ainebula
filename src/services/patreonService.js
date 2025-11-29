@@ -39,12 +39,13 @@ export async function checkPatreonMembership(patreonUserId) {
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/patreon/check-membership`, {
+    const response = await fetch(`${API_BASE_URL}/patreon/check-membership?action=check-membership`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
+      credentials: 'include', // Importante: include i cookie nella richiesta
       body: JSON.stringify({ patreonUserId })
     });
     
@@ -80,6 +81,7 @@ export async function linkPatreonAccount(patreonUserId, patreonAccessToken) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
+      credentials: 'include', // Importante: include i cookie nella richiesta
       body: JSON.stringify({ patreonUserId, patreonAccessToken })
     });
     
@@ -151,7 +153,8 @@ export async function getPatreonLinkStatus() {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      credentials: 'include' // Importante: include i cookie nella richiesta
     });
     
     const data = await response.json();
@@ -180,12 +183,13 @@ export async function unlinkPatreonAccount() {
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/patreon/unlink-account`, {
+    const response = await fetch(`${API_BASE_URL}/patreon/unlink-account?action=unlink-account`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      credentials: 'include' // Importante: include i cookie nella richiesta
     });
     
     const data = await response.json();
