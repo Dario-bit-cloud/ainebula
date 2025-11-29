@@ -46,7 +46,10 @@ async function authenticateUser(req, sql) {
   let token = null;
   const authHeader = req.headers['authorization'];
   if (authHeader) {
-    token = authHeader.split(' ')[1];
+    const parts = authHeader.split(' ');
+    if (parts.length > 1) {
+      token = parts[1];
+    }
   }
   
   if (!token) {
@@ -55,6 +58,13 @@ async function authenticateUser(req, sql) {
       token = cookies.auth_token;
     }
   }
+
+  console.log('🔐 [AUTH] Verifica token:', {
+    hasAuthHeader: !!authHeader,
+    hasCookie: !!req.headers.cookie,
+    hasToken: !!token,
+    cookieHeader: req.headers.cookie ? req.headers.cookie.substring(0, 100) : null
+  });
 
   if (!token) {
     return { error: 'Token non fornito', status: 401 };
@@ -73,11 +83,14 @@ async function authenticateUser(req, sql) {
     `;
 
     if (sessions.length === 0) {
+      console.log('⚠️ [AUTH] Sessione non trovata o scaduta per token:', token.substring(0, 20) + '...');
       return { error: 'Sessione non valida', status: 401 };
     }
 
+    console.log('✅ [AUTH] Sessione valida per user:', sessions[0].user_id);
     return { user: sessions[0], token };
   } catch (error) {
+    console.error('❌ [AUTH] Errore verifica token:', error.message);
     return { error: 'Token non valido', status: 403 };
   }
 }
@@ -135,8 +148,11 @@ export default async function handler(req, res) {
       endpoint, 
       action, 
       slug,
+      url: req.url,
       hasBody: !!req.body,
-      bodyType: typeof req.body
+      bodyType: typeof req.body,
+      hasCookie: !!req.headers.cookie,
+      hasAuthHeader: !!req.headers['authorization']
     });
     
     // GET /api/auth/me - Verifica sessione
