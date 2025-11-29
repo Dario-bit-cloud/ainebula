@@ -14,6 +14,26 @@
       "destination": "/api/shared-links"
     },
     {
+      "source": "/api/patreon/callback",
+      "destination": "/api/patreon?action=callback"
+    },
+    {
+      "source": "/api/patreon/link-status",
+      "destination": "/api/patreon?action=link-status"
+    },
+    {
+      "source": "/api/patreon/link-account",
+      "destination": "/api/patreon?action=link-account"
+    },
+    {
+      "source": "/api/patreon/check-membership",
+      "destination": "/api/patreon?action=check-membership"
+    },
+    {
+      "source": "/api/patreon/unlink-account",
+      "destination": "/api/patreon?action=unlink-account"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     }

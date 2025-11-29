@@ -1,10 +1,11 @@
-// API Route dinamica per gestire tutte le operazioni Patreon su Vercel
-// Gestisce:
-// GET /api/patreon/callback - Callback OAuth Patreon
-// POST /api/patreon/link-account - Collega account Patreon
-// POST /api/patreon/check-membership - Verifica membership Patreon
-// GET /api/patreon/link-status - Verifica stato collegamento
-// POST /api/patreon/unlink-account - Scollega account Patreon
+// API Route consolidata per gestire tutte le operazioni Patreon su Vercel
+// Gestisce tutti gli endpoint tramite query parameter 'action' o path
+// Endpoints:
+// GET /api/patreon?action=callback - Callback OAuth Patreon
+// POST /api/patreon?action=link-account - Collega account Patreon
+// POST /api/patreon?action=check-membership - Verifica membership Patreon
+// GET /api/patreon?action=link-status - Verifica stato collegamento
+// POST /api/patreon?action=unlink-account - Scollega account Patreon
 
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
@@ -93,34 +94,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Determina il percorso dall'URL
-    // In Vercel, possiamo usare req.url o req.query.slug
-    let path = '';
+    // Determina l'azione dall'URL o query parameter
+    // Supporta sia /api/patreon/callback che /api/patreon?action=callback
+    let action = req.query.action;
     
-    // Prova prima con req.query.slug (route dinamica)
-    if (req.query.slug) {
-      if (Array.isArray(req.query.slug)) {
-        path = req.query.slug.join('/');
-      } else {
-        path = req.query.slug;
-      }
-    }
-    
-    // Se non c'è slug, prova a estrarre dal URL
-    if (!path && req.url) {
-      const urlPath = req.url.split('?')[0]; // Rimuovi query string
-      // Estrai il path dopo /api/patreon/
-      const match = urlPath.match(/\/api\/patreon\/(.+)$/);
+    // Se non c'è action, prova a estrarre dall'URL
+    if (!action && req.url) {
+      const urlPath = req.url.split('?')[0];
+      const match = urlPath.match(/\/api\/patreon\/([^/?]+)/);
       if (match) {
-        path = match[1];
+        action = match[1];
       }
     }
     
-    // Debug: log per vedere cosa riceviamo
-    console.log('🔍 [PATREON] Path:', path, 'Method:', req.method, 'URL:', req.url, 'Query:', req.query);
+    // Se ancora non c'è action, controlla se c'è un code (callback OAuth)
+    if (!action && req.query.code) {
+      action = 'callback';
+    }
+    
+    console.log('🔍 [PATREON] Action:', action, 'Method:', req.method, 'URL:', req.url);
     
     // Gestisci callback OAuth Patreon
-    if (path === 'callback' && req.method === 'GET') {
+    if (action === 'callback' && req.method === 'GET') {
       const { code, state, error } = req.query;
       
       // Gestisci errori da Patreon
@@ -191,9 +186,8 @@ export default async function handler(req, res) {
     // Inizializza la connessione al database per le altre operazioni
     const sql = getDatabaseConnection();
     
-    // GET /api/patreon o /api/patreon/link-status - Verifica stato collegamento
-    // Se path è vuoto, assumiamo che sia link-status (per retrocompatibilità)
-    if ((path === 'link-status' || path === '') && req.method === 'GET') {
+    // GET /api/patreon/link-status o /api/patreon?action=link-status - Verifica stato collegamento
+    if ((action === 'link-status' || !action) && req.method === 'GET') {
       const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
@@ -224,8 +218,8 @@ export default async function handler(req, res) {
       return;
     }
 
-    // POST /api/patreon/link-account - Collega account Patreon
-    if (path === 'link-account' && req.method === 'POST') {
+    // POST /api/patreon/link-account o /api/patreon?action=link-account - Collega account Patreon
+    if (action === 'link-account' && req.method === 'POST') {
       const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
@@ -258,8 +252,8 @@ export default async function handler(req, res) {
       return;
     }
 
-    // POST /api/patreon/check-membership - Verifica membership
-    if (path === 'check-membership' && req.method === 'POST') {
+    // POST /api/patreon/check-membership o /api/patreon?action=check-membership - Verifica membership
+    if (action === 'check-membership' && req.method === 'POST') {
       const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
@@ -387,8 +381,8 @@ export default async function handler(req, res) {
       return;
     }
 
-    // POST /api/patreon/unlink-account - Scollega account
-    if (path === 'unlink-account' && req.method === 'POST') {
+    // POST /api/patreon/unlink-account o /api/patreon?action=unlink-account - Scollega account
+    if (action === 'unlink-account' && req.method === 'POST') {
       const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
@@ -423,7 +417,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    return res.status(404).json({ success: false, message: 'Endpoint non trovato' });
+    return res.status(404).json({ success: false, message: 'Endpoint non trovato', action: action || 'none', url: req.url });
   } catch (error) {
     console.error('❌ Errore Patreon:', {
       message: error.message,
