@@ -537,24 +537,81 @@
   }
   
   @media (max-width: 768px) {
-    .modal-content {
-      width: 95%;
-      max-height: 95vh;
+    .personalization-modal {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
     
-    .modal-header,
-    .modal-body,
-    .modal-footer {
-      padding: 20px;
+    .modal-content {
+      width: 100%;
+      max-width: 100%;
+      max-height: 100vh;
+      height: 100vh;
+      border-radius: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .modal-header {
+      padding: 16px;
+      padding-top: calc(16px + env(safe-area-inset-top));
+      flex-shrink: 0;
+    }
+    
+    .modal-header h2 {
+      font-size: 20px;
+    }
+    
+    .modal-close {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 12px;
+    }
+    
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+    
+    .section {
+      margin-bottom: 20px;
     }
     
     .section-header {
       flex-direction: column;
-      gap: 12px;
+      gap: 16px;
+      align-items: stretch;
+    }
+    
+    .section-title-group {
+      width: 100%;
+    }
+    
+    .section h3 {
+      font-size: 16px;
+    }
+    
+    .section-description {
+      font-size: 13px;
+      margin-top: 4px;
     }
     
     .toggle-switch {
       align-self: flex-start;
+      width: 48px;
+      height: 28px;
+    }
+    
+    .toggle-slider:before {
+      height: 22px;
+      width: 22px;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(20px);
     }
     
     .dropdown-wrapper {
@@ -563,6 +620,80 @@
     
     .style-dropdown {
       width: 100%;
+      padding: 12px 40px 12px 16px;
+      font-size: 15px;
+      min-height: 48px;
+    }
+    
+    .custom-instructions-input {
+      padding: 14px;
+      font-size: 15px;
+      min-height: 120px;
+      -webkit-appearance: none;
+    }
+    
+    .suggestions-container {
+      gap: 10px;
+      margin-top: 16px;
+    }
+    
+    .suggestion-tag {
+      padding: 10px 16px;
+      font-size: 14px;
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+    
+    .info-input {
+      padding: 14px 16px;
+      font-size: 15px;
+      min-height: 48px;
+      -webkit-appearance: none;
+    }
+    
+    .info-field label {
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    
+    .modal-footer {
+      padding: 16px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+      flex-shrink: 0;
+      gap: 12px;
+      flex-direction: column-reverse;
+    }
+    
+    .cancel-btn,
+    .save-btn {
+      width: 100%;
+      padding: 14px 20px;
+      font-size: 16px;
+      min-height: 48px;
+      touch-action: manipulation;
+    }
+    
+    .divider {
+      margin: 20px 0;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .modal-header h2 {
+      font-size: 18px;
+    }
+    
+    .section h3 {
+      font-size: 15px;
+    }
+    
+    .suggestions-container {
+      gap: 8px;
+    }
+    
+    .suggestion-tag {
+      padding: 8px 14px;
+      font-size: 13px;
     }
   }
 </style>

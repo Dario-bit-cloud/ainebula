@@ -891,19 +891,28 @@
   /* Responsive Design */
   @media (max-width: 768px) {
     .auth-modal-overlay {
-      padding: 16px;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      align-items: flex-end;
     }
     
     .auth-modal {
       width: 100%;
       max-width: 100%;
-      max-height: 98vh;
+      max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      border-radius: 20px 20px 0 0;
+      margin: 0;
     }
     
     .form {
       padding: 2em 1.5em 1.5em 1.5em;
-      border-radius: 20px;
-      gap: 14px;
+      padding-bottom: calc(2em + env(safe-area-inset-bottom));
+      border-radius: 20px 20px 0 0;
+      gap: 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      max-height: 100%;
     }
     
     #heading {
@@ -918,6 +927,23 @@
     
     .input-field {
       font-size: 16px; /* Previene zoom su iOS */
+      min-height: 48px;
+      -webkit-appearance: none;
+      padding: 14px 16px;
+    }
+    
+    .submit-button {
+      min-height: 48px;
+      padding: 14px 20px;
+      font-size: 16px;
+      touch-action: manipulation;
+    }
+    
+    .switch-button {
+      min-height: 44px;
+      padding: 12px 16px;
+      font-size: 15px;
+      touch-action: manipulation;
     }
     
     .form .btn {

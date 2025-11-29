@@ -737,6 +737,7 @@
       padding: 12px 14px;
       font-size: 14px;
       min-height: 48px; /* Touch target più grande */
+      touch-action: manipulation;
     }
     
     .menu-item svg {
@@ -748,6 +749,7 @@
       padding: 12px 14px;
       font-size: 14px;
       min-height: 48px;
+      touch-action: manipulation;
     }
     
     .submenu-item svg {

@@ -1989,10 +1989,25 @@
   }
 
   @media (max-width: 768px) {
+    .modal-backdrop {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+    
+    .modal-content {
+      max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    }
+    
+    .modal-header {
+      padding-top: calc(16px + env(safe-area-inset-top));
+    }
+    
     .modal-body {
       padding: 20px 0;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
     }
     
     .plans-selection {
@@ -2002,6 +2017,29 @@
     .patreon-selection {
       padding: 20px 16px;
     }
+    
+    .patreon-header h3 {
+      font-size: 20px;
+    }
+    
+    .patreon-description {
+      font-size: 14px;
+    }
+    
+    .maintenance-badge {
+      padding: 10px 18px;
+      font-size: 15px;
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+    
+    .alternative-button,
+    .back-button {
+      min-height: 48px;
+      padding: 14px 20px;
+      font-size: 16px;
+      touch-action: manipulation;
+    }
 
     .payment--options {
       grid-template-columns: 1fr;
@@ -2009,20 +2047,80 @@
     }
 
     .payment--options button {
-      height: 50px;
+      height: 56px;
+      min-height: 56px;
+      font-size: 16px;
+      touch-action: manipulation;
     }
 
     .split {
       grid-template-columns: 1fr;
+      gap: 16px;
     }
 
     .form-footer-new {
       flex-direction: column-reverse;
+      gap: 12px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
     }
 
     .back-button,
     .purchase--btn {
       width: 100%;
+      min-height: 48px;
+      padding: 14px 20px;
+      font-size: 16px;
+      touch-action: manipulation;
+    }
+    
+    .order-summary-section,
+    .payment-form-section {
+      padding: 16px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    
+    .form-group input,
+    .form-group select {
+      padding: 14px 16px;
+      font-size: 15px;
+      min-height: 48px;
+      -webkit-appearance: none;
+    }
+    
+    .plan-card {
+      touch-action: manipulation;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .modal-header h2 {
+      font-size: 18px;
+    }
+    
+    .plan-card {
+      min-width: calc(100vw - 48px);
+      max-width: calc(100vw - 48px);
+      padding: 14px;
+    }
+    
+    .plan-name {
+      font-size: 16px;
+    }
+    
+    .plan-price {
+      font-size: 24px;
+    }
+    
+    .feature-item {
+      font-size: 13px;
     }
   }
 </style>

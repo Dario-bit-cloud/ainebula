@@ -1251,7 +1251,7 @@
   
   @media (max-width: 768px) {
     .modal-backdrop {
-      padding: 0;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       align-items: flex-end;
       background-color: rgba(0, 0, 0, 0.6);
       backdrop-filter: blur(8px);
@@ -1283,8 +1283,8 @@
   @media (max-width: 768px) {
     .modal-content {
       max-width: 100%;
-      max-height: 90vh;
-      height: 90vh;
+      max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
       border-radius: 20px 20px 0 0;
       box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
     }
@@ -1328,6 +1328,7 @@
   @media (max-width: 768px) {
     .modal-header {
       padding: 16px 20px;
+      padding-top: calc(16px + env(safe-area-inset-top));
       border-bottom: none;
     }
     
@@ -1339,6 +1340,13 @@
       right: 0;
       height: 1px;
       background: var(--border-color);
+    }
+    
+    .close-button {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 12px;
+      touch-action: manipulation;
     }
     
     .modal-title {
@@ -1449,6 +1457,8 @@
       flex-shrink: 0;
       border-radius: 24px;
       min-width: fit-content;
+      min-height: 44px;
+      touch-action: manipulation;
       font-size: 14px;
       font-weight: 500;
       scroll-snap-align: center;
@@ -1585,6 +1595,7 @@
       gap: 12px;
     }
     
+    .view-button,
     .manage-button,
     .danger-button,
     .view-button {

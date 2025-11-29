@@ -388,8 +388,15 @@
 
     .icon-button {
       padding: 8px;
-      min-width: 36px;
-      min-height: 36px;
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+    
+    .menu-toggle {
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
     }
   }
 
