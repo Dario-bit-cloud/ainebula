@@ -34,26 +34,6 @@
       "destination": "/api/patreon?action=unlink"
     },
     {
-      "source": "/api/auth/login",
-      "destination": "/api/auth?action=login"
-    },
-    {
-      "source": "/api/auth/register",
-      "destination": "/api/auth?action=register"
-    },
-    {
-      "source": "/api/auth/passkey",
-      "destination": "/api/auth?action=passkey"
-    },
-    {
-      "source": "/api/auth/2fa",
-      "destination": "/api/auth?action=2fa"
-    },
-    {
-      "source": "/api/auth/me",
-      "destination": "/api/auth?action=me"
-    },
-    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     }
