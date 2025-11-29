@@ -18,20 +18,20 @@
       "destination": "/api/patreon?action=callback"
     },
     {
-      "source": "/api/patreon/link-status",
-      "destination": "/api/patreon?action=link-status"
+      "source": "/api/patreon/status",
+      "destination": "/api/patreon?action=status"
     },
     {
-      "source": "/api/patreon/link-account",
-      "destination": "/api/patreon?action=link-account"
+      "source": "/api/patreon/link",
+      "destination": "/api/patreon?action=link"
     },
     {
-      "source": "/api/patreon/check-membership",
-      "destination": "/api/patreon?action=check-membership"
+      "source": "/api/patreon/sync",
+      "destination": "/api/patreon?action=sync"
     },
     {
-      "source": "/api/patreon/unlink-account",
-      "destination": "/api/patreon?action=unlink-account"
+      "source": "/api/patreon/unlink",
+      "destination": "/api/patreon?action=unlink"
     },
     {
       "source": "/api/:path*",
