@@ -1,4 +1,5 @@
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { nebulini, savedNebulini, getNebulinoById, incrementNebulinoUsage } from '../stores/nebulini.js';
   import { isNebuliniModalOpen } from '../stores/app.js';
   import { isMobile } from '../stores/app.js';
@@ -268,10 +269,11 @@
                 </div>
               {/each}
             {:else}
-              <div class="empty-state">
-                <p>Nessun nebulino trovato</p>
-                <p class="empty-hint">Prova a modificare i filtri di ricerca</p>
-              </div>
+              <EmptyState 
+                variant="search"
+                title="Nessun nebulino trovato"
+                description="Prova a modificare i filtri di ricerca"
+              />
             {/if}
           </div>
         {:else}

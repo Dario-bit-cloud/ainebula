@@ -9,8 +9,11 @@
   import { projects, updateProject, deleteProject, syncProjectsOnLogin, loadProjects } from '../stores/projects.js';
   import { showConfirm } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
+  import Skeleton from './Skeleton.svelte';
+  import EmptyState from './EmptyState.svelte';
   
   let activeItem = 'new-chat';
+  let isLoadingChats = false;
   let searchInput = '';
   let filteredChats = [];
   let showChatList = true;
@@ -34,8 +37,12 @@
       lastAuthState = true;
       if (!hasLoadedChats) {
         hasLoadedChats = true;
-        syncChatsOnLogin().catch(err => {
+        isLoadingChats = true;
+        syncChatsOnLogin().then(() => {
+          isLoadingChats = false;
+        }).catch(err => {
           console.error('Errore caricamento chat:', err);
+          isLoadingChats = false;
         });
       }
       if (!hasLoadedProjects) {
@@ -49,6 +56,7 @@
       lastAuthState = false;
       hasLoadedChats = false;
       hasLoadedProjects = false;
+      isLoadingChats = false;
     }
   }
   
@@ -432,7 +440,12 @@
     <!-- Bottone Nuova Chat Prominente -->
     <div class="new-chat-wrapper" on:click={() => handleMenuClick('new-chat')}>
       <div class="new-chat-glow"></div>
-      <button class="new-chat-button" role="button">
+      <button 
+        class="new-chat-button" 
+        role="button"
+        aria-label={$t('newChat')}
+        title={$t('newChat')}
+      >
         {#if !$isSidebarCollapsed || $isMobile}
           {$t('newChat')}
           <svg
@@ -583,10 +596,11 @@
               </div>
             {/each}
           {:else if $searchQuery && $searchQuery.trim()}
-            <div class="no-results">
-              <p>{$t('noResultsFound')}</p>
-              <p class="no-results-subtitle">{$t('noChatFound')}</p>
-            </div>
+            <EmptyState 
+              variant="search"
+              title={$t('noResultsFound')}
+              description={$t('noChatFound')}
+            />
           {/if}
         {/if}
         
@@ -806,7 +820,11 @@
                         {/each}
                       {:else}
                         <div class="empty-project">
-                          <p>{$t('noChatsInFolder')}</p>
+                          <EmptyState 
+                            variant="chat"
+                            title={$t('noChatsInFolder')}
+                            description=""
+                          />
                         </div>
                       {/if}
                     </div>
@@ -814,10 +832,13 @@
                 </div>
               {/each}
             {:else}
-              <div class="empty-state">
-                <p>{$t('noFoldersYet')}</p>
-                <p class="empty-hint">{$t('createNewFolder')}</p>
-              </div>
+              <EmptyState 
+                variant="project"
+                title={$t('noFoldersYet')}
+                description={$t('createNewFolder')}
+                actionLabel={$t('newFolder')}
+                onAction={() => isProjectModalOpen.set(true)}
+              />
             {/if}
           </div>
         {:else if $sidebarView === 'search'}
@@ -849,14 +870,31 @@
               <p>{$t('noChatFound')}</p>
             </div>
           {:else}
-            <div class="empty-state">
-              <p>{$t('noChatsYet')}</p>
-              <p class="empty-hint">{$t('createNewChat')}</p>
-            </div>
+            {#if isLoadingChats}
+              <div class="skeleton-list">
+                {#each Array(3) as _}
+                  <Skeleton variant="chat-item" />
+                {/each}
+              </div>
+            {:else}
+              <EmptyState 
+                variant="chat"
+                title={$t('noChatsYet')}
+                description={$t('createNewChat')}
+                actionLabel={$t('newChat')}
+                onAction={() => handleMenuClick('new-chat')}
+              />
+            {/if}
           {/if}
         {:else}
           <!-- Cronologia standard quando non si è in search o library -->
-          {#if organizedChats.unassigned.length > 0 || Object.keys(organizedChats.projects).some(pid => organizedChats.projects[pid]?.length > 0)}
+          {#if isLoadingChats}
+            <div class="skeleton-list">
+              {#each Array(3) as _}
+                <Skeleton variant="chat-item" />
+              {/each}
+            </div>
+          {:else if organizedChats.unassigned.length > 0 || Object.keys(organizedChats.projects).some(pid => organizedChats.projects[pid]?.length > 0)}
             <!-- Mostra chat non assegnate -->
             {#if organizedChats.unassigned.length > 0}
               {#each organizedChats.unassigned.slice(0, 20) as chat}
@@ -970,10 +1008,13 @@
               {/if}
             {/each}
           {:else}
-            <div class="empty-state">
-              <p>{$t('noChatsYet')}</p>
-              <p class="empty-hint">{$t('createNewChat')}</p>
-            </div>
+            <EmptyState 
+              variant="chat"
+              title={$t('noChatsYet')}
+              description={$t('createNewChat')}
+              actionLabel={$t('newChat')}
+              onAction={() => handleMenuClick('new-chat')}
+            />
           {/if}
         {/if}
       </div>
@@ -1182,6 +1223,32 @@
   .close-sidebar-btn:hover {
     background-color: var(--hover-bg);
     color: var(--text-primary);
+  }
+
+  /* Tablet styles */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .sidebar {
+      width: 240px;
+    }
+
+    .sidebar-nav {
+      padding: 10px;
+    }
+
+    .new-chat-button {
+      padding: 10px 24px;
+      font-size: 14px;
+    }
+
+    .nav-item {
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    .chat-item {
+      padding: 8px 10px;
+      font-size: 13px;
+    }
   }
 
   @media (max-width: 768px) {

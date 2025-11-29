@@ -140,7 +140,14 @@
       </svg>
     </div>
     <div class="model-selector-wrapper">
-      <button class="model-selector" bind:this={modelSelectorButton} on:click={toggleModelDropdown}>
+      <button 
+        class="model-selector" 
+        bind:this={modelSelectorButton} 
+        on:click={toggleModelDropdown}
+        aria-label="Seleziona modello AI"
+        aria-expanded={isModelDropdownOpen}
+        aria-haspopup="listbox"
+      >
         <span class="model-name">
           {#if $availableModels.find(m => m.id === $selectedModel)}
             {@const selected = $availableModels.find(m => m.id === $selectedModel)}
@@ -162,7 +169,13 @@
         </svg>
       </button>
       {#if isModelDropdownOpen}
-        <div class="model-dropdown" bind:this={modelDropdown} style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;">
+        <div 
+          class="model-dropdown" 
+          bind:this={modelDropdown} 
+          style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;"
+          role="listbox"
+          aria-label="Lista modelli AI disponibili"
+        >
           {#each Object.entries(groupedModels) as [groupName, models]}
             <div class="model-group-header">{groupName}</div>
             {#each models as model}
@@ -173,6 +186,9 @@
                 class:disabled={model.premium && !hasPlanOrHigher(model.requiredPlan)}
                 on:click={() => selectModel(model.id)}
                 title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? $t('requiresSubscription', { plan: model.requiredPlan === 'premium' ? 'Premium' : (model.requiredPlan === 'pro' ? $t('pro') : $t('max')) }) : ''}
+                role="option"
+                aria-selected={model.id === $selectedModel}
+                aria-disabled={model.premium && !hasPlanOrHigher(model.requiredPlan)}
               >
                 <div class="model-info">
                   <div class="model-name">

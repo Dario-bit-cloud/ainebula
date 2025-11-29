@@ -136,6 +136,62 @@ body {
   }
 }
 
+/* Animazioni più fluide per transizioni */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Utility classes per animazioni fluide */
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) var(--md-sys-motion-easing-standard);
+}
+
+.animate-slide-up {
+  animation: slideUpFade var(--transition-normal) var(--md-sys-motion-easing-standard);
+}
+
+.animate-scale-in {
+  animation: fadeInScale var(--transition-normal) var(--md-sys-motion-easing-standard);
+}
+
 /* Transizioni smooth per elementi interattivi */
 button, a, input, select, textarea {
   transition: all var(--transition-normal);
@@ -148,6 +204,30 @@ button, a, input, select, textarea {
 /* Smooth scroll */
 * {
   scroll-behavior: smooth;
+}
+
+/* Tablet optimizations */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Layout ottimizzato per tablet */
+  .app-container {
+    max-width: 100%;
+  }
+
+  /* Sidebar più compatta su tablet */
+  .sidebar {
+    width: 240px;
+  }
+
+  /* Miglioramenti touch targets per tablet */
+  button, a, input[type="button"], input[type="submit"], .clickable {
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  /* Spacing ottimizzato */
+  .messages-container {
+    padding: 32px 24px;
+  }
 }
 
 /* Mobile optimizations */
@@ -235,5 +315,47 @@ button, a, input, select, textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Accessibility improvements */
+/* Focus visible - migliorato per accessibilità */
+*:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--md-sys-shape-corner-small);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+/* Skip link per navigazione da tastiera */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  padding: 8px 16px;
+  text-decoration: none;
+  z-index: 10000;
+  border-radius: 0 0 var(--md-sys-shape-corner-medium) 0;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Miglioramento contrasto per accessibilità */
+@media (prefers-contrast: high) {
+  :root {
+    --md-sys-color-outline: #000000;
+    --md-sys-color-outline-variant: #333333;
   }
 }

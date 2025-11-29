@@ -14,11 +14,14 @@
   import { isInputElement } from './utils/shortcuts.js';
   import { showConfirm, showAlert } from './services/dialogService.js';
   import { linkPatreonAccount } from './services/patreonService.js';
+  import { showSuccess as showToastSuccess, showError, showWarning, showInfo } from './services/toastService.js';
   
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
   let PromptLibraryModal, ShortcutsModal, ReportBugModal, PersonalizationModal, AuthModal, SharedLinksModal;
   let HelpCenterModal, ReleaseNotesModal, TermsModal, DownloadAppModal, WorkspaceSettingsModal, NebuliniModal, ImageGeneratorModal;
+  // Toast container (always loaded)
+  import ToastContainer from './components/ToastContainer.svelte';
   // Dialog components (always loaded)
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AlertDialog from './components/AlertDialog.svelte';
@@ -373,30 +376,8 @@
   }
   
   function showCopyNotification() {
-    // Usa la funzione esistente se disponibile, altrimenti mostra un alert
-    if (window.showCopyToast) {
-      window.showCopyToast();
-    } else {
-      // Crea una notifica temporanea
-      const toast = document.createElement('div');
-      toast.textContent = '✓ Codice copiato!';
-      toast.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #3b82f6;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        z-index: 10000;
-        animation: slideIn 0.3s ease;
-      `;
-      document.body.appendChild(toast);
-      setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => toast.remove(), 300);
-      }, 2000);
-    }
+    // Usa il toast service
+    showToastSuccess('Codice copiato!');
   }
   
   let authModalMode = 'login'; // 'login' o 'register'
@@ -407,6 +388,12 @@
     initAuth();
     // Precarica SettingsModal dato che è un componente importante
     loadSettingsModal();
+    
+    // Esponi toast service globalmente per compatibilità
+    window.showToastSuccess = showToastSuccess;
+    window.showToastError = showError;
+    window.showToastWarning = showWarning;
+    window.showToastInfo = showInfo;
     
     // Gestisci callback Patreon
     const urlParams = new URLSearchParams(window.location.search);
@@ -620,6 +607,9 @@
   <ConfirmDialog />
   <AlertDialog />
   <PromptDialog />
+  
+  <!-- Toast notifications -->
+  <svelte:component this={ToastContainer} />
 </div>
 
 <style>

@@ -19,6 +19,9 @@
   import TopBar from './TopBar.svelte';
   import { throttle } from '../utils/performance.js';
   import { logError } from '../utils/logger.js';
+  import Skeleton from './Skeleton.svelte';
+  import EmptyState from './EmptyState.svelte';
+  import { showSuccess, showError, showWarning } from '../services/toastService.js';
   
   const dispatch = createEventDispatcher();
   
@@ -101,12 +104,13 @@
   
   // Variabili reattive
   let messages = [];
-  let showError = false;
+  let showErrorBanner = false;
   let errorMessage = '';
   let currentChatTokens = 0;
   let maxTokens = 4000;
   let tokenUsagePercentage = 0;
   let tokenWarning = false;
+  let isLoadingChat = false;
   
   // Usa textarea invece di input
   $: isTextarea = true;
@@ -1120,6 +1124,7 @@
       a.download = `${chat.title || 'chat'}-${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      showSuccess('Chat esportata come JSON!');
       return;
     }
     
@@ -1234,6 +1239,7 @@
       printWindow.onload = () => {
         setTimeout(() => {
           printWindow.print();
+          showSuccess('Chat pronta per l\'esportazione PDF!');
         }, 250);
       };
       
@@ -1265,6 +1271,7 @@
     a.download = `${chat.title || 'chat'}-${Date.now()}.${format === 'markdown' ? 'md' : 'txt'}`;
     a.click();
     URL.revokeObjectURL(url);
+    showSuccess(`Chat esportata come ${format === 'markdown' ? 'Markdown' : 'TXT'}!`);
   }
   
   function toggleExportMenu() {
@@ -1318,7 +1325,7 @@
 
 <main class="main-area" bind:this={mainAreaElement}>
   <TopBar on:openAuth={handleOpenAuth} />
-  {#if showError}
+  {#if showErrorBanner}
     <div class="error-banner">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
@@ -1326,7 +1333,7 @@
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
       <span>{errorMessage}</span>
-      <button class="error-close" on:click={() => showError = false}>×</button>
+      <button class="error-close" on:click={() => showErrorBanner = false}>×</button>
     </div>
   {/if}
   
@@ -1397,7 +1404,15 @@
   {/if}
   
   <div class="messages-container" bind:this={messagesContainer}>
-    {#if visibleMessages.length === 0}
+    {#if isLoadingChat}
+      <div class="loading-messages">
+        {#each Array(3) as _, i}
+          <div class="message-skeleton-wrapper" class:user={i % 2 === 0}>
+            <Skeleton variant="message" />
+          </div>
+        {/each}
+      </div>
+    {:else if visibleMessages.length === 0}
       <div class="welcome-message">
         <div class="welcome-content">
           <div class="welcome-header">
@@ -1591,11 +1606,25 @@
   </div>
   
   {#if showScrollToTop}
-    <button class="scroll-to-top" on:click={scrollToTop} title="Torna all'inizio">
+    <button 
+      class="scroll-to-top" 
+      on:click={scrollToTop} 
+      title="Torna all'inizio"
+      aria-label="Torna all'inizio della conversazione"
+    >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 15l-6-6-6 6"/>
       </svg>
     </button>
+  {/if}
+  
+  {#if $isGenerating}
+    <div class="generation-progress" role="status" aria-live="polite">
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+      <span class="progress-text">Generazione in corso...</span>
+    </div>
   {/if}
   
   {#if $isMobile}
@@ -4043,6 +4072,124 @@
       right: 16px;
       width: 40px;
       height: 40px;
+    }
+  }
+
+  /* Loading skeleton styles */
+  .loading-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 40px;
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .message-skeleton-wrapper {
+    display: flex;
+    max-width: 80%;
+  }
+
+  .message-skeleton-wrapper.user {
+    align-self: flex-end;
+  }
+
+  .message-skeleton-wrapper:not(.user) {
+    align-self: flex-start;
+  }
+
+  /* Generation progress indicator */
+  .generation-progress {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--md-sys-color-surface-container-high);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-large);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--md-sys-elevation-level3);
+    z-index: 1000;
+    min-width: 200px;
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .progress-bar {
+    width: 120px;
+    height: 4px;
+    background: var(--md-sys-color-surface-container);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));
+    border-radius: 2px;
+    animation: progressAnimation 2s ease-in-out infinite;
+    width: 60%;
+  }
+
+  .progress-text {
+    font-size: var(--md-sys-typescale-body-small-size);
+    color: var(--md-sys-color-on-surface-variant);
+    white-space: nowrap;
+  }
+
+  @keyframes progressAnimation {
+    0%, 100% {
+      transform: translateX(-100%);
+      opacity: 0.5;
+    }
+    50% {
+      transform: translateX(0%);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .generation-progress {
+      bottom: 70px;
+      padding: 10px 16px;
+      min-width: 180px;
+    }
+
+    .progress-bar {
+      width: 80px;
+    }
+
+    .progress-text {
+      font-size: 12px;
+    }
+
+    .loading-messages {
+      padding: 20px 16px;
+      gap: 16px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress-fill {
+      animation: none;
+      width: 100%;
+    }
+
+    .generation-progress {
+      animation: none;
     }
   }
   

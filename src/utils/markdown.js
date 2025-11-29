@@ -76,32 +76,34 @@ export function renderMarkdown(markdown) {
 
 // Funzione per mostrare un toast di notifica
 function showCopyToast() {
-  // Rimuovi toast esistenti
-  const existingToast = document.querySelector('.copy-toast');
-  if (existingToast) {
-    existingToast.remove();
-  }
-  
-  // Crea nuovo toast
-  const toast = document.createElement('div');
-  toast.className = 'copy-toast';
-  toast.textContent = '✓ Codice copiato!';
-  document.body.appendChild(toast);
-  
-  // Mostra il toast
-  setTimeout(() => {
-    toast.classList.add('show');
-  }, 10);
-  
-  // Rimuovi il toast dopo 3 secondi
-  setTimeout(() => {
-    toast.classList.remove('show');
+  // Usa il toast service se disponibile
+  if (typeof window !== 'undefined' && window.showToastSuccess) {
+    window.showToastSuccess('Codice copiato!');
+  } else {
+    // Fallback al metodo originale
+    const existingToast = document.querySelector('.copy-toast');
+    if (existingToast) {
+      existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = 'copy-toast';
+    toast.textContent = '✓ Codice copiato!';
+    document.body.appendChild(toast);
+    
     setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300);
-  }, 3000);
+      toast.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 3000);
+  }
 }
 
 // Inizializza i pulsanti di copia usando event delegation

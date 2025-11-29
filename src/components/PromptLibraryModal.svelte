@@ -1,4 +1,5 @@
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { promptTemplates, savedPrompts, savePrompt, updatePrompt, deletePrompt, duplicatePrompt, fillPromptTemplate, extractVariables, incrementUsageCount, exportPrompts, importPrompts } from '../stores/promptLibrary.js';
   import { isPromptLibraryModalOpen, selectedPrompt, isMobile, isSidebarOpen } from '../stores/app.js';
   import { createEventDispatcher } from 'svelte';
@@ -465,9 +466,11 @@
                 </div>
               {/each}
             {:else}
-              <p class="empty-state">
-                {searchTerm ? 'Nessun prompt trovato per la ricerca' : 'Nessun prompt disponibile'}
-              </p>
+              <EmptyState 
+                variant="search"
+                title={searchTerm ? 'Nessun prompt trovato' : 'Nessun prompt disponibile'}
+                description={searchTerm ? 'Prova con una ricerca diversa' : 'I prompt verranno aggiunti presto'}
+              />
             {/if}
           </div>
         {/if}
