@@ -64,10 +64,9 @@
         'Token generosi per chat',
         'Caricamento file e immagini',
         'Esportazione chat base (Markdown)',
-        'Supporto via email',
-        'Integrazione con Patreon'
+        'Supporto via email'
       ],
-      patreonEnabled: true
+      patreonEnabled: false
     },
     monthly: {
       name: 'Pro',
@@ -727,62 +726,24 @@
             </div>
           </div>
         {:else if selectedPlan === 'premium'}
-          <!-- Opzioni Patreon per Piano Premium -->
+          <!-- Patreon in Manutenzione -->
           <div class="patreon-selection">
             <div class="patreon-header">
-              <div class="patreon-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M0 .48v23.04h4.22V.48zm5.42 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48z"/>
+              <div class="patreon-icon maintenance">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
                 </svg>
               </div>
-              <h3>Collega con Patreon</h3>
+              <h3>Patreon in Manutenzione</h3>
               <p class="patreon-description">
-                Il piano Premium è disponibile tramite Patreon. Collega il tuo account Patreon per attivare l'abbonamento da 5€/mese.
+                L'integrazione con Patreon è temporaneamente in manutenzione. Stiamo lavorando per migliorare il servizio.
               </p>
-            </div>
-            
-            <div class="patreon-options">
-              {#if patreonLinkStatus?.isLinked}
-                <div class="patreon-status">
-                  <div class="status-badge linked">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                      <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                    <span>Account Patreon collegato</span>
-                  </div>
-                  <button 
-                    class="patreon-button check-button" 
-                    on:click={handlePatreonSync}
-                    disabled={isCheckingPatreon}
-                  >
-                    {#if isCheckingPatreon}
-                      <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                      </svg>
-                      Verifica in corso...
-                    {:else}
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                      Sincronizza Abbonamento
-                    {/if}
-                  </button>
-                </div>
-              {:else}
-                <button 
-                  class="patreon-button link-button" 
-                  on:click={handlePatreonLink}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M0 .48v23.04h4.22V.48zm5.42 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48z"/>
-                  </svg>
-                  <span>Collega con Patreon</span>
-                </button>
-                <p class="patreon-info">
-                  Verrai reindirizzato a Patreon per autorizzare l'accesso. Dopo l'autorizzazione, potrai verificare il tuo abbonamento.
-                </p>
-              {/if}
+              <div class="maintenance-badge">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                <span>In Manutenzione</span>
+              </div>
             </div>
             
             <div class="patreon-alternative">
@@ -793,7 +754,7 @@
                   showPaymentForm = true;
                 }}
               >
-                Oppure scegli il piano Pro
+                Scegli il piano Pro
               </button>
             </div>
             

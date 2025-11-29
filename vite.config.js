@@ -57,6 +57,14 @@ export default defineConfig({
     sourcemap: false,
     // Target modern browsers per bundle più piccolo
     target: 'esnext',
+    // Compressione e ottimizzazioni aggiuntive
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug']
+      }
+    },
     // Ottimizza le dipendenze
     commonjsOptions: {
       transformMixedEsModules: true
