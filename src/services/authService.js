@@ -63,6 +63,7 @@ export async function register(username, password, referralCode = null) {
       headers: {
         'Content-Type': 'application/json'
       },
+      credentials: 'include', // Importante: include i cookie nella richiesta
       body: JSON.stringify(requestBody)
     });
     
@@ -303,23 +304,30 @@ export async function login(username, password) {
  */
 export async function verifySession() {
   try {
-    const token = localStorage.getItem('auth_token');
+    let token = localStorage.getItem('auth_token');
     
-    if (!token) {
-      return { success: false, message: 'Nessun token trovato' };
-    }
+    // Se non c'è token nel localStorage, prova a recuperarlo dal cookie
+    // (il cookie viene inviato automaticamente dal browser)
+    // Se il token è nel localStorage, usalo; altrimenti il server controllerà il cookie
     
     const response = await fetch(`${API_BASE_URL}/me`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         'Content-Type': 'application/json'
-      }
+      },
+      credentials: 'include' // Importante: include i cookie nella richiesta
     });
     
     const data = await response.json();
     
     if (data.success && data.user) {
+      // Se il server ha restituito un token (potrebbe essere dal cookie), salviamolo
+      if (data.token && !token) {
+        token = data.token;
+        localStorage.setItem('auth_token', token);
+      }
+      
       localStorage.setItem('user', JSON.stringify(data.user));
       
       // Sincronizza l'abbonamento con lo store utente
@@ -360,15 +368,14 @@ export async function logout() {
   try {
     const token = localStorage.getItem('auth_token');
     
-    if (token) {
-      await fetch(`${API_BASE_URL}/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-    }
+    await fetch(`${API_BASE_URL}/logout`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include' // Importante: include i cookie nella richiesta
+    });
   } catch (error) {
     console.error('Errore durante il logout:', error);
   } finally {
@@ -427,6 +434,7 @@ export async function updateUsername(username) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
+      credentials: 'include', // Importante: include i cookie nella richiesta
       body: JSON.stringify({ username })
     });
     
@@ -473,6 +481,7 @@ export async function updatePassword(currentPassword, newPassword) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
+      credentials: 'include', // Importante: include i cookie nella richiesta
       body: JSON.stringify({
         current_password: currentPassword,
         new_password: newPassword
@@ -513,7 +522,8 @@ export async function deleteAccount() {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      credentials: 'include' // Importante: include i cookie nella richiesta
     });
     
     const responseText = await response.text();

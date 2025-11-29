@@ -23,10 +23,36 @@ function getDatabaseConnection() {
   return neon(connectionString);
 }
 
+// Helper per parsare i cookie dalle richieste
+function parseCookies(cookieHeader) {
+  const cookies = {};
+  if (cookieHeader) {
+    cookieHeader.split(';').forEach(cookie => {
+      const parts = cookie.trim().split('=');
+      if (parts.length === 2) {
+        cookies[parts[0]] = parts[1];
+      }
+    });
+  }
+  return cookies;
+}
+
 // Helper per verificare autenticazione
 async function authenticateUser(req, sql) {
+  // Prova prima con l'header Authorization
+  let token = null;
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  if (authHeader) {
+    token = authHeader.split(' ')[1];
+  }
+  
+  // Se non c'è token nell'header, prova con il cookie
+  if (!token) {
+    const cookies = parseCookies(req.headers.cookie);
+    if (cookies.auth_token) {
+      token = cookies.auth_token;
+    }
+  }
 
   if (!token) {
     return { error: 'Token non fornito', status: 401 };
@@ -153,13 +179,33 @@ export default async function handler(req, res) {
     // POST /api/auth/logout - Logout (default POST without action)
     if (req.method === 'POST' && !req.query.action) {
       const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1];
+      let token = authHeader && authHeader.split(' ')[1];
+      
+      // Se non c'è token nell'header, prova con il cookie
+      if (!token) {
+        const cookies = parseCookies(req.headers.cookie);
+        if (cookies.auth_token) {
+          token = cookies.auth_token;
+        }
+      }
 
       if (token) {
         await sql`
           DELETE FROM sessions WHERE token = ${token}
         `;
       }
+      
+      // Cancella il cookie (per Vercel API routes, usiamo setHeader)
+      const isProduction = process.env.NODE_ENV === 'production';
+      const cookieParts = [
+        'auth_token=',
+        'Max-Age=0',
+        'Path=/',
+        'SameSite=Lax',
+        isProduction ? 'Secure' : '',
+        'HttpOnly'
+      ].filter(Boolean);
+      res.setHeader('Set-Cookie', cookieParts.join('; '));
 
       res.json({
         success: true,

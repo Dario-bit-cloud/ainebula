@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { neon } from '@neondatabase/serverless';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -82,11 +83,21 @@ app.use(compression({
 }));
 
 app.use(express.json());
+app.use(cookieParser()); // Middleware per leggere i cookie
 
 // Middleware per verificare l'autenticazione
 async function authenticateToken(req, res, next) {
+  // Prova prima con l'header Authorization
+  let token = null;
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  if (authHeader) {
+    token = authHeader.split(' ')[1]; // Bearer TOKEN
+  }
+  
+  // Se non c'è token nell'header, prova con il cookie
+  if (!token && req.cookies && req.cookies.auth_token) {
+    token = req.cookies.auth_token;
+  }
 
   if (!token) {
     return res.status(401).json({ success: false, message: 'Token non fornito' });
@@ -505,6 +516,24 @@ app.post('/api/auth/login', async (req, res) => {
       UPDATE users SET last_login = NOW() WHERE id = ${user.id}
     `;
     
+    // Imposta il cookie HTTP per mantenere la sessione
+    const cookieOptions = {
+      httpOnly: true, // Previene accesso JavaScript al cookie (sicurezza)
+      secure: process.env.NODE_ENV === 'production', // Solo HTTPS in produzione
+      sameSite: 'lax', // Protezione CSRF
+      maxAge: SESSION_DURATION / 1000, // Durata in secondi (7 giorni)
+      path: '/' // Disponibile su tutto il sito
+    };
+    
+    res.cookie('auth_token', sessionToken, cookieOptions);
+    
+    log('🍪 [SERVER LOGIN] Cookie impostato:', {
+      httpOnly: cookieOptions.httpOnly,
+      secure: cookieOptions.secure,
+      sameSite: cookieOptions.sameSite,
+      maxAge: cookieOptions.maxAge
+    });
+
     const response = {
       success: true,
       message: 'Login completato con successo',
@@ -543,9 +572,28 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // Logout
 app.post('/api/auth/logout', authenticateToken, async (req, res) => {
   try {
-    await sql`
-      DELETE FROM sessions WHERE token = ${req.headers['authorization'].split(' ')[1]}
-    `;
+    // Ottieni il token dall'header o dal cookie
+    let token = null;
+    const authHeader = req.headers['authorization'];
+    if (authHeader) {
+      token = authHeader.split(' ')[1];
+    } else if (req.cookies && req.cookies.auth_token) {
+      token = req.cookies.auth_token;
+    }
+    
+    if (token) {
+      await sql`
+        DELETE FROM sessions WHERE token = ${token}
+      `;
+    }
+    
+    // Cancella il cookie
+    res.clearCookie('auth_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/'
+    });
     
     res.json({
       success: true,

@@ -180,6 +180,23 @@ export default async function handler(req, res) {
       UPDATE users SET last_login = NOW() WHERE id = ${userId}
     `;
 
+    // Imposta il cookie HTTP per mantenere la sessione
+    // Per Vercel API routes, usiamo setHeader invece di res.cookie()
+    const maxAge = SESSION_DURATION / 1000; // Durata in secondi (7 giorni)
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieParts = [
+      `auth_token=${sessionToken}`,
+      `Max-Age=${maxAge}`,
+      `Path=/`,
+      `SameSite=Lax`,
+      isProduction ? 'Secure' : '',
+      'HttpOnly'
+    ].filter(Boolean); // Rimuove stringhe vuote
+    
+    res.setHeader('Set-Cookie', cookieParts.join('; '));
+    
+    console.log('🍪 [VERCEL REGISTER] Cookie impostato');
+
     console.log('✅ [VERCEL REGISTER] Registrazione completata per:', username.toLowerCase());
 
     res.json({

@@ -200,6 +200,23 @@ async function handlePasskeyLoginFinish(req, res, sql) {
     UPDATE users SET last_login = NOW() WHERE id = ${user.id}
   `;
   
+  // Imposta il cookie HTTP per mantenere la sessione
+  // Per Vercel API routes, usiamo setHeader invece di res.cookie()
+  const maxAge = SESSION_DURATION / 1000; // Durata in secondi (7 giorni)
+  const isProduction = process.env.NODE_ENV === 'production';
+  const cookieParts = [
+    `auth_token=${sessionToken}`,
+    `Max-Age=${maxAge}`,
+    `Path=/`,
+    `SameSite=Lax`,
+    isProduction ? 'Secure' : '',
+    'HttpOnly'
+  ].filter(Boolean); // Rimuove stringhe vuote
+  
+  res.setHeader('Set-Cookie', cookieParts.join('; '));
+  
+  console.log('🍪 [VERCEL PASSKEY LOGIN] Cookie impostato');
+  
   res.json({
     success: true,
     message: 'Login con passkey completato con successo',
