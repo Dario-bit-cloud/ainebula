@@ -3648,6 +3648,21 @@
       flex: 1;
       min-width: 0;
     }
+    
+    .send-button,
+    .stop-button {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+      padding: 8px;
+    }
+    
+    .send-button svg,
+    .stop-button svg {
+      width: 20px;
+      height: 20px;
+    }
   }
   
   @media (max-width: 480px) {
@@ -3986,6 +4001,9 @@
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 4px;
     transform: scale(1);
+    min-width: 40px;
+    min-height: 40px;
+    touch-action: manipulation;
   }
   
   .stop-button:hover {
@@ -4245,7 +4263,10 @@
     transform: scale(1);
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
     flex-shrink: 0;
+    touch-action: manipulation;
   }
   
   .send-button:disabled {
