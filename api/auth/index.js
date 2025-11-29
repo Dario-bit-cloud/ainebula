@@ -1,6 +1,10 @@
-// API Route consolidata per gestire operazioni di autenticazione su Vercel
+// API Route consolidata per gestire TUTTE le operazioni di autenticazione su Vercel
 // Endpoints:
 // GET /api/auth/me - Verifica sessione e ottieni dati utente
+// POST /api/auth/login - Login
+// POST /api/auth/register - Registrazione
+// POST /api/auth/passkey - Passkey (login/register)
+// POST /api/auth/2fa - 2FA (generate/verify/disable/status)
 // POST /api/auth/logout - Logout
 // POST /api/auth/disconnect-all - Disconnetti da tutti i dispositivi
 // DELETE /api/auth/delete-account - Elimina account
@@ -11,8 +15,22 @@
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
+import * as SimpleWebAuthnServer from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
+
+// Configurazione WebAuthn
+const rpId = process.env.WEBAUTHN_RP_ID || 'ainebula.vercel.app';
+const rpName = process.env.WEBAUTHN_RP_NAME || 'Nebula AI';
+const origin = process.env.WEBAUTHN_ORIGIN || 'https://ainebula.vercel.app';
+
+// Store temporaneo per le challenge passkey
+const challenges = new Map();
 
 // Inizializza la connessione al database solo se DATABASE_URL è disponibile
 function getDatabaseConnection() {
@@ -96,8 +114,728 @@ export default async function handler(req, res) {
     // Inizializza la connessione al database
     const sql = getDatabaseConnection();
     
+    // Determina l'endpoint dal path o query parameter
+    const urlPath = req.url.split('?')[0];
+    const action = req.query.action || req.body.action;
+    const endpoint = urlPath.split('/api/auth/')[1] || '';
+    
+    // POST /api/auth/login - Login
+    if (req.method === 'POST' && (endpoint === 'login' || action === 'login')) {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username e password sono obbligatori'
+        });
+      }
+      
+      const usernameLower = username.toLowerCase();
+      const users = await sql`
+        SELECT id, email, username, password_hash, is_active
+        FROM users
+        WHERE username = ${usernameLower}
+      `;
+      
+      if (users.length === 0) {
+        return res.status(401).json({
+          success: false,
+          message: 'Credenziali non valide'
+        });
+      }
+      
+      const user = users[0];
+      
+      if (!user.is_active) {
+        return res.status(403).json({
+          success: false,
+          message: 'Account disattivato'
+        });
+      }
+      
+      const isValidPassword = await bcrypt.compare(password, user.password_hash);
+      
+      if (!isValidPassword) {
+        return res.status(401).json({
+          success: false,
+          message: 'Credenziali non valide'
+        });
+      }
+      
+      const sessionToken = jwt.sign(
+        { userId: user.id, email: user.email, username: user.username },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      const sessionId = randomBytes(16).toString('hex');
+      const expiresAt = new Date(Date.now() + SESSION_DURATION);
+      
+      await sql`
+        INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
+        VALUES (${sessionId}, ${user.id}, ${sessionToken}, ${expiresAt}, ${req.headers['x-forwarded-for'] || req.socket.remoteAddress}, ${req.headers['user-agent']})
+      `;
+      
+      await sql`
+        UPDATE users SET last_login = NOW() WHERE id = ${user.id}
+      `;
+      
+      const maxAge = SESSION_DURATION / 1000;
+      const isProduction = process.env.NODE_ENV === 'production';
+      const cookieParts = [
+        `auth_token=${sessionToken}`,
+        `Max-Age=${maxAge}`,
+        `Path=/`,
+        `SameSite=Lax`,
+        isProduction ? 'Secure' : '',
+        'HttpOnly'
+      ].filter(Boolean);
+      
+      res.setHeader('Set-Cookie', cookieParts.join('; '));
+      
+      res.json({
+        success: true,
+        message: 'Login completato con successo',
+        user: {
+          id: user.id,
+          username: user.username
+        },
+        token: sessionToken
+      });
+      return;
+    }
+    
+    // POST /api/auth/register - Registrazione
+    if (req.method === 'POST' && (endpoint === 'register' || action === 'register')) {
+      const { username, password, referralCode } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username e password sono obbligatori'
+        });
+      }
+      
+      if (username.length < 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'Lo username deve essere di almeno 3 caratteri'
+        });
+      }
+      
+      if (password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'La password deve essere di almeno 6 caratteri'
+        });
+      }
+      
+      const existing = await sql`
+        SELECT id FROM users 
+        WHERE username = ${username.toLowerCase()}
+      `;
+      
+      if (existing.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username già in uso'
+        });
+      }
+      
+      const passwordHash = await bcrypt.hash(password, 10);
+      const userId = randomBytes(16).toString('hex');
+      const email = `${username.toLowerCase()}@nebula.local`;
+      
+      function generateReferralCode() {
+        return randomBytes(8).toString('hex');
+      }
+      
+      let userReferralCode = generateReferralCode();
+      let codeExists = true;
+      while (codeExists) {
+        const existing = await sql`
+          SELECT id FROM users WHERE referral_code = ${userReferralCode}
+        `;
+        if (existing.length === 0) {
+          codeExists = false;
+        } else {
+          userReferralCode = generateReferralCode();
+        }
+      }
+      
+      await sql`
+        INSERT INTO users (id, email, username, password_hash, referral_code)
+        VALUES (${userId}, ${email}, ${username.toLowerCase()}, ${passwordHash}, ${userReferralCode})
+      `;
+      
+      if (referralCode) {
+        try {
+          const [referrer] = await sql`
+            SELECT id FROM users WHERE referral_code = ${referralCode}
+          `;
+          
+          if (referrer && referrer.id !== userId) {
+            const referralId = randomBytes(16).toString('hex');
+            await sql`
+              INSERT INTO referrals (id, referrer_id, referred_id, referral_code, status)
+              VALUES (${referralId}, ${referrer.id}, ${userId}, ${referralCode}, 'completed')
+            `;
+            
+            const [earningsCheck] = await sql`
+              SELECT 
+                COALESCE(SUM(CASE WHEN re.status IN ('available', 'withdrawn') THEN re.amount ELSE 0 END), 0) as total_earnings
+              FROM referral_earnings re
+              WHERE re.user_id = ${referrer.id}
+            `;
+            
+            const totalEarnings = parseFloat(earningsCheck?.total_earnings || 0);
+            const REFERRAL_REWARD = 20.00;
+            const MAX_EARNINGS = 500.00;
+            
+            if (totalEarnings < MAX_EARNINGS) {
+              const earningId = randomBytes(16).toString('hex');
+              const rewardAmount = Math.min(REFERRAL_REWARD, MAX_EARNINGS - totalEarnings);
+              
+              await sql`
+                INSERT INTO referral_earnings (id, user_id, referral_id, amount, status)
+                VALUES (${earningId}, ${referrer.id}, ${referralId}, ${rewardAmount}, 'available')
+              `;
+            }
+          }
+        } catch (refError) {
+          console.error('Errore referral:', refError);
+        }
+      }
+      
+      const sessionToken = jwt.sign({ userId, email, username: username.toLowerCase() }, JWT_SECRET, { expiresIn: '7d' });
+      const sessionId = randomBytes(16).toString('hex');
+      const expiresAt = new Date(Date.now() + SESSION_DURATION);
+      
+      await sql`
+        INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
+        VALUES (${sessionId}, ${userId}, ${sessionToken}, ${expiresAt}, ${req.headers['x-forwarded-for'] || req.socket.remoteAddress}, ${req.headers['user-agent']})
+      `;
+      
+      await sql`
+        UPDATE users SET last_login = NOW() WHERE id = ${userId}
+      `;
+      
+      const maxAge = SESSION_DURATION / 1000;
+      const isProduction = process.env.NODE_ENV === 'production';
+      const cookieParts = [
+        `auth_token=${sessionToken}`,
+        `Max-Age=${maxAge}`,
+        `Path=/`,
+        `SameSite=Lax`,
+        isProduction ? 'Secure' : '',
+        'HttpOnly'
+      ].filter(Boolean);
+      
+      res.setHeader('Set-Cookie', cookieParts.join('; '));
+      
+      res.json({
+        success: true,
+        message: 'Registrazione completata con successo',
+        user: {
+          id: userId,
+          username: username.toLowerCase()
+        },
+        token: sessionToken
+      });
+      return;
+    }
+    
+    // POST /api/auth/passkey - Passkey operations
+    if (req.method === 'POST' && (endpoint === 'passkey' || action === 'passkey')) {
+      const passkeyAction = req.body.action || req.query.action;
+      
+      // Passkey Login Start
+      if (passkeyAction === 'login-start') {
+        const { username } = req.body;
+        
+        if (!username) {
+          return res.status(400).json({
+            success: false,
+            message: 'Username obbligatorio'
+          });
+        }
+        
+        const users = await sql`
+          SELECT id, username FROM users WHERE username = ${username.toLowerCase()}
+        `;
+        
+        if (users.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Utente non trovato'
+          });
+        }
+        
+        const user = users[0];
+        const passkeys = await sql`
+          SELECT credential_id, counter FROM passkeys WHERE user_id = ${user.id}
+        `;
+        
+        if (passkeys.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Nessuna passkey registrata per questo utente'
+          });
+        }
+        
+        const opts = await SimpleWebAuthnServer.generateAuthenticationOptions({
+          rpID: rpId,
+          timeout: 60000,
+          allowCredentials: passkeys.map(pk => ({
+            id: isoBase64URL.toBuffer(pk.credential_id),
+            type: 'public-key',
+            transports: ['internal', 'hybrid']
+          })),
+          userVerification: 'preferred'
+        });
+        
+        challenges.set(`login:${user.id}`, opts.challenge);
+        
+        res.json({
+          success: true,
+          options: opts
+        });
+        return;
+      }
+      
+      // Passkey Login Finish
+      if (passkeyAction === 'login-finish') {
+        const { username, credential } = req.body;
+        
+        if (!username || !credential) {
+          return res.status(400).json({
+            success: false,
+            message: 'Username e credential obbligatori'
+          });
+        }
+        
+        const users = await sql`
+          SELECT id, username, email FROM users WHERE username = ${username.toLowerCase()}
+        `;
+        
+        if (users.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Utente non trovato'
+          });
+        }
+        
+        const user = users[0];
+        const expectedChallenge = challenges.get(`login:${user.id}`);
+        
+        if (!expectedChallenge) {
+          return res.status(400).json({
+            success: false,
+            message: 'Challenge non trovata. Riprova il login.'
+          });
+        }
+        
+        const credentialId = credential.id;
+        const passkeys = await sql`
+          SELECT id, credential_id, public_key, counter FROM passkeys WHERE user_id = ${user.id}
+        `;
+        
+        const passkey = passkeys.find(pk => pk.credential_id === credentialId);
+        
+        if (!passkey) {
+          challenges.delete(`login:${user.id}`);
+          return res.status(404).json({
+            success: false,
+            message: 'Passkey non trovata'
+          });
+        }
+        
+        let verification;
+        try {
+          verification = await SimpleWebAuthnServer.verifyAuthenticationResponse({
+            response: credential,
+            expectedChallenge: expectedChallenge,
+            expectedOrigin: origin,
+            expectedRPID: rpId,
+            authenticator: {
+              credentialID: isoBase64URL.toBuffer(passkey.credential_id),
+              credentialPublicKey: isoBase64URL.toBuffer(passkey.public_key),
+              counter: parseInt(passkey.counter) || 0
+            },
+            requireUserVerification: false
+          });
+        } catch (error) {
+          challenges.delete(`login:${user.id}`);
+          return res.status(400).json({
+            success: false,
+            message: 'Errore durante la verifica: ' + error.message
+          });
+        }
+        
+        if (!verification.verified) {
+          challenges.delete(`login:${user.id}`);
+          return res.status(400).json({
+            success: false,
+            message: 'Verifica fallita'
+          });
+        }
+        
+        await sql`
+          UPDATE passkeys 
+          SET counter = ${verification.authenticationInfo.newCounter}, last_used_at = NOW()
+          WHERE id = ${passkey.id}
+        `;
+        
+        challenges.delete(`login:${user.id}`);
+        
+        const sessionToken = jwt.sign(
+          { userId: user.id, email: user.email, username: user.username },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        const sessionId = randomBytes(16).toString('hex');
+        const expiresAt = new Date(Date.now() + SESSION_DURATION);
+        
+        await sql`
+          INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
+          VALUES (${sessionId}, ${user.id}, ${sessionToken}, ${expiresAt}, ${req.headers['x-forwarded-for'] || req.socket.remoteAddress}, ${req.headers['user-agent']})
+        `;
+        
+        await sql`
+          UPDATE users SET last_login = NOW() WHERE id = ${user.id}
+        `;
+        
+        const maxAge = SESSION_DURATION / 1000;
+        const isProduction = process.env.NODE_ENV === 'production';
+        const cookieParts = [
+          `auth_token=${sessionToken}`,
+          `Max-Age=${maxAge}`,
+          `Path=/`,
+          `SameSite=Lax`,
+          isProduction ? 'Secure' : '',
+          'HttpOnly'
+        ].filter(Boolean);
+        
+        res.setHeader('Set-Cookie', cookieParts.join('; '));
+        
+        res.json({
+          success: true,
+          message: 'Login con passkey completato con successo',
+          user: {
+            id: user.id,
+            username: user.username
+          },
+          token: sessionToken
+        });
+        return;
+      }
+      
+      // Passkey Register Start
+      if (passkeyAction === 'register-start') {
+        const { username } = req.body;
+        
+        if (!username) {
+          return res.status(400).json({
+            success: false,
+            message: 'Username obbligatorio'
+          });
+        }
+        
+        const users = await sql`
+          SELECT id, username FROM users WHERE username = ${username.toLowerCase()}
+        `;
+        
+        if (users.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Utente non trovato'
+          });
+        }
+        
+        const user = users[0];
+        
+        const opts = await SimpleWebAuthnServer.generateRegistrationOptions({
+          rpName,
+          rpID: rpId,
+          userID: user.id,
+          userName: user.username,
+          userDisplayName: user.username,
+          timeout: 60000,
+          attestationType: 'none',
+          excludeCredentials: [],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+            residentKey: 'preferred',
+            requireResidentKey: false
+          },
+          supportedAlgorithmIDs: [-7, -257]
+        });
+        
+        challenges.set(`register:${user.id}`, opts.challenge);
+        
+        res.json({
+          success: true,
+          options: opts
+        });
+        return;
+      }
+      
+      // Passkey Register Finish
+      if (passkeyAction === 'register-finish') {
+        const { username, credential } = req.body;
+        
+        if (!username || !credential) {
+          return res.status(400).json({
+            success: false,
+            message: 'Username e credential obbligatori'
+          });
+        }
+        
+        const users = await sql`
+          SELECT id, username FROM users WHERE username = ${username.toLowerCase()}
+        `;
+        
+        if (users.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'Utente non trovato'
+          });
+        }
+        
+        const user = users[0];
+        const expectedChallenge = challenges.get(`register:${user.id}`);
+        
+        if (!expectedChallenge) {
+          return res.status(400).json({
+            success: false,
+            message: 'Challenge non trovata. Riprova la registrazione.'
+          });
+        }
+        
+        let verification;
+        try {
+          verification = await SimpleWebAuthnServer.verifyRegistrationResponse({
+            response: credential,
+            expectedChallenge: expectedChallenge,
+            expectedOrigin: origin,
+            expectedRPID: rpId,
+            requireUserVerification: true
+          });
+        } catch (error) {
+          challenges.delete(`register:${user.id}`);
+          return res.status(400).json({
+            success: false,
+            message: 'Errore durante la verifica: ' + error.message
+          });
+        }
+        
+        if (!verification.verified || !verification.registrationInfo) {
+          challenges.delete(`register:${user.id}`);
+          return res.status(400).json({
+            success: false,
+            message: 'Verifica fallita'
+          });
+        }
+        
+        const passkeyId = randomBytes(16).toString('hex');
+        const credentialId = isoBase64URL.fromBuffer(verification.registrationInfo.credentialID);
+        const publicKey = isoBase64URL.fromBuffer(verification.registrationInfo.credentialPublicKey);
+        
+        await sql`
+          INSERT INTO passkeys (id, user_id, credential_id, public_key, counter, device_name)
+          VALUES (${passkeyId}, ${user.id}, ${credentialId}, ${publicKey}, ${verification.registrationInfo.counter || 0}, ${credential.response?.userHandle || 'Unknown Device'})
+        `;
+        
+        challenges.delete(`register:${user.id}`);
+        
+        res.json({
+          success: true,
+          message: 'Passkey registrata con successo'
+        });
+        return;
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Azione passkey non valida'
+      });
+    }
+    
+    // POST /api/auth/2fa - 2FA operations
+    if (req.method === 'POST' && (endpoint === '2fa' || action === '2fa')) {
+      const twoFactorAction = req.query.action || req.body.action;
+      
+      // GET /api/auth/2fa?action=status
+      if (req.method === 'GET' || twoFactorAction === 'status') {
+        const auth = await authenticateUser(req, sql);
+        if (auth.error) {
+          return res.status(auth.status).json({ success: false, message: auth.error });
+        }
+        
+        const users = await sql`
+          SELECT two_factor_enabled FROM users WHERE id = ${auth.user.user_id}
+        `;
+        
+        res.json({
+          success: true,
+          twoFactorEnabled: users[0]?.two_factor_enabled || false
+        });
+        return;
+      }
+      
+      // POST /api/auth/2fa?action=generate
+      if (twoFactorAction === 'generate') {
+        const auth = await authenticateUser(req, sql);
+        if (auth.error) {
+          return res.status(auth.status).json({ success: false, message: auth.error });
+        }
+        
+        const userId = auth.user.user_id;
+        const username = auth.user.username;
+        
+        const users = await sql`
+          SELECT two_factor_enabled FROM users WHERE id = ${userId}
+        `;
+        
+        if (users[0]?.two_factor_enabled) {
+          return res.status(400).json({ success: false, message: '2FA già abilitato' });
+        }
+        
+        const secret = speakeasy.generateSecret({
+          name: `Nebula AI (${username})`,
+          issuer: 'Nebula AI'
+        });
+        
+        await sql`
+          UPDATE users
+          SET two_factor_secret = ${secret.base32}
+          WHERE id = ${userId}
+        `;
+        
+        const otpauthUrl = speakeasy.otpauthURL({
+          secret: secret.base32,
+          label: username,
+          issuer: 'Nebula AI',
+          encoding: 'base32'
+        });
+        
+        const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+        
+        res.json({
+          success: true,
+          secret: secret.base32,
+          qrCode: qrCodeDataUrl,
+          manualEntryKey: secret.base32
+        });
+        return;
+      }
+      
+      // POST /api/auth/2fa?action=verify
+      if (twoFactorAction === 'verify') {
+        const auth = await authenticateUser(req, sql);
+        if (auth.error) {
+          return res.status(auth.status).json({ success: false, message: auth.error });
+        }
+        
+        const { code } = req.body;
+        
+        if (!code) {
+          return res.status(400).json({ success: false, message: 'Codice 2FA richiesto' });
+        }
+        
+        const userId = auth.user.user_id;
+        const users = await sql`
+          SELECT two_factor_secret FROM users WHERE id = ${userId}
+        `;
+        
+        const twoFactorSecret = users[0]?.two_factor_secret;
+        
+        if (!twoFactorSecret) {
+          return res.status(400).json({ success: false, message: 'Nessun secret 2FA trovato. Genera prima un QR code.' });
+        }
+        
+        const verified = speakeasy.totp.verify({
+          secret: twoFactorSecret,
+          encoding: 'base32',
+          token: code,
+          window: 2
+        });
+        
+        if (!verified) {
+          return res.status(400).json({ success: false, message: 'Codice 2FA non valido' });
+        }
+        
+        await sql`
+          UPDATE users
+          SET two_factor_enabled = TRUE
+          WHERE id = ${userId}
+        `;
+        
+        res.json({
+          success: true,
+          message: '2FA abilitato con successo'
+        });
+        return;
+      }
+      
+      // POST /api/auth/2fa?action=disable
+      if (twoFactorAction === 'disable') {
+        const auth = await authenticateUser(req, sql);
+        if (auth.error) {
+          return res.status(auth.status).json({ success: false, message: auth.error });
+        }
+        
+        const { code } = req.body;
+        
+        if (!code) {
+          return res.status(400).json({ success: false, message: 'Codice 2FA richiesto per disabilitare' });
+        }
+        
+        const userId = auth.user.user_id;
+        const users = await sql`
+          SELECT two_factor_enabled, two_factor_secret FROM users WHERE id = ${userId}
+        `;
+        
+        const twoFactorEnabled = users[0]?.two_factor_enabled;
+        const twoFactorSecret = users[0]?.two_factor_secret;
+        
+        if (!twoFactorEnabled) {
+          return res.status(400).json({ success: false, message: '2FA non è abilitato' });
+        }
+        
+        if (!twoFactorSecret) {
+          return res.status(400).json({ success: false, message: 'Nessun secret 2FA trovato' });
+        }
+        
+        const verified = speakeasy.totp.verify({
+          secret: twoFactorSecret,
+          encoding: 'base32',
+          token: code,
+          window: 2
+        });
+        
+        if (!verified) {
+          return res.status(400).json({ success: false, message: 'Codice 2FA non valido' });
+        }
+        
+        await sql`
+          UPDATE users
+          SET two_factor_enabled = FALSE, two_factor_secret = NULL
+          WHERE id = ${userId}
+        `;
+        
+        res.json({
+          success: true,
+          message: '2FA disabilitato con successo'
+        });
+        return;
+      }
+      
+      return res.status(400).json({ success: false, message: 'Azione 2FA non valida' });
+    }
+    
     // GET /api/auth/me - Verifica sessione e ottieni dati utente
-    if (req.method === 'GET') {
+    if (req.method === 'GET' && (endpoint === 'me' || !endpoint)) {
       const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
@@ -145,7 +883,8 @@ export default async function handler(req, res) {
           username: auth.user.username,
           phone_number: auth.user.phone_number || null,
           subscription: subscription
-        }
+        },
+        token: auth.token
       });
       return;
     }
@@ -176,8 +915,8 @@ export default async function handler(req, res) {
       return;
     }
 
-    // POST /api/auth/logout - Logout (default POST without action)
-    if (req.method === 'POST' && !req.query.action) {
+    // POST /api/auth/logout - Logout (default POST without action and not login/register/passkey/2fa)
+    if (req.method === 'POST' && !endpoint && !action && !req.query.action) {
       const authHeader = req.headers['authorization'];
       let token = authHeader && authHeader.split(' ')[1];
       
