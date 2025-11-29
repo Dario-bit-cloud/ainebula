@@ -67,6 +67,7 @@
         'Supporto via email'
       ],
       patreonEnabled: false
+      patreonEnabled: false
     },
     monthly: {
       name: 'Pro',
@@ -1828,6 +1829,24 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  
+  .patreon-icon.maintenance {
+    color: #f59e0b;
+  }
+  
+  .maintenance-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 8px;
+    color: #f59e0b;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 16px;
   }
   
   .patreon-header h3 {
