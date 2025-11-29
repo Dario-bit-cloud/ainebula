@@ -4,8 +4,8 @@
   import { isMobile } from '../stores/app.js';
   import { user } from '../stores/user.js';
   import { isAuthenticatedStore } from '../stores/auth.js';
-  import { showAlert } from '../services/dialogService.js';
-  import { getPatreonAuthUrl, checkPatreonMembership, getPatreonLinkStatus } from '../services/patreonService.js';
+  import { showAlert, showConfirm } from '../services/dialogService.js';
+  import { getPatreonAuthUrl, getPatreonStatus, syncPatreonMembership, unlinkPatreonAccount } from '../services/patreonService.js';
   import { saveSubscription } from '../services/subscriptionService.js';
   
   let selectedPlan = 'premium'; // 'premium', 'monthly' o 'yearly'
@@ -151,7 +151,7 @@
   onMount(async () => {
     if ($isAuthenticatedStore && $isPremiumModalOpen) {
       try {
-        const status = await getPatreonLinkStatus();
+        const status = await getPatreonStatus();
         if (status.success) {
           patreonLinkStatus = status;
         }
@@ -194,49 +194,90 @@
     }
   }
   
-  async function handlePatreonCheck() {
+  async function handlePatreonSync() {
     if (!$isAuthenticatedStore) {
-      await showAlert('Devi essere autenticato per verificare Patreon', 'Autenticazione richiesta', 'OK', 'warning');
+      await showAlert('Devi essere autenticato per sincronizzare Patreon', 'Autenticazione richiesta', 'OK', 'warning');
       return;
     }
     
     isCheckingPatreon = true;
     
     try {
-      // Verifica se l'utente ha già un account Patreon collegato
-      const linkStatus = await getPatreonLinkStatus();
+      const syncResult = await syncPatreonMembership();
       
-      if (!linkStatus.success || !linkStatus.isLinked) {
-        await showAlert('Collega prima il tuo account Patreon', 'Account non collegato', 'OK', 'info');
-        isCheckingPatreon = false;
-        return;
-      }
-      
-      // Verifica membership
-      const membershipCheck = await checkPatreonMembership(linkStatus.patreonUserId);
-      
-      if (membershipCheck.success && membershipCheck.subscription) {
+      if (syncResult.success && syncResult.hasActiveMembership) {
         // Aggiorna store utente
         user.update(u => ({
           ...u,
           subscription: {
             active: true,
             plan: 'premium',
-            expiresAt: membershipCheck.subscription.expires_at,
+            expiresAt: syncResult.subscription?.expires_at,
             key: `NEBULA-PREMIUM-PATREON-${Date.now()}`
           }
         }));
         
-        await showAlert('Abbonamento Premium attivato con successo tramite Patreon!', 'Abbonamento attivato', 'OK', 'success');
-        closeModal();
+        // Ricarica stato
+        const status = await getPatreonStatus();
+        if (status.success) {
+          patreonLinkStatus = status;
+        }
+        
+        await showAlert('Abbonamento Premium sincronizzato e attivo!', 'Patreon sincronizzato', 'OK', 'success');
       } else {
-        await showAlert(membershipCheck.message || 'Nessun abbonamento Premium attivo su Patreon. Assicurati di essere iscritto al tier da almeno 5€/mese.', 'Abbonamento non trovato', 'OK', 'warning');
+        await showAlert(syncResult.message || 'Nessun abbonamento Premium attivo trovato. Assicurati di essere iscritto al tier da almeno 5€/mese su Patreon.', 'Abbonamento non trovato', 'OK', 'warning');
       }
     } catch (error) {
-      console.error('Errore verifica Patreon:', error);
-      await showAlert('Errore durante la verifica dell\'abbonamento Patreon', 'Errore', 'OK', 'error');
+      console.error('Errore sincronizzazione Patreon:', error);
+      await showAlert('Errore durante la sincronizzazione dell\'abbonamento Patreon', 'Errore', 'OK', 'error');
     } finally {
       isCheckingPatreon = false;
+    }
+  }
+  
+  async function handlePatreonUnlink() {
+    if (!$isAuthenticatedStore) {
+      return;
+    }
+    
+    const confirmed = await showConfirm(
+      'Sei sicuro di voler scollegare il tuo account Patreon? Il tuo abbonamento Premium verrà disattivato.',
+      'Scollega Patreon',
+      'Scollega',
+      'Annulla',
+      'danger'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const result = await unlinkPatreonAccount();
+      
+      if (result.success) {
+        // Aggiorna store utente
+        user.update(u => ({
+          ...u,
+          subscription: {
+            active: false,
+            plan: null,
+            expiresAt: null,
+            key: null
+          }
+        }));
+        
+        // Ricarica stato
+        const status = await getPatreonStatus();
+        if (status.success) {
+          patreonLinkStatus = status;
+        }
+        
+        await showAlert('Account Patreon scollegato con successo', 'Patreon scollegato', 'OK', 'success');
+      } else {
+        await showAlert(result.message || 'Errore durante lo scollegamento', 'Errore', 'OK', 'error');
+      }
+    } catch (error) {
+      console.error('Errore scollegamento Patreon:', error);
+      await showAlert('Errore durante lo scollegamento con Patreon', 'Errore', 'OK', 'error');
     }
   }
   
@@ -712,7 +753,7 @@
                   </div>
                   <button 
                     class="patreon-button check-button" 
-                    on:click={handlePatreonCheck}
+                    on:click={handlePatreonSync}
                     disabled={isCheckingPatreon}
                   >
                     {#if isCheckingPatreon}
@@ -724,7 +765,7 @@
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
-                      Verifica Abbonamento
+                      Sincronizza Abbonamento
                     {/if}
                   </button>
                 </div>

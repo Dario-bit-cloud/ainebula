@@ -13,7 +13,7 @@
   import { currentChatId } from './stores/chat.js';
   import { isInputElement } from './utils/shortcuts.js';
   import { showConfirm, showAlert } from './services/dialogService.js';
-  import { linkPatreonAccount, checkPatreonMembership } from './services/patreonService.js';
+  import { linkPatreonAccount } from './services/patreonService.js';
   
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
@@ -410,114 +410,91 @@
     
     // Gestisci callback Patreon
     const urlParams = new URLSearchParams(window.location.search);
-    const patreonLinked = urlParams.get('patreon_linked');
+    const patreonCallback = urlParams.get('patreon_callback');
     const patreonUserId = urlParams.get('patreon_user_id');
     const patreonToken = urlParams.get('patreon_token');
     const patreonError = urlParams.get('patreon_error');
     
     if (patreonError) {
-      // Rimuovi parametri dall'URL
       window.history.replaceState({}, document.title, window.location.pathname);
       showAlert(`Errore collegamento Patreon: ${decodeURIComponent(patreonError)}`, 'Errore Patreon', 'OK', 'error');
-    } else if (patreonLinked === 'true' && patreonUserId && patreonToken) {
-      // Salva temporaneamente i dati Patreon nel localStorage
-      // Verranno processati quando l'utente sarà autenticato
-      localStorage.setItem('patreon_pending_user_id', patreonUserId);
-      localStorage.setItem('patreon_pending_token', decodeURIComponent(patreonToken));
-      
-      // Rimuovi parametri dall'URL immediatamente
+    } else if (patreonCallback === 'true' && patreonUserId && patreonToken) {
       window.history.replaceState({}, document.title, window.location.pathname);
       
-      // Funzione per processare il collegamento Patreon
+      // Processa collegamento quando l'utente è autenticato
       const processPatreonLink = async () => {
-        const pendingUserId = localStorage.getItem('patreon_pending_user_id');
-        const pendingToken = localStorage.getItem('patreon_pending_token');
-        
-        if (!pendingUserId || !pendingToken) {
-          return; // Nessun collegamento in attesa
-        }
-        
-        // Verifica se c'è un token di autenticazione
-        const authToken = localStorage.getItem('auth_token');
-        if (!authToken) {
-          // Attendi che l'utente si autentichi
-          console.log('⏳ [PATREON] In attesa di autenticazione per collegare account Patreon...');
+        if (!$isAuthenticatedStore) {
+          // Salva temporaneamente e aspetta autenticazione
+          localStorage.setItem('patreon_pending_user_id', patreonUserId);
+          localStorage.setItem('patreon_pending_token', decodeURIComponent(patreonToken));
           return;
         }
         
         try {
-          console.log('🔗 [PATREON] Collegamento account Patreon...');
-          const linkResult = await linkPatreonAccount(pendingUserId, pendingToken);
+          const linkResult = await linkPatreonAccount(patreonUserId, decodeURIComponent(patreonToken));
           
           if (linkResult.success) {
-            // Rimuovi dati temporanei
-            localStorage.removeItem('patreon_pending_user_id');
-            localStorage.removeItem('patreon_pending_token');
-            
-            // Verifica membership e attiva abbonamento
-            const membershipResult = await checkPatreonMembership(pendingUserId);
-            
-            if (membershipResult.success && membershipResult.subscription) {
-              // Aggiorna store utente
+            if (linkResult.hasActiveMembership) {
+              // Aggiorna store utente con subscription
               user.update(u => ({
                 ...u,
                 subscription: {
                   active: true,
                   plan: 'premium',
-                  expiresAt: membershipResult.subscription.expires_at,
+                  expiresAt: linkResult.subscription?.expires_at,
                   key: `NEBULA-PREMIUM-PATREON-${Date.now()}`
                 }
               }));
-              
-              showAlert('Account Patreon collegato e abbonamento Premium attivato con successo!', 'Patreon collegato', 'OK', 'success');
+              showAlert('Account Patreon collegato e abbonamento Premium attivato!', 'Patreon collegato', 'OK', 'success');
             } else {
               showAlert('Account Patreon collegato. Verifica il tuo abbonamento Premium su Patreon (minimo 5€/mese).', 'Account collegato', 'OK', 'info');
             }
           } else {
-            showAlert(linkResult.message || 'Errore durante il collegamento dell\'account Patreon', 'Errore', 'OK', 'error');
+            showAlert(linkResult.message || 'Errore durante il collegamento', 'Errore', 'OK', 'error');
           }
         } catch (error) {
-          console.error('Errore processamento callback Patreon:', error);
-          showAlert('Errore durante il processamento del callback Patreon', 'Errore', 'OK', 'error');
+          console.error('Errore collegamento Patreon:', error);
+          showAlert('Errore durante il collegamento con Patreon', 'Errore', 'OK', 'error');
         }
       };
       
-      // Se l'utente è già autenticato, processa immediatamente
+      // Processa immediatamente se autenticato, altrimenti aspetta
       if ($isAuthenticatedStore) {
         processPatreonLink();
       } else {
-        // Altrimenti, aspetta che l'autenticazione sia completata
-        // Usa un reactive statement per monitorare lo stato di autenticazione
-        let unsubscribe = null;
-        unsubscribe = isAuthenticatedStore.subscribe(async (isAuth) => {
-          if (isAuth && unsubscribe) {
-            unsubscribe(); // Rimuovi subscription dopo il primo trigger
-            unsubscribe = null;
-            // Aspetta un momento per assicurarsi che tutto sia pronto
+        const unsubscribe = isAuthenticatedStore.subscribe(async (isAuth) => {
+          if (isAuth) {
+            unsubscribe();
             await new Promise(resolve => setTimeout(resolve, 500));
             await processPatreonLink();
           }
         });
         
-        // Anche listener per evento custom (backup)
-        const handlePatreonPending = async () => {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          await processPatreonLink();
-        };
-        window.addEventListener('patreon-pending-process', handlePatreonPending);
-        
-        // Cleanup quando il componente viene distrutto
-        const cleanup = () => {
-          if (unsubscribe) {
-            unsubscribe();
-            unsubscribe = null;
-          }
-          window.removeEventListener('patreon-pending-process', handlePatreonPending);
-        };
-        
-        // Salva cleanup per chiamarlo in onDestroy
-        window._patreonCleanup = cleanup;
+        // Cleanup
+        window._patreonUnsubscribe = unsubscribe;
       }
+    }
+    
+    // Processa eventuali dati Patreon salvati in localStorage
+    const pendingUserId = localStorage.getItem('patreon_pending_user_id');
+    const pendingToken = localStorage.getItem('patreon_pending_token');
+    if (pendingUserId && pendingToken && $isAuthenticatedStore) {
+      localStorage.removeItem('patreon_pending_user_id');
+      localStorage.removeItem('patreon_pending_token');
+      
+      linkPatreonAccount(pendingUserId, pendingToken).then(result => {
+        if (result.success && result.hasActiveMembership) {
+          user.update(u => ({
+            ...u,
+            subscription: {
+              active: true,
+              plan: 'premium',
+              expiresAt: result.subscription?.expires_at,
+              key: `NEBULA-PREMIUM-PATREON-${Date.now()}`
+            }
+          }));
+        }
+      });
     }
     
     // Inizializza il tema all'avvio
@@ -571,9 +548,9 @@
   onDestroy(() => {
     window.removeEventListener('keydown', handleKeyboardShortcuts);
     // Cleanup Patreon se presente
-    if (window._patreonCleanup) {
-      window._patreonCleanup();
-      delete window._patreonCleanup;
+    if (window._patreonUnsubscribe) {
+      window._patreonUnsubscribe();
+      delete window._patreonUnsubscribe;
     }
   });
 </script>

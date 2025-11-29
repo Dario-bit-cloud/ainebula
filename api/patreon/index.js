@@ -1,11 +1,10 @@
-// API Route consolidata per gestire tutte le operazioni Patreon su Vercel
-// Gestisce tutti gli endpoint tramite query parameter 'action' o path
+// API Route semplificata per gestire abbonamenti Patreon
 // Endpoints:
-// GET /api/patreon?action=callback - Callback OAuth Patreon
-// POST /api/patreon?action=link-account - Collega account Patreon
-// POST /api/patreon?action=check-membership - Verifica membership Patreon
-// GET /api/patreon?action=link-status - Verifica stato collegamento
-// POST /api/patreon?action=unlink-account - Scollega account Patreon
+// GET  /api/patreon/callback - Callback OAuth Patreon
+// GET  /api/patreon/status - Verifica stato collegamento e abbonamento
+// POST /api/patreon/link - Collega account Patreon (dopo callback)
+// POST /api/patreon/sync - Sincronizza abbonamento da Patreon
+// POST /api/patreon/unlink - Scollega account Patreon
 
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
@@ -14,8 +13,8 @@ import { randomBytes } from 'crypto';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const PATREON_CLIENT_ID = process.env.PATREON_CLIENT_ID || 'NF2MmLVExjXVv4ZpcgijfosjlJIYQuPBblK7vE1PpSPRawgFbKhiVbzq0Nbl1YAf';
 const PATREON_CLIENT_SECRET = process.env.PATREON_CLIENT_SECRET || '8JZGmekMz0KcEs-20TV1mVFZUb4VpPny6vA_XXM_OFm4GwTTrbv7wTkQSzHgjiEm';
+const MIN_AMOUNT_CENTS = 500; // 5€ = 500 centesimi
 
-// Inizializza la connessione al database solo se DATABASE_URL è disponibile
 function getDatabaseConnection() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -24,7 +23,6 @@ function getDatabaseConnection() {
   return neon(connectionString);
 }
 
-// Helper per parsare i cookie dalle richieste
 function parseCookies(cookieHeader) {
   const cookies = {};
   if (cookieHeader) {
@@ -38,16 +36,13 @@ function parseCookies(cookieHeader) {
   return cookies;
 }
 
-// Helper per verificare autenticazione
 async function authenticateUser(req, sql) {
-  // Prova prima con l'header Authorization
   let token = null;
   const authHeader = req.headers['authorization'];
   if (authHeader) {
     token = authHeader.split(' ')[1];
   }
   
-  // Se non c'è token nell'header, prova con il cookie
   if (!token) {
     const cookies = parseCookies(req.headers.cookie);
     if (cookies.auth_token) {
@@ -61,7 +56,6 @@ async function authenticateUser(req, sql) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-
     const sessions = await sql`
       SELECT s.*, u.id as user_id, u.email, u.username, u.is_active
       FROM sessions s
@@ -81,11 +75,106 @@ async function authenticateUser(req, sql) {
   }
 }
 
+// Verifica membership su Patreon e aggiorna subscription
+async function syncPatreonMembership(userId, patreonUserId, accessToken, sql) {
+  try {
+    const membershipResponse = await fetch(
+      `https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name&fields[member]=patron_status,currently_entitled_amount_cents`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!membershipResponse.ok) {
+      return { success: false, message: 'Errore nella verifica membership Patreon' };
+    }
+
+    const membershipData = await membershipResponse.json();
+    let hasActiveMembership = false;
+    let amountCents = 0;
+
+    if (membershipData.included) {
+      for (const item of membershipData.included) {
+        if (item.type === 'member') {
+          const isActive = item.attributes?.patron_status === 'active_patron';
+          amountCents = item.attributes?.currently_entitled_amount_cents || 0;
+          
+          if (isActive && amountCents >= MIN_AMOUNT_CENTS) {
+            hasActiveMembership = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (hasActiveMembership) {
+      // Crea o aggiorna abbonamento
+      const expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+      const existingSubs = await sql`
+        SELECT id FROM subscriptions
+        WHERE user_id = ${userId}
+          AND payment_method = 'patreon'
+          AND status = 'active'
+      `;
+
+      if (existingSubs.length === 0) {
+        const subscriptionId = randomBytes(16).toString('hex');
+        await sql`
+          INSERT INTO subscriptions (id, user_id, plan, status, started_at, expires_at, payment_method, auto_renew, amount, currency, billing_cycle)
+          VALUES (${subscriptionId}, ${userId}, 'premium', 'active', NOW(), ${expiresAt}, 'patreon', true, ${amountCents / 100}, 'EUR', 'monthly')
+        `;
+      } else {
+        await sql`
+          UPDATE subscriptions
+          SET expires_at = ${expiresAt},
+              updated_at = NOW(),
+              amount = ${amountCents / 100}
+          WHERE id = ${existingSubs[0].id}
+        `;
+      }
+
+      return {
+        success: true,
+        hasActiveMembership: true,
+        subscription: {
+          plan: 'premium',
+          status: 'active',
+          expires_at: expiresAt.toISOString()
+        }
+      };
+    } else {
+      // Disattiva abbonamento se non più attivo
+      await sql`
+        UPDATE subscriptions
+        SET status = 'cancelled',
+            cancelled_at = NOW(),
+            auto_renew = false
+        WHERE user_id = ${userId}
+          AND payment_method = 'patreon'
+          AND status = 'active'
+      `;
+
+      return {
+        success: true,
+        hasActiveMembership: false,
+        message: 'Nessun abbonamento Premium attivo su Patreon'
+      };
+    }
+  } catch (error) {
+    console.error('Errore sync membership Patreon:', error);
+    return { success: false, message: error.message };
+  }
+}
+
 export default async function handler(req, res) {
-  // Abilita CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -94,31 +183,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Determina l'azione dall'URL o query parameter
-    // Supporta sia /api/patreon/callback che /api/patreon?action=callback
-    let action = req.query.action;
-    
-    // Se non c'è action, prova a estrarre dall'URL
-    if (!action && req.url) {
-      const urlPath = req.url.split('?')[0];
-      const match = urlPath.match(/\/api\/patreon\/([^/?]+)/);
-      if (match) {
-        action = match[1];
-      }
-    }
-    
-    // Se ancora non c'è action, controlla se c'è un code (callback OAuth)
-    if (!action && req.query.code) {
-      action = 'callback';
-    }
-    
-    console.log('🔍 [PATREON] Action:', action, 'Method:', req.method, 'URL:', req.url);
-    
-    // Gestisci callback OAuth Patreon
+    const sql = getDatabaseConnection();
+    const urlPath = req.url.split('?')[0];
+    const action = req.query.action || urlPath.split('/api/patreon/')[1] || '';
+
+    // GET /api/patreon/callback - Callback OAuth
     if (action === 'callback' && req.method === 'GET') {
-      const { code, state, error } = req.query;
+      const { code, error } = req.query;
       
-      // Gestisci errori da Patreon
       if (error) {
         return res.redirect(`/?patreon_error=${encodeURIComponent(error)}`);
       }
@@ -127,7 +199,6 @@ export default async function handler(req, res) {
         return res.redirect('/?patreon_error=no_code');
       }
       
-      // Determina redirect URI
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers['host'];
       const redirectUri = `${protocol}://${host}/api/patreon/callback`;
@@ -135,11 +206,9 @@ export default async function handler(req, res) {
       // Scambia code con access token
       const tokenResponse = await fetch('https://www.patreon.com/api/oauth2/token', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          code: code,
+          code,
           grant_type: 'authorization_code',
           client_id: PATREON_CLIENT_ID,
           client_secret: PATREON_CLIENT_SECRET,
@@ -160,13 +229,16 @@ export default async function handler(req, res) {
         return res.redirect('/?patreon_error=no_access_token');
       }
       
-      // Ottieni informazioni utente da Patreon
-      const userResponse = await fetch('https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+      // Ottieni info utente da Patreon
+      const userResponse = await fetch(
+        'https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name',
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
       
       if (!userResponse.ok) {
         return res.redirect('/?patreon_error=user_info_failed');
@@ -179,52 +251,20 @@ export default async function handler(req, res) {
         return res.redirect('/?patreon_error=no_user_id');
       }
       
-      // Reindirizza alla pagina principale con i dati
-      return res.redirect(`/?patreon_linked=true&patreon_user_id=${patreonUserId}&patreon_token=${encodeURIComponent(accessToken)}`);
-    }
-    
-    // Inizializza la connessione al database per le altre operazioni
-    const sql = getDatabaseConnection();
-    
-    // GET /api/patreon/link-status o /api/patreon?action=link-status - Verifica stato collegamento
-    if ((action === 'link-status' || !action) && req.method === 'GET') {
-      const auth = await authenticateUser(req, sql);
-      if (auth.error) {
-        return res.status(auth.status).json({ success: false, message: auth.error });
-      }
-
-      const userId = auth.user.user_id;
-      
-      const users = await sql`
-        SELECT patreon_user_id, patreon_access_token
-        FROM users
-        WHERE id = ${userId}
-      `;
-      
-      if (users.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'Utente non trovato'
-        });
-      }
-      
-      const isLinked = !!(users[0].patreon_user_id && users[0].patreon_access_token);
-      
-      res.json({
-        success: true,
-        isLinked,
-        patreonUserId: users[0].patreon_user_id || null
-      });
-      return;
+      // Salva temporaneamente i dati per il collegamento
+      return res.redirect(`/?patreon_callback=true&patreon_user_id=${patreonUserId}&patreon_token=${encodeURIComponent(accessToken)}`);
     }
 
-    // POST /api/patreon/link-account o /api/patreon?action=link-account - Collega account Patreon
-    if (action === 'link-account' && req.method === 'POST') {
-      const auth = await authenticateUser(req, sql);
-      if (auth.error) {
-        return res.status(auth.status).json({ success: false, message: auth.error });
-      }
+    // Tutti gli altri endpoint richiedono autenticazione
+    const auth = await authenticateUser(req, sql);
+    if (auth.error) {
+      return res.status(auth.status).json({ success: false, message: auth.error });
+    }
 
+    const userId = auth.user.user_id;
+
+    // POST /api/patreon/link - Collega account dopo callback
+    if (action === 'link' && req.method === 'POST') {
       const { patreonUserId, patreonAccessToken } = req.body;
       
       if (!patreonUserId || !patreonAccessToken) {
@@ -234,9 +274,7 @@ export default async function handler(req, res) {
         });
       }
       
-      const userId = auth.user.user_id;
-      
-      // Aggiorna utente con dati Patreon
+      // Salva dati Patreon
       await sql`
         UPDATE users
         SET patreon_user_id = ${patreonUserId},
@@ -245,152 +283,86 @@ export default async function handler(req, res) {
         WHERE id = ${userId}
       `;
       
+      // Sincronizza membership
+      const syncResult = await syncPatreonMembership(userId, patreonUserId, patreonAccessToken, sql);
+      
       res.json({
         success: true,
-        message: 'Account Patreon collegato con successo'
+        message: 'Account Patreon collegato con successo',
+        ...syncResult
       });
       return;
     }
 
-    // POST /api/patreon/check-membership o /api/patreon?action=check-membership - Verifica membership
-    if (action === 'check-membership' && req.method === 'POST') {
-      const auth = await authenticateUser(req, sql);
-      if (auth.error) {
-        return res.status(auth.status).json({ success: false, message: auth.error });
-      }
-
-      const { patreonUserId } = req.body;
-      
-      if (!patreonUserId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Patreon User ID richiesto'
-        });
-      }
-
-      // Ottieni access token dell'utente
+    // GET /api/patreon/status - Verifica stato collegamento e abbonamento
+    if (action === 'status' && req.method === 'GET') {
       const users = await sql`
-        SELECT patreon_access_token
+        SELECT patreon_user_id, patreon_access_token
         FROM users
-        WHERE id = ${auth.user.user_id}
-          AND patreon_user_id = ${patreonUserId}
+        WHERE id = ${userId}
       `;
+      
+      if (users.length === 0) {
+        return res.status(404).json({ success: false, message: 'Utente non trovato' });
+      }
+      
+      const isLinked = !!(users[0].patreon_user_id && users[0].patreon_access_token);
+      
+      // Ottieni subscription attiva
+      const subscriptions = await sql`
+        SELECT * FROM subscriptions
+        WHERE user_id = ${userId}
+          AND payment_method = 'patreon'
+          AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > NOW())
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      
+      const subscription = subscriptions.length > 0 ? {
+        plan: subscriptions[0].plan,
+        status: subscriptions[0].status,
+        expires_at: subscriptions[0].expires_at?.toISOString(),
+        started_at: subscriptions[0].started_at?.toISOString()
+      } : null;
+      
+      res.json({
+        success: true,
+        isLinked,
+        patreonUserId: users[0].patreon_user_id || null,
+        subscription
+      });
+      return;
+    }
 
-      if (users.length === 0 || !users[0].patreon_access_token) {
+    // POST /api/patreon/sync - Sincronizza abbonamento da Patreon
+    if (action === 'sync' && req.method === 'POST') {
+      const users = await sql`
+        SELECT patreon_user_id, patreon_access_token
+        FROM users
+        WHERE id = ${userId}
+      `;
+      
+      if (users.length === 0 || !users[0].patreon_user_id || !users[0].patreon_access_token) {
         return res.status(404).json({
           success: false,
           message: 'Account Patreon non collegato'
         });
       }
-
-      const accessToken = users[0].patreon_access_token;
-
-      // Verifica membership su Patreon
-      try {
-        const membershipResponse = await fetch(`https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name&fields[member]=patron_status,currently_entitled_amount_cents`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!membershipResponse.ok) {
-          return res.status(500).json({
-            success: false,
-            message: 'Errore nella verifica membership Patreon'
-          });
-        }
-
-        const membershipData = await membershipResponse.json();
-        
-        // Verifica se l'utente ha una membership attiva con almeno 5€/mese
-        const MIN_AMOUNT_CENTS = 500; // 5€ = 500 centesimi
-        let hasActiveMembership = false;
-        let subscription = null;
-
-        if (membershipData.included) {
-          for (const item of membershipData.included) {
-            if (item.type === 'member') {
-              const isActive = item.attributes?.patron_status === 'active_patron';
-              const amountCents = item.attributes?.currently_entitled_amount_cents || 0;
-              
-              if (isActive && amountCents >= MIN_AMOUNT_CENTS) {
-                hasActiveMembership = true;
-                
-                // Crea o aggiorna abbonamento nel database
-                const subscriptionId = randomBytes(16).toString('hex');
-                const expiresAt = new Date();
-                expiresAt.setMonth(expiresAt.getMonth() + 1); // 1 mese da ora
-                
-                // Verifica se esiste già un abbonamento attivo
-                const existingSubs = await sql`
-                  SELECT id FROM subscriptions
-                  WHERE user_id = ${auth.user.user_id}
-                    AND payment_method = 'patreon'
-                    AND status = 'active'
-                `;
-
-                if (existingSubs.length === 0) {
-                  await sql`
-                    INSERT INTO subscriptions (id, user_id, plan, status, started_at, expires_at, payment_method, auto_renew)
-                    VALUES (${subscriptionId}, ${auth.user.user_id}, 'premium', 'active', NOW(), ${expiresAt}, 'patreon', true)
-                  `;
-                } else {
-                  // Aggiorna abbonamento esistente
-                  await sql`
-                    UPDATE subscriptions
-                    SET expires_at = ${expiresAt},
-                        updated_at = NOW()
-                    WHERE id = ${existingSubs[0].id}
-                  `;
-                }
-
-                subscription = {
-                  active: true,
-                  plan: 'premium',
-                  expires_at: expiresAt.toISOString(),
-                  started_at: new Date().toISOString()
-                };
-                break;
-              }
-            }
-          }
-        }
-
-        if (hasActiveMembership && subscription) {
-          res.json({
-            success: true,
-            subscription: subscription,
-            message: 'Abbonamento Premium attivo trovato'
-          });
-        } else {
-          res.json({
-            success: false,
-            subscription: null,
-            message: 'Nessun abbonamento Premium attivo trovato. Assicurati di essere iscritto al tier da almeno 5€/mese su Patreon.'
-          });
-        }
-      } catch (error) {
-        console.error('Errore verifica membership Patreon:', error);
-        res.status(500).json({
-          success: false,
-          message: 'Errore nella verifica membership Patreon',
-          error: error.message
-        });
-      }
+      
+      const syncResult = await syncPatreonMembership(
+        userId,
+        users[0].patreon_user_id,
+        users[0].patreon_access_token,
+        sql
+      );
+      
+      res.json(syncResult);
       return;
     }
 
-    // POST /api/patreon/unlink-account o /api/patreon?action=unlink-account - Scollega account
-    if (action === 'unlink-account' && req.method === 'POST') {
-      const auth = await authenticateUser(req, sql);
-      if (auth.error) {
-        return res.status(auth.status).json({ success: false, message: auth.error });
-      }
-
-      const userId = auth.user.user_id;
-      
-      // Rimuovi dati Patreon dall'utente
+    // POST /api/patreon/unlink - Scollega account
+    if (action === 'unlink' && req.method === 'POST') {
       await sql`
         UPDATE users
         SET patreon_user_id = NULL,
@@ -399,7 +371,6 @@ export default async function handler(req, res) {
         WHERE id = ${userId}
       `;
       
-      // Disattiva abbonamenti attivi collegati a Patreon
       await sql`
         UPDATE subscriptions
         SET status = 'cancelled',
@@ -417,21 +388,16 @@ export default async function handler(req, res) {
       return;
     }
 
-    return res.status(404).json({ success: false, message: 'Endpoint non trovato', action: action || 'none', url: req.url });
+    return res.status(404).json({ success: false, message: 'Endpoint non trovato' });
   } catch (error) {
-    console.error('❌ Errore Patreon:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
+    console.error('❌ Errore Patreon:', error);
     
     if (!res.headersSent) {
       return res.status(500).json({
         success: false,
         message: 'Errore durante l\'operazione',
-        error: error.message || 'Unknown error'
+        error: error.message
       });
     }
   }
 }
-

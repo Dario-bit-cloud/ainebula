@@ -1,23 +1,15 @@
-// Servizio per integrazione Patreon
+// Servizio semplificato per gestire Patreon
 
-// Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    
-    // Se siamo su localhost, usa localhost:3001
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3001/api';
     }
-    
-    // In produzione, controlla se c'è una variabile d'ambiente per il backend
     const backendUrl = import.meta.env.VITE_API_BASE_URL;
-    
     if (backendUrl) {
       return `${backendUrl}/api`;
     }
-    
-    // Altrimenti, per Vercel, usa URL relativo
     return '/api';
   }
   return 'http://localhost:3001/api';
@@ -25,64 +17,39 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
-/**
- * Verifica lo stato dell'abbonamento Patreon dell'utente
- */
-export async function checkPatreonMembership(patreonUserId) {
-  const token = localStorage.getItem('auth_token');
+// Ottieni URL OAuth Patreon
+export function getPatreonAuthUrl() {
+  const protocol = typeof window !== 'undefined' && window.location.protocol === 'http:' ? 'http' : 'https';
+  const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3001';
+  const redirectUri = `${protocol}://${host}/api/patreon/callback`;
   
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
+  const clientId = 'NF2MmLVExjXVv4ZpcgijfosjlJIYQuPBblK7vE1PpSPRawgFbKhiVbzq0Nbl1YAf';
+  const scopes = 'identity identity[email] identity.memberships';
   
-  try {
-    const response = await fetch(`${API_BASE_URL}/patreon/check-membership`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include', // Importante: include i cookie nella richiesta
-      body: JSON.stringify({ patreonUserId })
-    });
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Errore verifica Patreon:', error);
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message
-    };
-  }
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: scopes,
+    state: 'patreon_auth'
+  });
+  
+  return `https://www.patreon.com/oauth2/authorize?${params.toString()}`;
 }
 
-/**
- * Collega l'account Patreon all'utente
- */
+// Collega account Patreon (dopo callback)
 export async function linkPatreonAccount(patreonUserId, patreonAccessToken) {
-  const token = localStorage.getItem('auth_token');
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
   try {
-    const response = await fetch(`${API_BASE_URL}/patreon/link-account`, {
+    const response = await fetch(`${API_BASE_URL}/patreon/link`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      credentials: 'include', // Importante: include i cookie nella richiesta
-      body: JSON.stringify({ patreonUserId, patreonAccessToken })
+      credentials: 'include',
+      body: JSON.stringify({
+        patreonUserId,
+        patreonAccessToken
+      })
     });
     
     const data = await response.json();
@@ -91,70 +58,21 @@ export async function linkPatreonAccount(patreonUserId, patreonAccessToken) {
     console.error('Errore collegamento Patreon:', error);
     return {
       success: false,
-      message: 'Errore nella comunicazione con il server',
+      message: 'Errore durante il collegamento con Patreon',
       error: error.message
     };
   }
 }
 
-/**
- * Ottiene l'URL di autorizzazione Patreon
- */
-export function getPatreonAuthUrl() {
-  const clientId = import.meta.env.VITE_PATREON_CLIENT_ID || 'NF2MmLVExjXVv4ZpcgijfosjlJIYQuPBblK7vE1PpSPRawgFbKhiVbzq0Nbl1YAf';
-  
-  // Determina redirect URI in base all'ambiente
-  let redirectUri;
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Se siamo su localhost, usa il backend locale (porta 3001)
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      redirectUri = 'http://localhost:3001/api/patreon/callback';
-    } else {
-      // In produzione, usa il dominio corrente
-      redirectUri = `${window.location.origin}/api/patreon/callback`;
-    }
-  } else {
-    redirectUri = 'http://localhost:3001/api/patreon/callback';
-  }
-  
-  // Scope validi per Patreon OAuth 2.0 API v2
-  // identity: accesso base alle informazioni utente
-  // identity[email]: accesso all'email dell'utente
-  // identity.memberships: accesso alle informazioni di membership
-  const scope = 'identity identity[email] identity.memberships';
-  const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  
-  // Salva state in localStorage per verifica dopo redirect
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('patreon_oauth_state', state);
-  }
-  
-  return `https://www.patreon.com/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
-}
-
-/**
- * Verifica se l'utente ha un account Patreon collegato
- */
-export async function getPatreonLinkStatus() {
-  const token = localStorage.getItem('auth_token');
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
+// Verifica stato collegamento e abbonamento
+export async function getPatreonStatus() {
   try {
-    const response = await fetch(`${API_BASE_URL}/patreon/link-status`, {
+    const response = await fetch(`${API_BASE_URL}/patreon/status`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      credentials: 'include' // Importante: include i cookie nella richiesta
+      credentials: 'include'
     });
     
     const data = await response.json();
@@ -163,33 +81,44 @@ export async function getPatreonLinkStatus() {
     console.error('Errore verifica stato Patreon:', error);
     return {
       success: false,
-      message: 'Errore nella comunicazione con il server',
+      message: 'Errore durante la verifica dello stato',
       error: error.message
     };
   }
 }
 
-/**
- * Scollega l'account Patreon
- */
-export async function unlinkPatreonAccount() {
-  const token = localStorage.getItem('auth_token');
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
+// Sincronizza abbonamento da Patreon
+export async function syncPatreonMembership() {
   try {
-    const response = await fetch(`${API_BASE_URL}/patreon/unlink-account`, {
+    const response = await fetch(`${API_BASE_URL}/patreon/sync`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      credentials: 'include' // Importante: include i cookie nella richiesta
+      credentials: 'include'
+    });
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Errore sincronizzazione Patreon:', error);
+    return {
+      success: false,
+      message: 'Errore durante la sincronizzazione',
+      error: error.message
+    };
+  }
+}
+
+// Scollega account Patreon
+export async function unlinkPatreonAccount() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/patreon/unlink`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
     });
     
     const data = await response.json();
@@ -198,9 +127,8 @@ export async function unlinkPatreonAccount() {
     console.error('Errore scollegamento Patreon:', error);
     return {
       success: false,
-      message: 'Errore nella comunicazione con il server',
+      message: 'Errore durante lo scollegamento',
       error: error.message
     };
   }
 }
-
