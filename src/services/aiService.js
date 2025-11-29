@@ -204,7 +204,12 @@ export async function* generateResponseStream(message, modelId = 'gpt-4o-mini', 
   if (selectedModel?.premium) {
     const requiredPlan = selectedModel.requiredPlan;
     if (!hasPlanOrHigher(requiredPlan)) {
-      throw new Error(`Questo modello richiede un abbonamento ${requiredPlan === 'pro' ? 'Pro' : 'Massimo'}. Aggiorna il tuo piano per utilizzarlo.`);
+      const planNames = {
+        'premium': 'Premium',
+        'pro': 'Pro',
+        'max': 'Massimo'
+      };
+      throw new Error(`Questo modello richiede un abbonamento ${planNames[requiredPlan] || requiredPlan}. Aggiorna il tuo piano per utilizzarlo.`);
     }
   }
   
@@ -425,8 +430,11 @@ export async function* generateResponseStream(message, modelId = 'gpt-4o-mini', 
     const isCodexMini = modelId === 'gpt-5.1-codex-mini';
     const isPremiumPro = modelId === 'gpt-4.1';
     const isPremiumMax = modelId === 'o3';
-    const isAdvancedModel = isCodexMini || isPremiumPro || isPremiumMax;
+    const isGeminiFlash = modelId === 'gemini-2.5-flash-image';
+    const isAdvancedModel = isCodexMini || isPremiumPro || isPremiumMax || isGeminiFlash;
     const isPremiumModel = isPremiumPro || isPremiumMax;
+    // Modelli che permettono funzioni premium anche senza abbonamento
+    const allowsPremiumFeatures = selectedModel?.allowsPremiumFeatures || false;
     const isRegistered = get(isAuthenticatedStore);
     
     // Token illimitati per utenti premium, altrimenti 50.000 per modelli avanzati
@@ -434,7 +442,14 @@ export async function* generateResponseStream(message, modelId = 'gpt-4o-mini', 
     // Nota: alcuni modelli hanno limiti di contesto specifici che devono essere rispettati
     let maxTokens;
     if (isPremiumModel && hasActiveSubscription()) {
-      maxTokens = 1000000; // Valore molto alto per simulare "illimitati" (le API hanno comunque limiti tecnici)
+      // Per modelli premium con abbonamento, usa un valore alto ma rispettando il contextLength
+      const contextLength = selectedModel?.contextLength || 1000000;
+      maxTokens = Math.min(contextLength - 1000, 1000000); // Lascia spazio per i messaggi
+    } else if (allowsPremiumFeatures && isGeminiFlash) {
+      // Per gemini che permette funzioni premium, usa un valore sicuro
+      // gemini-2.5-flash-image ha contextLength di 200000, ma l'API ha limite reale di 32000
+      // Usiamo 30000 per sicurezza (lascia 2000 token per i messaggi)
+      maxTokens = 30000;
     } else if (isAdvancedModel) {
       // Controlla se il modello API ha limiti specifici
       // gpt-5.1-codex-mini ha un limite di contesto elevato (128K tokens)

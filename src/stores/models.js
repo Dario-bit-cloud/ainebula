@@ -16,11 +16,13 @@ export const availableModels = writable([
     contextLength: 128000
   },
   {
-    id: 'o3-mini',
-    name: 'Nebula o3-mini',
+    id: 'gemini-2.5-flash-image',
+    name: 'Nebula Gemini 2.5 Flash Image',
     description: 'Modello reasoning ottimizzato per STEM, matematica e coding. Eccelle in problem solving complessi e analisi approfondite.',
     group: 'Nebula AI',
     premium: false,
+    allowsPremiumFeatures: true,
+    limitedTimeFree: true,
     webSearch: false,
     vision: false,
     functionCall: true,

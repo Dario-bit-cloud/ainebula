@@ -1,6 +1,7 @@
 import { derived } from 'svelte/store';
+import { get } from 'svelte/store';
 import { currentChat } from './chat.js';
-import { selectedModel } from './models.js';
+import { selectedModel, availableModels } from './models.js';
 import { isAuthenticatedStore } from './auth.js';
 import { hasActiveSubscription } from './user.js';
 import { estimateChatTokens } from '../utils/tokenCounter.js';
@@ -10,8 +11,8 @@ import { estimateChatTokens } from '../utils/tokenCounter.js';
  * Ottimizza i calcoli evitando reactive statements multipli
  */
 export const tokenInfo = derived(
-  [currentChat, selectedModel, isAuthenticatedStore],
-  ([$currentChat, $selectedModel, $isAuthenticatedStore]) => {
+  [currentChat, selectedModel, isAuthenticatedStore, availableModels],
+  ([$currentChat, $selectedModel, $isAuthenticatedStore, $availableModels]) => {
     try {
       // Filtra i messaggi nascosti
       const messages = $currentChat?.messages || [];
@@ -24,8 +25,11 @@ export const tokenInfo = derived(
       
       // Determina i limiti in base al modello e abbonamento
       const isPremiumModel = $selectedModel === 'gpt-4.1' || $selectedModel === 'o3';
-      const hasPremium = isPremiumModel && hasActiveSubscription();
-      const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel;
+      const isGeminiFlash = $selectedModel === 'gemini-2.5-flash-image';
+      const selectedModelData = $availableModels.find(m => m.id === $selectedModel);
+      const allowsPremiumFeatures = selectedModelData?.allowsPremiumFeatures || false;
+      const hasPremium = (isPremiumModel && hasActiveSubscription()) || (allowsPremiumFeatures && isGeminiFlash);
+      const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel || isGeminiFlash;
       const isNebula15 = $selectedModel === 'gpt-4o-mini';
       const isRegistered = $isAuthenticatedStore;
       
@@ -61,8 +65,11 @@ export const tokenInfo = derived(
     } catch (error) {
       // Fallback in caso di errore
       const isPremiumModel = $selectedModel === 'gpt-4.1' || $selectedModel === 'o3';
-      const hasPremium = isPremiumModel && hasActiveSubscription();
-      const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel;
+      const isGeminiFlash = $selectedModel === 'gemini-2.5-flash-image';
+      const selectedModelData = $availableModels.find(m => m.id === $selectedModel);
+      const allowsPremiumFeatures = selectedModelData?.allowsPremiumFeatures || false;
+      const hasPremium = (isPremiumModel && hasActiveSubscription()) || (allowsPremiumFeatures && isGeminiFlash);
+      const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel || isGeminiFlash;
       const isNebula15 = $selectedModel === 'gpt-4o-mini';
       const isRegistered = $isAuthenticatedStore;
       

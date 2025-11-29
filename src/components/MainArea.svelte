@@ -3,11 +3,10 @@
   import { get } from 'svelte/store';
   import { createEventDispatcher } from 'svelte';
   import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, saveChatsToStorage } from '../stores/chat.js';
-  import { selectedModel } from '../stores/models.js';
+  import { selectedModel, availableModels } from '../stores/models.js';
   import { hasActiveSubscription, user as userStore } from '../stores/user.js';
   import { isAuthenticatedStore } from '../stores/auth.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
-  import { availableModels } from '../stores/models.js';
   import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView, isSidebarOpen, isIncognitoMode } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
   import { renderMarkdown, initCodeCopyButtons, normalizeTextSpacing } from '../utils/markdown.js';
@@ -31,6 +30,7 @@
   let inputRef;
   let textareaRef;
   let fileInput;
+  let imageInput;
   let attachedImages = [];
   let messagesContainer;
   let currentStreamingMessageId = null;
@@ -40,21 +40,20 @@
   let showSearchBar = false;
   let showTokenCounter = true;
   let highlightedMessageIndex = null;
-  let showAttachMenu = false;
-  let attachMenuRef;
-  let showMoreOptions = false;
   let showImageStyles = false;
   let selectedImageIndex = null;
   let imageDescription = '';
   let showPrivacyCard = true;
+  let showAttachMenu = false;
   
   // Verifica se il modello selezionato supporta web search
   $: currentModel = $availableModels.find(m => m.id === $selectedModel);
   $: hasWebSearch = currentModel?.webSearch || false;
+  $: allowsPremiumFeatures = currentModel?.allowsPremiumFeatures || false;
   let isPrivacyModalOpen = false;
   let mainAreaElement;
-  let selectedMenuOption = null;
   let deepResearchEnabled = false;
+  let webSearchEnabled = false;
   
   // Variabili per gestione swipe
   let touchStartX = 0;
@@ -297,8 +296,6 @@
       });
     }
     
-    // Aggiungi listener per chiudere il menu quando si clicca fuori
-    document.addEventListener('click', handleClickOutside);
     
     // Inizializza i pulsanti di copia codice
     tick().then(() => {
@@ -362,7 +359,6 @@
           delete messagesContainer._copyButtonHandler;
         }
       }
-      document.removeEventListener('click', handleClickOutside);
       if (textareaRef && keyboardHandlers.handleTextareaFocus) {
         textareaRef.removeEventListener('focus', keyboardHandlers.handleTextareaFocus);
         textareaRef.removeEventListener('blur', keyboardHandlers.handleKeyboardClose);
@@ -503,9 +499,12 @@
     const hasImages = attachedImages.length > 0;
     const hasMax = hasActiveSubscription() && $userStore.subscription?.plan === 'max';
     const hasPro = hasActiveSubscription() && $userStore.subscription?.plan === 'pro';
+    const currentModel = $availableModels.find(m => m.id === $selectedModel);
+    const allowsPremiumFeatures = currentModel?.allowsPremiumFeatures || false;
     
     // Se ci sono immagini, verifica abbonamento (Pro e Max possono usare immagini)
-    if (hasImages && !hasMax && !hasPro && !hasActiveSubscription()) {
+    // Oppure se il modello permette funzioni premium
+    if (hasImages && !hasMax && !hasPro && !hasActiveSubscription() && !allowsPremiumFeatures) {
       isPremiumModalOpen.set(true);
       return;
     }
@@ -566,7 +565,7 @@
         
         for await (const chunk of generateResponseStream(
           messageText, 
-          $selectedModel, 
+          effectiveModel, 
           chatHistory,
           [],
           abortController,
@@ -784,7 +783,7 @@
         
         for await (const chunk of generateResponseStream(
           userMessage.content,
-          $selectedModel,
+          effectiveModel,
           styleModifier ? modifiedHistory.slice(0, -1) : chatHistory.slice(0, -1),
           [],
           abortController,
@@ -915,131 +914,53 @@
     }
   }
   
-  function handleAttachClick(event) {
-    event.stopPropagation();
-    showAttachMenu = !showAttachMenu;
-    if (!showAttachMenu) {
-      showMoreOptions = false;
-      selectedMenuOption = null;
-    }
-  }
-  
   function handleAttachFile() {
     fileInput?.click();
-    showAttachMenu = false;
   }
   
-  function handleAttachOption(option) {
-    switch(option) {
-      case 'file':
-        handleAttachFile();
-        showAttachMenu = false;
-        selectedMenuOption = null;
-        break;
-      case 'business-info':
-        showAlert('Informazioni aziendali - Funzionalità in arrivo', 'Info', 'OK', 'info');
-        showAttachMenu = false;
-        selectedMenuOption = null;
-        break;
-      case 'deep-research':
-        deepResearchEnabled = !deepResearchEnabled;
-        if (deepResearchEnabled) {
-          showAlert('Deep Research attivato: l\'AI approfondirà maggiormente le risposte', 'Deep Research', 'OK', 'success');
-        } else {
-          showAlert('Deep Research disattivato', 'Deep Research', 'OK', 'info');
-        }
-        showAttachMenu = false;
-        selectedMenuOption = null;
-        break;
-      case 'agent-mode':
-        showAlert('Modalità agente - Funzionalità in arrivo', 'Info', 'OK', 'info');
-        showAttachMenu = false;
-        selectedMenuOption = null;
-        break;
-      case 'create-image':
-        showAlert('Crea immagine - Funzionalità in arrivo', 'Info', 'OK', 'info');
-        showAttachMenu = false;
-        selectedMenuOption = null;
-        break;
-      case 'more-options':
-        showMoreOptions = !showMoreOptions;
-        selectedMenuOption = showMoreOptions ? 'more-options' : null;
-        break;
-      case 'web-search':
-        showAlert('Ricerca sul web - Funzionalità in arrivo', 'Info', 'OK', 'info');
-        showAttachMenu = false;
-        showMoreOptions = false;
-        selectedMenuOption = null;
-        break;
-      case 'canvas':
-        showAlert('Canvas - Funzionalità in arrivo', 'Info', 'OK', 'info');
-        showAttachMenu = false;
-        showMoreOptions = false;
-        selectedMenuOption = null;
-        break;
-      case 'study-learn':
-        showAlert('Studia e impara - Funzionalità in arrivo', 'Info', 'OK', 'info');
-        showAttachMenu = false;
-        showMoreOptions = false;
-        selectedMenuOption = null;
-        break;
+  function handleAttachImage() {
+    imageInput?.click();
+  }
+  
+  function handleClearContext() {
+    if (visibleMessages.length === 0) {
+      return;
     }
+    showPrompt(
+      'Sei sicuro di voler pulire il contesto della chat? Tutti i messaggi verranno eliminati.',
+      'Pulisci contesto',
+      async () => {
+        const chatId = $currentChatId;
+        if (chatId) {
+          const allChats = get(chats);
+          const chat = allChats.find(c => c.id === chatId);
+          if (chat) {
+            chat.messages = [];
+            chats.set(allChats);
+            await saveChatsToStorage();
+            await tick();
+            scrollToBottom();
+          }
+        }
+      },
+      'Pulisci',
+      'Annulla'
+    );
   }
   
-  function handleMenuOptionClick(option) {
-    selectedMenuOption = selectedMenuOption === option ? null : option;
-    if (option === 'more-options') {
-      showMoreOptions = selectedMenuOption === 'more-options';
+  function handleToggleWebSearch() {
+    webSearchEnabled = !webSearchEnabled;
+    if (webSearchEnabled) {
+      showAlert('Ricerca web attivata: l\'AI può accedere a informazioni in tempo reale dal web', 'Web Search', 'OK', 'success');
     } else {
-      handleAttachOption(option);
+      showAlert('Ricerca web disattivata', 'Web Search', 'OK', 'info');
     }
   }
   
-  function handleMenuOptionMouseEnter(option) {
-    if (option === 'more-options') {
-      showMoreOptions = true;
-      selectedMenuOption = 'more-options';
-    }
-  }
+  // Determina il modello da usare: se web search è attivo, usa il modello search, altrimenti quello selezionato
+  $: effectiveModel = webSearchEnabled ? 'gpt-4o-mini-search-preview-2025-03-11' : $selectedModel;
   
-  function handleMenuOptionMouseLeave() {
-    // Delay per permettere il movimento al sottomenu
-    setTimeout(() => {
-      if (!attachMenuRef?.querySelector('.more-options-menu:hover')) {
-        showMoreOptions = false;
-        if (selectedMenuOption === 'more-options') {
-          selectedMenuOption = null;
-        }
-      }
-    }, 200);
-  }
-  
-  function handleMoreOptionsMouseEnter() {
-    showMoreOptions = true;
-  }
-  
-  function handleMoreOptionsMouseLeave() {
-    // Delay per permettere il movimento al sottomenu
-    setTimeout(() => {
-      if (!attachMenuRef?.querySelector('.more-options-menu:hover')) {
-        showMoreOptions = false;
-      }
-    }, 200);
-  }
-  
-  // Chiudi menu quando si clicca fuori
-  function handleClickOutside(event) {
-    if (attachMenuRef && !attachMenuRef.contains(event.target)) {
-      showAttachMenu = false;
-      showMoreOptions = false;
-      selectedMenuOption = null;
-    }
-    if (exportMenuRef && !exportMenuRef.contains(event.target)) {
-      showExportMenu = false;
-    }
-  }
-  
-  async function handleFileSelect(event) {
+  async function handleImageSelect(event) {
     const files = Array.from(event.target.files || []);
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
     
@@ -1055,14 +976,19 @@
     }
     
     // Reset input per permettere di selezionare di nuovo lo stesso file
-    if (fileInput) {
-      fileInput.value = '';
+    if (imageInput) {
+      imageInput.value = '';
     }
+  }
+  
+  async function handleFileSelect(event) {
+    const files = Array.from(event.target.files || []);
+    // Gestisci file generici (non immagini)
+    const nonImageFiles = files.filter(file => !file.type.startsWith('image/'));
     
-    // Questo codice non verrà mai eseguito se ci sono immagini, ma lo lascio per sicurezza
-    for (const file of imageFiles) {
-      const preview = await readFileAsDataURL(file);
-      attachedImages = [...attachedImages, { file, preview }];
+    if (nonImageFiles.length > 0) {
+      // Per ora mostra un alert, in futuro si potrà implementare l'upload
+      showAlert('Caricamento file generici - Funzionalità in arrivo', 'Info', 'OK', 'info');
     }
     
     // Reset input per permettere di selezionare di nuovo lo stesso file
@@ -1142,9 +1068,11 @@
     
     // Verifica se l'utente ha abbonamento Pro per esportazione avanzata
     const hasPro = hasActiveSubscription() && $userStore.subscription?.plan === 'pro';
+    const currentModel = $availableModels.find(m => m.id === $selectedModel);
+    const allowsPremiumFeatures = currentModel?.allowsPremiumFeatures || false;
     const isAdvancedFormat = format === 'pdf' || format === 'json';
     
-    if (isAdvancedFormat && !hasPro) {
+    if (isAdvancedFormat && !hasPro && !allowsPremiumFeatures) {
       showAlert('L\'esportazione in ' + format.toUpperCase() + ' è disponibile solo per utenti Pro. Aggiorna il tuo piano per accedere a questa funzionalità.', 'Funzionalità Premium', 'OK', 'warning');
       isPremiumModalOpen.set(true);
       return;
@@ -1553,9 +1481,24 @@
           <div class="message-content">
             {#if message.type === 'ai'}
               {@html renderMarkdown(message.content)}
+              {#if currentStreamingMessageId === message.id && message.content.trim().length < 50}
+                <div class="typing-indicator-inline">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              {/if}
             {:else}
               {message.content}
             {/if}
+          </div>
+        {:else if message.type === 'ai' && currentStreamingMessageId === message.id}
+          <div class="message-content">
+            <div class="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
           </div>
         {/if}
         <MessageActions 
@@ -1677,7 +1620,7 @@
             <button class="export-option" on:click={() => handleExportOption('markdown')}>
               <span>Esporta come Markdown</span>
             </button>
-            {#if hasActiveSubscription() && $userStore.subscription?.plan === 'pro'}
+            {#if (hasActiveSubscription() && $userStore.subscription?.plan === 'pro') || allowsPremiumFeatures}
               <button class="export-option premium" on:click={() => handleExportOption('json')}>
                 <span>Esporta come JSON</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1735,7 +1678,7 @@
               <button class="export-option" on:click={() => handleExportOption('markdown')}>
                 <span>Esporta come Markdown</span>
               </button>
-              {#if hasActiveSubscription() && $userStore.subscription?.plan === 'pro'}
+              {#if (hasActiveSubscription() && $userStore.subscription?.plan === 'pro') || allowsPremiumFeatures}
                 <button class="export-option premium" on:click={() => handleExportOption('json')}>
                   <span>Esporta come JSON</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1874,154 +1817,72 @@
           </div>
         {/if}
         
-        <div class="attach-button-wrapper" bind:this={attachMenuRef}>
-          <button class="attach-button" class:active={showAttachMenu} on:click={handleAttachClick} title={$t('attachFile')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+        <!-- Nuove icone nella barra della chat -->
+        <div class="chat-input-icons">
+          <button 
+            class="chat-icon-button" 
+            on:click={handleAttachFile}
+            title="Carica file"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
           </button>
           
-          {#if showAttachMenu}
-            <div class="side-menu">
-              <button 
-                class="side-menu-item" 
-                class:active={selectedMenuOption === 'file'}
-                on:click={() => handleMenuOptionClick('file')}
-                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'file'; }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-                </svg>
-                <span>Aggiungi foto e file</span>
-              </button>
-              
-              <button 
-                class="side-menu-item" 
-                class:active={selectedMenuOption === 'business-info'}
-                on:click={() => handleMenuOptionClick('business-info')}
-                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'business-info'; }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-                </svg>
-                <span>Informazioni aziendali</span>
-              </button>
-              
-              <button 
-                class="side-menu-item" 
-                class:active={selectedMenuOption === 'deep-research' || deepResearchEnabled}
-                on:click={() => handleMenuOptionClick('deep-research')}
-                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'deep-research'; }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <path d="M21 21l-4.35-4.35"/>
-                </svg>
-                <span>Deep Research</span>
-                {#if deepResearchEnabled}
-                  <span class="deep-research-badge">ON</span>
-                {/if}
-              </button>
-              
-              <button 
-                class="side-menu-item" 
-                class:active={selectedMenuOption === 'agent-mode'}
-                on:click={() => handleMenuOptionClick('agent-mode')}
-                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'agent-mode'; }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                  <circle cx="12" cy="12" r="3" fill="currentColor"/>
-                </svg>
-                <span>Modalità agente</span>
-              </button>
-              
-              <button 
-                class="side-menu-item" 
-                class:active={selectedMenuOption === 'create-image'}
-                on:click={() => handleMenuOptionClick('create-image')}
-                on:mouseenter={() => { if (selectedMenuOption !== 'more-options') selectedMenuOption = 'create-image'; }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-                <span>Crea immagine</span>
-              </button>
-              
-              <div 
-                class="side-menu-item-wrapper"
-                on:mouseenter={() => handleMenuOptionMouseEnter('more-options')}
-                on:mouseleave={handleMenuOptionMouseLeave}
-              >
-                <button 
-                  class="side-menu-item" 
-                  class:active={selectedMenuOption === 'more-options'}
-                  on:click={() => handleMenuOptionClick('more-options')}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="1"/>
-                    <circle cx="19" cy="12" r="1"/>
-                    <circle cx="5" cy="12" r="1"/>
-                  </svg>
-                  <span>Altre opzioni</span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
-                
-                {#if showMoreOptions}
-                  <div class="more-options-menu">
-                    <button 
-                      class="menu-item" 
-                      on:click={() => handleAttachOption('web-search')}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="2" y1="12" x2="22" y2="12"/>
-                        <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
-                      </svg>
-                      <span>Ricerca sul web</span>
-                    </button>
-                    
-                    <button 
-                      class="menu-item" 
-                      on:click={() => handleAttachOption('canvas')}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-                      </svg>
-                      <span>Canvas</span>
-                    </button>
-                    
-                    <button 
-                      class="menu-item" 
-                      on:click={() => handleAttachOption('study-learn')}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-                        <line x1="8" y1="7" x2="16" y2="7"/>
-                        <line x1="8" y1="11" x2="16" y2="11"/>
-                        <line x1="8" y1="15" x2="12" y2="15"/>
-                      </svg>
-                      <span>Studia e impara</span>
-                    </button>
-                  </div>
-                {/if}
-              </div>
-            </div>
-          {/if}
+          <button 
+            class="chat-icon-button" 
+            on:click={handleAttachImage}
+            title="Carica immagine"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </button>
+          
+          <button 
+            class="chat-icon-button" 
+            on:click={handleClearContext}
+            title="Pulisci contesto"
+            disabled={visibleMessages.length === 0}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"/>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+            </svg>
+          </button>
+          
+          <button 
+            class="chat-icon-button web-search-button" 
+            class:active={webSearchEnabled}
+            on:click={handleToggleWebSearch}
+            title="Ricerca web"
+            disabled={$isGenerating}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <span>Web Search</span>
+          </button>
         </div>
+        
       <input 
         type="file"
         bind:this={fileInput}
         on:change={handleFileSelect}
+        multiple
+        style="display: none;"
+      />
+      <input 
+        type="file"
+        bind:this={imageInput}
+        on:change={handleImageSelect}
         accept="image/*"
         multiple
         style="display: none;"
@@ -2039,16 +1900,6 @@
             <path d="M21 21l-4.35-4.35"/>
           </svg>
           <span>Deep Research</span>
-        </div>
-      {/if}
-      {#if hasWebSearch}
-        <div class="web-search-indicator" title="Ricerca web attiva: l'AI può accedere a informazioni in tempo reale dal web">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="m21 21-4.35-4.35"/>
-            <circle cx="11" cy="11" r="3" fill="currentColor"/>
-          </svg>
-          <span>Web Search Attivo</span>
         </div>
       {/if}
       <textarea
@@ -2782,8 +2633,8 @@
 
     .message-image {
       max-width: 100%;
-      max-height: 200px;
-      width: 100%;
+      max-height: 150px;
+      width: auto;
       height: auto;
       border-radius: 8px;
       object-fit: contain;
@@ -2910,7 +2761,7 @@
     }
 
     .message-image {
-      max-height: 180px;
+      max-height: 130px;
     }
   }
 
@@ -3003,8 +2854,8 @@
   }
 
   .message-image {
-    max-width: 300px;
-    max-height: 300px;
+    max-width: 200px;
+    max-height: 200px;
     border-radius: 8px;
     object-fit: cover;
     cursor: pointer;
@@ -3056,16 +2907,22 @@
 
   .typing-indicator {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     align-items: center;
+    padding: 12px 0;
   }
 
   .typing-indicator span {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background-color: var(--text-secondary);
-    animation: typing 1.4s infinite;
+    animation: typing-bounce 1.4s infinite ease-in-out;
+    opacity: 0.6;
+  }
+
+  .typing-indicator span:nth-child(1) {
+    animation-delay: 0s;
   }
 
   .typing-indicator span:nth-child(2) {
@@ -3076,13 +2933,53 @@
     animation-delay: 0.4s;
   }
 
-  @keyframes typing {
+  .typing-indicator-inline {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .typing-indicator-inline span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--text-secondary);
+    animation: typing-pulse 1.2s infinite ease-in-out;
+    opacity: 0.5;
+  }
+
+  .typing-indicator-inline span:nth-child(1) {
+    animation-delay: 0s;
+  }
+
+  .typing-indicator-inline span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .typing-indicator-inline span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes typing-bounce {
     0%, 60%, 100% {
-      transform: translateY(0);
-      opacity: 0.5;
+      transform: translateY(0) scale(1);
+      opacity: 0.6;
     }
     30% {
-      transform: translateY(-10px);
+      transform: translateY(-12px) scale(1.1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes typing-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.3);
       opacity: 1;
     }
   }
@@ -3476,33 +3373,78 @@
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
-  .attach-button-wrapper {
-    position: relative;
+  .chat-input-icons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
+    margin-right: 8px;
   }
 
-  .attach-button {
+  .chat-icon-button {
     background: none;
-    border: none;
-    color: var(--text-secondary);
+    border: 1.5px solid var(--text-primary);
+    color: var(--text-primary);
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     flex-shrink: 0;
-    border-radius: 4px;
-    transform: scale(1) rotate(0deg);
+    border-radius: 50%;
     width: 36px;
     height: 36px;
+    opacity: 0.7;
   }
 
-  .attach-button:hover,
-  .attach-button.active {
-    color: var(--text-primary);
-    background-color: var(--hover-bg);
+  .chat-icon-button:hover:not(:disabled) {
+    opacity: 1;
     transform: scale(1.1);
+    background-color: var(--hover-bg);
+  }
+
+  .chat-icon-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .chat-icon-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .web-search-button {
+    border-radius: 20px;
+    padding: 0 12px;
+    width: auto;
+    min-width: 100px;
+    gap: 6px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .web-search-button span {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .web-search-button.active {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: white;
+    opacity: 1;
+  }
+
+  .web-search-button.active svg {
+    color: white;
+  }
+
+  .web-search-button.active span {
+    color: white;
   }
 
     .attach-menu {

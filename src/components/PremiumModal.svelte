@@ -5,8 +5,10 @@
   import { user } from '../stores/user.js';
   import { isAuthenticatedStore } from '../stores/auth.js';
   import { showAlert } from '../services/dialogService.js';
+  import { getPatreonAuthUrl, checkPatreonMembership, getPatreonLinkStatus } from '../services/patreonService.js';
+  import { saveSubscription } from '../services/subscriptionService.js';
   
-  let selectedPlan = 'monthly'; // 'monthly' o 'yearly'
+  let selectedPlan = 'premium'; // 'premium', 'monthly' o 'yearly'
   let selectedDuration = 1; // Durata in mesi
   let showPaymentForm = false;
   let couponCode = '';
@@ -52,6 +54,21 @@
   };
   
   const plans = {
+    premium: {
+      name: 'Premium',
+      basePrice: 5, // Prezzo mensile base
+      badge: 'Patreon',
+      description: 'Piano base con accesso a funzionalità essenziali di Nebula AI. Perfetto per iniziare.',
+      features: [
+        'Accesso a modelli standard (Nebula AI 1.5, Pro, Coder)',
+        'Token generosi per chat',
+        'Caricamento file e immagini',
+        'Esportazione chat base (Markdown)',
+        'Supporto via email',
+        'Integrazione con Patreon'
+      ],
+      patreonEnabled: true
+    },
     monthly: {
       name: 'Pro',
       basePrice: 30, // Prezzo mensile base
@@ -111,7 +128,7 @@
   function closeModal() {
     isPremiumModalOpen.set(false);
     showPaymentForm = false;
-    selectedPlan = 'monthly';
+    selectedPlan = 'premium';
     selectedDuration = 1;
     couponCode = '';
     couponApplied = false;
@@ -127,6 +144,23 @@
     }
   }
   
+  let patreonLinkStatus = null;
+  let isCheckingPatreon = false;
+  
+  // Carica stato collegamento Patreon quando si apre il modal
+  onMount(async () => {
+    if ($isAuthenticatedStore && $isPremiumModalOpen) {
+      try {
+        const status = await getPatreonLinkStatus();
+        if (status.success) {
+          patreonLinkStatus = status;
+        }
+      } catch (error) {
+        console.error('Errore caricamento stato Patreon:', error);
+      }
+    }
+  });
+  
   function selectPlan(plan) {
     selectedPlan = plan;
     // Su mobile, scrolla al piano selezionato prima di aprire il form
@@ -135,7 +169,75 @@
         scrollToPlan(plan);
       }, 100);
     }
-    showPaymentForm = true;
+    
+    // Se è il piano premium, mostra opzione Patreon invece del form di pagamento
+    if (plan === 'premium') {
+      // Non aprire subito il form, mostra opzione Patreon
+      showPaymentForm = false;
+    } else {
+      showPaymentForm = true;
+    }
+  }
+  
+  async function handlePatreonLink() {
+    if (!$isAuthenticatedStore) {
+      await showAlert('Devi essere autenticato per collegare Patreon', 'Autenticazione richiesta', 'OK', 'warning');
+      return;
+    }
+    
+    try {
+      const authUrl = getPatreonAuthUrl();
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Errore collegamento Patreon:', error);
+      await showAlert('Errore durante il collegamento con Patreon', 'Errore', 'OK', 'error');
+    }
+  }
+  
+  async function handlePatreonCheck() {
+    if (!$isAuthenticatedStore) {
+      await showAlert('Devi essere autenticato per verificare Patreon', 'Autenticazione richiesta', 'OK', 'warning');
+      return;
+    }
+    
+    isCheckingPatreon = true;
+    
+    try {
+      // Verifica se l'utente ha già un account Patreon collegato
+      const linkStatus = await getPatreonLinkStatus();
+      
+      if (!linkStatus.success || !linkStatus.isLinked) {
+        await showAlert('Collega prima il tuo account Patreon', 'Account non collegato', 'OK', 'info');
+        isCheckingPatreon = false;
+        return;
+      }
+      
+      // Verifica membership
+      const membershipCheck = await checkPatreonMembership(linkStatus.patreonUserId);
+      
+      if (membershipCheck.success && membershipCheck.subscription) {
+        // Aggiorna store utente
+        user.update(u => ({
+          ...u,
+          subscription: {
+            active: true,
+            plan: 'premium',
+            expiresAt: membershipCheck.subscription.expires_at,
+            key: `NEBULA-PREMIUM-PATREON-${Date.now()}`
+          }
+        }));
+        
+        await showAlert('Abbonamento Premium attivato con successo tramite Patreon!', 'Abbonamento attivato', 'OK', 'success');
+        closeModal();
+      } else {
+        await showAlert(membershipCheck.message || 'Nessun abbonamento Premium attivo su Patreon. Assicurati di essere iscritto al tier da almeno 5€/mese.', 'Abbonamento non trovato', 'OK', 'warning');
+      }
+    } catch (error) {
+      console.error('Errore verifica Patreon:', error);
+      await showAlert('Errore durante la verifica dell\'abbonamento Patreon', 'Errore', 'OK', 'error');
+    } finally {
+      isCheckingPatreon = false;
+    }
   }
   
   function applyCoupon() {
@@ -299,7 +401,7 @@
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Attiva abbonamento premium
-    const planType = selectedPlan === 'monthly' ? 'pro' : 'max';
+    const planType = selectedPlan === 'premium' ? 'premium' : (selectedPlan === 'monthly' ? 'pro' : 'max');
     const durationOption = durationOptions.find(d => d.value === selectedDuration);
     const months = durationOption ? durationOption.months : 1;
     const expiresAt = new Date();
@@ -451,12 +553,37 @@
       </div>
       
       <div class="modal-body">
-        {#if !showPaymentForm}
+        {#if !showPaymentForm && selectedPlan !== 'premium'}
           <!-- Selezione Piano -->
           <div class="plans-selection">
             <p class="section-description">Scegli il piano che fa per te</p>
             
             <div class="plans-grid" bind:this={plansContainerRef} on:scroll={handlePlansScroll}>
+              <div class="plan-card" class:selected={selectedPlan === 'premium'} data-plan="premium" role="button" tabindex="0" on:click={() => selectPlan('premium')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('premium'))}>
+                {#if plans.premium.badge}
+                  <div class="plan-badge">{plans.premium.badge}</div>
+                {/if}
+                <div class="plan-header">
+                  <h3>{plans.premium.name}</h3>
+                  <div class="plan-price">
+                    <span class="price-amount">€{plans.premium.basePrice.toFixed(2)}</span>
+                    <span class="price-period">/mese</span>
+                  </div>
+                </div>
+                <p class="plan-description">{plans.premium.description}</p>
+                <ul class="plan-features">
+                  {#each plans.premium.features as feature}
+                    <li>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      {feature}
+                    </li>
+                  {/each}
+                </ul>
+                <button class="select-plan-button">Ottieni Premium</button>
+              </div>
+              
               <div class="plan-card" class:selected={selectedPlan === 'monthly'} data-plan="monthly" role="button" tabindex="0" on:click={() => selectPlan('monthly')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('monthly'))}>
                 {#if plans.monthly.badge}
                   <div class="plan-badge">{plans.monthly.badge}</div>
@@ -556,6 +683,89 @@
                   {/if}
                 </div>
               {/if}
+            </div>
+          </div>
+        {:else if selectedPlan === 'premium'}
+          <!-- Opzioni Patreon per Piano Premium -->
+          <div class="patreon-selection">
+            <div class="patreon-header">
+              <div class="patreon-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M0 .48v23.04h4.22V.48zm5.42 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48z"/>
+                </svg>
+              </div>
+              <h3>Collega con Patreon</h3>
+              <p class="patreon-description">
+                Il piano Premium è disponibile tramite Patreon. Collega il tuo account Patreon per attivare l'abbonamento da 5€/mese.
+              </p>
+            </div>
+            
+            <div class="patreon-options">
+              {#if patreonLinkStatus?.isLinked}
+                <div class="patreon-status">
+                  <div class="status-badge linked">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                      <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                    <span>Account Patreon collegato</span>
+                  </div>
+                  <button 
+                    class="patreon-button check-button" 
+                    on:click={handlePatreonCheck}
+                    disabled={isCheckingPatreon}
+                  >
+                    {#if isCheckingPatreon}
+                      <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                      </svg>
+                      Verifica in corso...
+                    {:else}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Verifica Abbonamento
+                    {/if}
+                  </button>
+                </div>
+              {:else}
+                <button 
+                  class="patreon-button link-button" 
+                  on:click={handlePatreonLink}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M0 .48v23.04h4.22V.48zm5.42 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48zm5.43 0v23.04h4.22V.48z"/>
+                  </svg>
+                  <span>Collega con Patreon</span>
+                </button>
+                <p class="patreon-info">
+                  Verrai reindirizzato a Patreon per autorizzare l'accesso. Dopo l'autorizzazione, potrai verificare il tuo abbonamento.
+                </p>
+              {/if}
+            </div>
+            
+            <div class="patreon-alternative">
+              <button 
+                class="alternative-button" 
+                on:click={() => {
+                  selectedPlan = 'monthly';
+                  showPaymentForm = true;
+                }}
+              >
+                Oppure scegli il piano Pro
+              </button>
+            </div>
+            
+            <div class="patreon-back">
+              <button 
+                class="back-button" 
+                on:click={() => {
+                  selectedPlan = 'premium';
+                  showPaymentForm = false;
+                }}
+              >
+                ← Torna alla selezione piani
+              </button>
             </div>
           </div>
         {:else}
@@ -1595,6 +1805,168 @@
     }
   }
 
+  /* Patreon Section Styles */
+  .patreon-selection {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  
+  .patreon-header {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  
+  .patreon-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    color: #FF424D;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .patreon-header h3 {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+  }
+  
+  .patreon-description {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+  
+  .patreon-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .patreon-status {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+  }
+  
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .status-badge.linked {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%);
+    border: 1px solid #10b981;
+    color: #10b981;
+  }
+  
+  .patreon-button {
+    width: 100%;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .patreon-button.link-button {
+    background: linear-gradient(135deg, #FF424D 0%, #E63946 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(255, 66, 77, 0.3);
+  }
+  
+  .patreon-button.link-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 66, 77, 0.4);
+  }
+  
+  .patreon-button.check-button {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+  }
+  
+  .patreon-button.check-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  }
+  
+  .patreon-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .patreon-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin: 0;
+    line-height: 1.5;
+  }
+  
+  .patreon-alternative {
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+  }
+  
+  .alternative-button {
+    width: 100%;
+    padding: 12px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .alternative-button:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent-blue);
+  }
+  
+  .patreon-back {
+    padding-top: 8px;
+  }
+  
+  .patreon-back .back-button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px;
+    transition: color 0.2s;
+  }
+  
+  .patreon-back .back-button:hover {
+    color: var(--text-primary);
+  }
+  
+  .patreon-button .spinner {
+    animation: spin 1s linear infinite;
+  }
+
   @media (max-width: 768px) {
     .modal-body {
       padding: 20px 0;
@@ -1604,6 +1976,10 @@
     
     .plans-selection {
       padding: 0 16px;
+    }
+    
+    .patreon-selection {
+      padding: 20px 16px;
     }
 
     .payment--options {

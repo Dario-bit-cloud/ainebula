@@ -1757,6 +1757,391 @@ app.get('/api/user/payments', authenticateToken, async (req, res) => {
 
 // ==================== FINE ENDPOINT ABBONAMENTI ====================
 
+// ==================== ENDPOINT PATREON ====================
+
+// Configurazione Patreon
+const PATREON_CLIENT_ID = process.env.PATREON_CLIENT_ID || 'NF2MmLVExjXVv4ZpcgijfosjlJIYQuPBblK7vE1PpSPRawgFbKhiVbzq0Nbl1YAf';
+const PATREON_CLIENT_SECRET = process.env.PATREON_CLIENT_SECRET || '8JZGmekMz0KcEs-20TV1mVFZUb4VpPny6vA_XXM_OFm4GwTTrbv7wTkQSzHgjiEm';
+const PATREON_CREATOR_ACCESS_TOKEN = process.env.PATREON_CREATOR_ACCESS_TOKEN || 'TWD_FwnKyJHjFNATwJHsUDQzzLSJuplWcbUpvIbTMrA';
+const PATREON_CREATOR_REFRESH_TOKEN = process.env.PATREON_CREATOR_REFRESH_TOKEN || 'Vb5aAzykB9meiShokfKv2mRt6h9Ov5kTNRYGVDNp58o';
+
+// Verifica stato collegamento Patreon
+app.get('/api/patreon/link-status', authenticateToken, async (req, res) => {
+  try {
+    const user = await sql`
+      SELECT patreon_user_id, patreon_access_token
+      FROM users
+      WHERE id = ${req.user.id}
+    `;
+    
+    if (user.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utente non trovato'
+      });
+    }
+    
+    const isLinked = !!(user[0].patreon_user_id && user[0].patreon_access_token);
+    
+    res.json({
+      success: true,
+      isLinked,
+      patreonUserId: user[0].patreon_user_id || null
+    });
+  } catch (error) {
+    console.error('Errore verifica stato Patreon:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero dello stato Patreon',
+      error: error.message
+    });
+  }
+});
+
+// Collega account Patreon
+app.post('/api/patreon/link-account', authenticateToken, async (req, res) => {
+  try {
+    const { patreonUserId, patreonAccessToken } = req.body;
+    
+    if (!patreonUserId || !patreonAccessToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patreon User ID e Access Token richiesti'
+      });
+    }
+    
+    // Aggiorna utente con dati Patreon
+    await sql`
+      UPDATE users
+      SET patreon_user_id = ${patreonUserId},
+          patreon_access_token = ${patreonAccessToken},
+          updated_at = NOW()
+      WHERE id = ${req.user.id}
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Account Patreon collegato con successo'
+    });
+  } catch (error) {
+    console.error('Errore collegamento Patreon:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel collegamento dell\'account Patreon',
+      error: error.message
+    });
+  }
+});
+
+// Scollega account Patreon
+app.post('/api/patreon/unlink-account', authenticateToken, async (req, res) => {
+  try {
+    // Rimuovi dati Patreon dall'utente
+    await sql`
+      UPDATE users
+      SET patreon_user_id = NULL,
+          patreon_access_token = NULL,
+          updated_at = NOW()
+      WHERE id = ${req.user.id}
+    `;
+    
+    // Disattiva abbonamenti attivi collegati a Patreon
+    await sql`
+      UPDATE subscriptions
+      SET status = 'cancelled',
+          cancelled_at = NOW(),
+          auto_renew = false
+      WHERE user_id = ${req.user.id}
+        AND payment_method = 'patreon'
+        AND status = 'active'
+    `;
+    
+    res.json({
+      success: true,
+      message: 'Account Patreon scollegato con successo'
+    });
+  } catch (error) {
+    console.error('Errore scollegamento Patreon:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nello scollegamento dell\'account Patreon',
+      error: error.message
+    });
+  }
+});
+
+// Verifica membership Patreon e attiva abbonamento
+app.post('/api/patreon/check-membership', authenticateToken, async (req, res) => {
+  try {
+    const { patreonUserId } = req.body;
+    
+    if (!patreonUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patreon User ID richiesto'
+      });
+    }
+    
+    // Verifica se l'utente ha un membership attivo su Patreon
+    // Usa l'API Patreon per verificare lo stato
+    try {
+      // Prima, verifica se l'utente è un patron attivo
+      const identityResponse = await fetch(`https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name`, {
+        headers: {
+          'Authorization': `Bearer ${PATREON_CREATOR_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!identityResponse.ok) {
+        throw new Error('Errore chiamata API Patreon');
+      }
+      
+      // Cerca il membership per questo utente
+      const membershipsResponse = await fetch(`https://www.patreon.com/api/oauth2/v2/members?fields[member]=patron_status,currently_entitled_amount_cents&include=currently_entitled_tiers`, {
+        headers: {
+          'Authorization': `Bearer ${PATREON_CREATOR_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!membershipsResponse.ok) {
+        throw new Error('Errore recupero memberships Patreon');
+      }
+      
+      const membershipsData = await membershipsResponse.json();
+      
+      // Cerca il membership per questo utente specifico
+      const userMembership = membershipsData.data?.find(member => 
+        member.relationships?.user?.data?.id === patreonUserId
+      );
+      
+      // Verifica se ha un tier attivo con importo >= 5€ (500 centesimi)
+      const hasPremiumTier = userMembership?.attributes?.patron_status === 'active_patron' &&
+                            (userMembership?.attributes?.currently_entitled_amount_cents >= 500 ||
+                             userMembership?.relationships?.currently_entitled_tiers?.data?.length > 0);
+      
+      if (hasPremiumTier) {
+        // Calcola data di scadenza (1 mese da ora)
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+        
+        // Disattiva abbonamenti precedenti
+        await sql`
+          UPDATE subscriptions 
+          SET status = 'cancelled', cancelled_at = NOW()
+          WHERE user_id = ${req.user.id} AND status = 'active'
+        `;
+        
+        // Crea nuovo abbonamento Premium
+        const subscriptionId = randomBytes(16).toString('hex');
+        await sql`
+          INSERT INTO subscriptions (
+            id, user_id, plan, status, billing_cycle, 
+            amount, currency, payment_method, payment_id, expires_at
+          )
+          VALUES (
+            ${subscriptionId}, ${req.user.id}, 'premium', 'active',
+            'monthly', 5.00, 'EUR', 'patreon', ${patreonUserId}, ${expiresAt}
+          )
+        `;
+        
+        // Crea record di pagamento
+        const paymentRecordId = randomBytes(16).toString('hex');
+        await sql`
+          INSERT INTO payments (
+            id, subscription_id, user_id, amount, currency,
+            status, payment_method, payment_provider, transaction_id, paid_at
+          )
+          VALUES (
+            ${paymentRecordId}, ${subscriptionId}, ${req.user.id},
+            5.00, 'EUR', 'completed',
+            'patreon', 'patreon', ${patreonUserId}, NOW()
+          )
+        `;
+        
+        const newSubscription = await sql`
+          SELECT * FROM subscriptions WHERE id = ${subscriptionId}
+        `;
+        
+        // Aggiorna anche l'utente con Patreon User ID se non già presente
+        await sql`
+          UPDATE users
+          SET patreon_user_id = ${patreonUserId},
+              updated_at = NOW()
+          WHERE id = ${req.user.id} AND patreon_user_id IS NULL
+        `;
+        
+        return res.json({
+          success: true,
+          subscription: newSubscription[0],
+          message: 'Abbonamento Premium attivato tramite Patreon'
+        });
+      } else {
+        return res.json({
+          success: false,
+          message: 'Nessun abbonamento Premium attivo su Patreon. Assicurati di essere iscritto al tier da almeno 5€/mese.'
+        });
+      }
+    } catch (patreonError) {
+      console.error('Errore chiamata API Patreon:', patreonError);
+      return res.status(500).json({
+        success: false,
+        message: 'Errore nella verifica con Patreon',
+        error: patreonError.message
+      });
+    }
+  } catch (error) {
+    console.error('Errore verifica Patreon:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore interno del server',
+      error: error.message
+    });
+  }
+});
+
+// Callback OAuth Patreon
+app.get('/api/patreon/callback', async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+    
+    if (error) {
+      return res.redirect(`/?patreon_error=${encodeURIComponent(error)}`);
+    }
+    
+    if (!code) {
+      return res.redirect('/?patreon_error=no_code');
+    }
+    
+    // Scambia code con access token
+    const tokenResponse = await fetch('https://www.patreon.com/api/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        code: code,
+        grant_type: 'authorization_code',
+        client_id: PATREON_CLIENT_ID,
+        client_secret: PATREON_CLIENT_SECRET,
+        redirect_uri: `${req.protocol}://${req.get('host')}/api/patreon/callback`
+      })
+    });
+    
+    if (!tokenResponse.ok) {
+      return res.redirect('/?patreon_error=token_exchange_failed');
+    }
+    
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+    
+    // Ottieni informazioni utente da Patreon
+    const userResponse = await fetch('https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!userResponse.ok) {
+      return res.redirect('/?patreon_error=user_info_failed');
+    }
+    
+    const userData = await userResponse.json();
+    const patreonUserId = userData.data.id;
+    
+    // Reindirizza alla pagina principale con i dati
+    // In produzione, dovresti salvare questi dati dopo che l'utente fa login
+    return res.redirect(`/?patreon_linked=true&patreon_user_id=${patreonUserId}&patreon_token=${accessToken}`);
+    
+  } catch (error) {
+    console.error('Errore callback Patreon:', error);
+    return res.redirect(`/?patreon_error=${encodeURIComponent(error.message)}`);
+  }
+});
+
+// Webhook Patreon (per aggiornamenti automatici)
+app.post('/api/patreon/webhook', async (req, res) => {
+  try {
+    // Verifica firma webhook (importante per sicurezza)
+    const signature = req.headers['x-patreon-signature'];
+    // TODO: Implementa verifica firma
+    
+    const event = req.body;
+    
+    // Gestisci diversi tipi di eventi
+    if (event.type === 'members:pledge:create' || event.type === 'members:pledge:update') {
+      const patreonUserId = event.data.relationships?.member?.data?.id;
+      const tierId = event.data.relationships?.tier?.data?.id;
+      const amountCents = event.data.attributes?.amount_cents || 0;
+      
+      // Verifica se è il tier Premium (>= 5€ = 500 centesimi)
+      if (amountCents >= 500) {
+        // Trova utente nel database tramite patreon_user_id
+        const users = await sql`
+          SELECT id FROM users WHERE patreon_user_id = ${patreonUserId}
+        `;
+        
+        if (users.length > 0) {
+          const userId = users[0].id;
+          
+          // Disattiva abbonamenti precedenti
+          await sql`
+            UPDATE subscriptions 
+            SET status = 'cancelled', cancelled_at = NOW()
+            WHERE user_id = ${userId} AND status = 'active'
+          `;
+          
+          // Crea nuovo abbonamento
+          const expiresAt = new Date();
+          expiresAt.setMonth(expiresAt.getMonth() + 1);
+          
+          const subscriptionId = randomBytes(16).toString('hex');
+          await sql`
+            INSERT INTO subscriptions (
+              id, user_id, plan, status, billing_cycle, 
+              amount, currency, payment_method, payment_id, expires_at
+            )
+            VALUES (
+              ${subscriptionId}, ${userId}, 'premium', 'active',
+              'monthly', ${amountCents / 100}, 'EUR', 'patreon', ${patreonUserId}, ${expiresAt}
+            )
+          `;
+        }
+      }
+    } else if (event.type === 'members:pledge:delete') {
+      const patreonUserId = event.data.relationships?.member?.data?.id;
+      
+      // Trova utente e disattiva abbonamento
+      const users = await sql`
+        SELECT id FROM users WHERE patreon_user_id = ${patreonUserId}
+      `;
+      
+      if (users.length > 0) {
+        const userId = users[0].id;
+        
+        await sql`
+          UPDATE subscriptions
+          SET status = 'cancelled',
+              cancelled_at = NOW(),
+              auto_renew = false
+          WHERE user_id = ${userId}
+            AND payment_method = 'patreon'
+            AND status = 'active'
+        `;
+      }
+    }
+    
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('Errore webhook Patreon:', error);
+    res.status(500).json({ error: 'Errore processing webhook' });
+  }
+});
+
+// ==================== FINE ENDPOINT PATREON ====================
+
 // ==================== ENDPOINT LINK CONDIVISI ====================
 
 // Crea tabella shared_links se non esiste

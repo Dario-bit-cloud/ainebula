@@ -749,6 +749,7 @@
   
   function getPlanName(plan) {
     if (!plan || plan === 'free') return get(t)('free');
+    if (plan === 'premium') return 'Premium';
     if (plan === 'pro') return get(t)('pro');
     if (plan === 'max') return get(t)('max');
     return plan;
@@ -907,7 +908,7 @@
                 <h3 class="setting-title">{$t('subscriptionStatus')}</h3>
                 
                 <div class="subscription-status">
-                  <div class="subscription-badge" class:active={isActive} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
+                  <div class="subscription-badge" class:active={isActive} class:premium={subscription?.plan === 'premium'} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
                     <span class="badge-label">{planName}</span>
                     {#if isActive}
                       <span class="badge-status">{$t('active')}</span>
@@ -950,7 +951,7 @@
                     </button>
                   </div>
                 {:else}
-                  {#if subscription?.plan === 'pro' || subscription?.plan === 'max'}
+                  {#if subscription?.plan === 'premium' || subscription?.plan === 'pro' || subscription?.plan === 'max'}
                     <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                       <div class="setting-info">
                         <div class="setting-label">Supporto Prioritario</div>
@@ -1933,6 +1934,11 @@
   
   .subscription-badge.active {
     border-color: var(--accent-blue);
+  }
+  
+  .subscription-badge.premium {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+    border-color: #fbbf24;
   }
   
   .subscription-badge.pro {

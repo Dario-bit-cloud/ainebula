@@ -88,7 +88,7 @@ export function hasPlanOrHigher(requiredPlan) {
   const userData = get(user);
   if (!hasActiveSubscription()) return false;
   
-  const planHierarchy = { 'pro': 1, 'max': 2 };
+  const planHierarchy = { 'premium': 1, 'pro': 2, 'max': 3 };
   const userPlan = userData.subscription?.plan;
   
   if (!userPlan || !planHierarchy[userPlan]) return false;

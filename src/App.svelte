@@ -12,7 +12,8 @@
   import { get } from 'svelte/store';
   import { currentChatId } from './stores/chat.js';
   import { isInputElement } from './utils/shortcuts.js';
-  import { showConfirm } from './services/dialogService.js';
+  import { showConfirm, showAlert } from './services/dialogService.js';
+  import { linkPatreonAccount, checkPatreonMembership } from './services/patreonService.js';
   
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
@@ -401,11 +402,59 @@
   let authModalMode = 'login'; // 'login' o 'register'
   
   // Inizializza autenticazione e tema
-  onMount(() => {
+  onMount(async () => {
     window.addEventListener('keydown', handleKeyboardShortcuts);
     initAuth();
     // Precarica SettingsModal dato che è un componente importante
     loadSettingsModal();
+    
+    // Gestisci callback Patreon
+    const urlParams = new URLSearchParams(window.location.search);
+    const patreonLinked = urlParams.get('patreon_linked');
+    const patreonUserId = urlParams.get('patreon_user_id');
+    const patreonToken = urlParams.get('patreon_token');
+    const patreonError = urlParams.get('patreon_error');
+    
+    if (patreonError) {
+      // Rimuovi parametri dall'URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      showAlert(`Errore collegamento Patreon: ${decodeURIComponent(patreonError)}`, 'Errore Patreon', 'OK', 'error');
+    } else if (patreonLinked === 'true' && patreonUserId && patreonToken && $isAuthenticatedStore) {
+      // Collega account Patreon
+      try {
+        const linkResult = await linkPatreonAccount(patreonUserId, decodeURIComponent(patreonToken));
+        
+        if (linkResult.success) {
+          // Verifica membership e attiva abbonamento
+          const membershipResult = await checkPatreonMembership(patreonUserId);
+          
+          if (membershipResult.success && membershipResult.subscription) {
+            // Aggiorna store utente
+            user.update(u => ({
+              ...u,
+              subscription: {
+                active: true,
+                plan: 'premium',
+                expiresAt: membershipResult.subscription.expires_at,
+                key: `NEBULA-PREMIUM-PATREON-${Date.now()}`
+              }
+            }));
+            
+            showAlert('Account Patreon collegato e abbonamento Premium attivato con successo!', 'Patreon collegato', 'OK', 'success');
+          } else {
+            showAlert('Account Patreon collegato. Verifica il tuo abbonamento Premium su Patreon (minimo 5€/mese).', 'Account collegato', 'OK', 'info');
+          }
+        } else {
+          showAlert(linkResult.message || 'Errore durante il collegamento dell\'account Patreon', 'Errore', 'OK', 'error');
+        }
+      } catch (error) {
+        console.error('Errore processamento callback Patreon:', error);
+        showAlert('Errore durante il processamento del callback Patreon', 'Errore', 'OK', 'error');
+      }
+      
+      // Rimuovi parametri dall'URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
     
     // Inizializza il tema all'avvio
     const savedTheme = localStorage.getItem('nebula-theme') || 'system';

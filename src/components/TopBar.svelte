@@ -42,7 +42,7 @@
     }
   }
   
-  function selectModel(modelId) {
+  async function selectModel(modelId) {
     // Verifica se il modello è premium e se l'utente ha l'abbonamento necessario
     const model = $availableModels.find(m => m.id === modelId);
     if (model?.premium) {
@@ -55,7 +55,16 @@
       }
     }
     
-    selectedModel.set(modelId);
+    // Se il modello è diverso da quello attuale, crea una nuova chat
+    const currentModelId = get(selectedModel);
+    if (currentModelId !== modelId) {
+      selectedModel.set(modelId);
+      // Crea una nuova chat quando si cambia modello
+      await createNewChat();
+    } else {
+      selectedModel.set(modelId);
+    }
+    
     isModelDropdownOpen = false;
   }
   
@@ -136,6 +145,14 @@
           {#if $availableModels.find(m => m.id === $selectedModel)}
             {@const selected = $availableModels.find(m => m.id === $selectedModel)}
             {selected.name}
+            {#if selected.limitedTimeFree}
+              <span class="limited-time-badge-small" title="Gratuito per tempo limitato">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </span>
+            {/if}
           {:else}
             Nebula AI 1.5
           {/if}
@@ -155,14 +172,23 @@
                 class:premium={model.premium}
                 class:disabled={model.premium && !hasPlanOrHigher(model.requiredPlan)}
                 on:click={() => selectModel(model.id)}
-                title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? $t('requiresSubscription', { plan: model.requiredPlan === 'pro' ? $t('pro') : $t('max') }) : ''}
+                title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? $t('requiresSubscription', { plan: model.requiredPlan === 'premium' ? 'Premium' : (model.requiredPlan === 'pro' ? $t('pro') : $t('max')) }) : ''}
               >
                 <div class="model-info">
                   <div class="model-name">
                     {model.name}
                     {#if model.premium}
-                      <span class="premium-badge" class:pro={model.requiredPlan === 'pro'} class:max={model.requiredPlan === 'max'}>
-                        {model.requiredPlan === 'pro' ? 'PRO' : 'MAX'}
+                      <span class="premium-badge" class:premium={model.requiredPlan === 'premium'} class:pro={model.requiredPlan === 'pro'} class:max={model.requiredPlan === 'max'}>
+                        {model.requiredPlan === 'premium' ? 'PREMIUM' : (model.requiredPlan === 'pro' ? 'PRO' : 'MAX')}
+                      </span>
+                    {/if}
+                    {#if model.limitedTimeFree}
+                      <span class="limited-time-badge" title="Gratuito per tempo limitato">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Gratuito
                       </span>
                     {/if}
                     {#if model.vision}
@@ -565,6 +591,11 @@
     line-height: 1;
   }
 
+  .premium-badge.premium {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: white;
+  }
+
   .premium-badge.pro {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -594,6 +625,54 @@
   .web-search-badge svg {
     width: 10px;
     height: 10px;
+  }
+  
+  .limited-time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    line-height: 1;
+    margin-left: 6px;
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+    color: #8b4513;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  .limited-time-badge svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .limited-time-badge-small {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+    color: #8b4513;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  .limited-time-badge-small svg {
+    width: 10px;
+    height: 10px;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(253, 160, 133, 0.7);
+    }
+    50% {
+      opacity: 0.9;
+      box-shadow: 0 0 0 3px rgba(253, 160, 133, 0.3);
+    }
   }
   
   .feature-badge {

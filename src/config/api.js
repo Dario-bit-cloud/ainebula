@@ -25,7 +25,7 @@ export const MODEL_MAPPING = {
   'gpt-4.1-mini': { model: 'gpt-4.1-mini', provider: 'electronhub' },
   'gpt-4.1-nano': { model: 'gpt-4.1-nano', provider: 'electronhub' },
   'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'electronhub' },
-  'o3-mini': { model: 'o3-mini', provider: 'electronhub' },
+  'gemini-2.5-flash-image': { model: 'gemini-2.5-flash-image', provider: 'electronhub' },
   
   // OpenAI - Code Models
   'gpt-5.1-codex-mini': { model: 'gpt-5.1-codex-mini', provider: 'electronhub' },

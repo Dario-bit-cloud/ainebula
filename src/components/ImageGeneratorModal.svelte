@@ -444,6 +444,9 @@
           <div class="generating-indicator">
             <Loader2 size={20} class="spinning" />
             <span>Generazione in corso...</span>
+            <div class="generating-progress">
+              <div class="progress-bar"></div>
+            </div>
           </div>
         {:else}
           <button
@@ -458,14 +461,21 @@
       </div>
 
       <!-- Generated Images Gallery -->
-      {#if generatedImages.length > 0}
+      {#if generatedImages.length > 0 || isGenerating}
         <div class="gallery">
           <div class="gallery-header">
             <div class="gallery-title">
-              <CheckCircle2 size={20} class="success-icon" />
-              <h3>Immagini Generate</h3>
+              {#if isGenerating}
+                <Loader2 size={20} class="spinning success-icon" />
+                <h3>Generazione in corso...</h3>
+              {:else}
+                <CheckCircle2 size={20} class="success-icon" />
+                <h3>Immagini Generate</h3>
+              {/if}
             </div>
-            <span class="gallery-count">{generatedImages.length} {generatedImages.length === 1 ? 'immagine' : 'immagini'}</span>
+            {#if !isGenerating}
+              <span class="gallery-count">{generatedImages.length} {generatedImages.length === 1 ? 'immagine' : 'immagini'}</span>
+            {/if}
           </div>
           <div class="images-grid">
             {#each generatedImages as image, index}
@@ -475,7 +485,7 @@
                   <p>Errore: {image.error}</p>
                 </div>
               {:else}
-                <div class="image-card">
+                <div class="image-card" style="animation: fadeInScale 0.5s ease-out {index * 0.1}s both;">
                   <div class="image-wrapper">
                     <img src={image.imageUrl} alt={image.title} loading="lazy" />
                     <div class="image-overlay">
@@ -513,6 +523,25 @@
                 </div>
               {/if}
             {/each}
+            {#if isGenerating}
+              {#each Array(numImages - generatedImages.length) as _, i}
+                <div class="image-card image-placeholder">
+                  <div class="image-wrapper placeholder-wrapper">
+                    <div class="image-skeleton">
+                      <Loader2 size={32} class="spinning" />
+                      <div class="skeleton-shimmer"></div>
+                    </div>
+                  </div>
+                  <div class="image-info">
+                    <div class="skeleton-text"></div>
+                    <div class="skeleton-meta">
+                      <div class="skeleton-badge"></div>
+                      <div class="skeleton-badge"></div>
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            {/if}
           </div>
         </div>
       {/if}
@@ -996,6 +1025,7 @@
 
   .generating-indicator {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 12px;
@@ -1004,12 +1034,119 @@
     font-size: 14px;
   }
 
+  .generating-progress {
+    width: 200px;
+    height: 4px;
+    background-color: var(--border-color, #e5e7eb);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+    background-size: 200% 100%;
+    animation: progress-shimmer 2s linear infinite;
+    width: 100%;
+  }
+
+  @keyframes progress-shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
   .spinning {
     animation: spin 0.8s linear infinite;
   }
 
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  .image-placeholder {
+    opacity: 0.7;
+  }
+
+  .placeholder-wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .image-skeleton {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--bg-secondary, #f3f4f6) 0%, var(--bg-tertiary, #e5e7eb) 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-shimmer {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      left: -100%;
+    }
+    100% {
+      left: 100%;
+    }
+  }
+
+  .skeleton-text {
+    height: 16px;
+    width: 60%;
+    background: var(--bg-secondary, #f3f4f6);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .skeleton-meta {
+    display: flex;
+    gap: 8px;
+  }
+
+  .skeleton-badge {
+    height: 20px;
+    width: 80px;
+    background: var(--bg-secondary, #f3f4f6);
+    border-radius: 10px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   .gallery {
