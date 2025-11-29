@@ -306,18 +306,49 @@ export async function verifySession() {
   try {
     let token = localStorage.getItem('auth_token');
     
+    console.log('🔍 [VERIFY SESSION] Verifica sessione:', {
+      hasToken: !!token,
+      tokenPreview: token ? token.substring(0, 20) + '...' : null
+    });
+    
     // Se non c'è token nel localStorage, prova a recuperarlo dal cookie
     // (il cookie viene inviato automaticamente dal browser)
     // Se il token è nel localStorage, usalo; altrimenti il server controllerà il cookie
     
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/me`, {
       method: 'GET',
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        'Content-Type': 'application/json'
-      },
+      headers,
       credentials: 'include' // Importante: include i cookie nella richiesta
     });
+    
+    console.log('📥 [VERIFY SESSION] Risposta:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [VERIFY SESSION] Errore risposta:', errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        return errorData;
+      } catch {
+        return {
+          success: false,
+          message: `Errore ${response.status}: ${response.statusText}`,
+          error: errorText
+        };
+      }
+    }
     
     const data = await response.json();
     
