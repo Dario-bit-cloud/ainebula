@@ -45,6 +45,8 @@
   let imageDescription = '';
   let showPrivacyCard = true;
   let showAttachMenu = false;
+  let showMobileActionsMenu = false;
+  let mobileActionsRef;
   
   // Verifica se il modello selezionato supporta web search
   $: currentModel = $availableModels.find(m => m.id === $selectedModel);
@@ -259,6 +261,15 @@
     // Aggiungi listener globale per l'incolla
     window.addEventListener('paste', handlePaste);
     
+    // Chiudi menu mobile quando si clicca fuori
+    function handleClickOutside(event) {
+      if (mobileActionsRef && !mobileActionsRef.contains(event.target)) {
+        showMobileActionsMenu = false;
+      }
+    }
+    
+    document.addEventListener('click', handleClickOutside);
+    
     // Aggiungi listener per swipe su mobile
     // Usa tick per assicurarsi che l'elemento sia disponibile
     tick().then(() => {
@@ -346,6 +357,7 @@
     // Cleanup function
     return () => {
       window.removeEventListener('paste', handlePaste);
+      document.removeEventListener('click', handleClickOutside);
       if (mainAreaElement) {
         mainAreaElement.removeEventListener('touchstart', handleTouchStart);
         mainAreaElement.removeEventListener('touchmove', handleTouchMove);
@@ -1819,42 +1831,101 @@
         
         <!-- Nuove icone nella barra della chat -->
         <div class="chat-input-icons">
-          <button 
-            class="chat-icon-button" 
-            on:click={handleAttachFile}
-            title="Carica file"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-          </button>
-          
-          <button 
-            class="chat-icon-button" 
-            on:click={handleAttachImage}
-            title="Carica immagine"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-          </button>
-          
-          <button 
-            class="chat-icon-button" 
-            on:click={handleClearContext}
-            title="Pulisci contesto"
-            disabled={visibleMessages.length === 0}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 6h18"/>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-            </svg>
-          </button>
+          {#if $isMobile}
+            <!-- Su mobile: menu a tendina per azioni secondarie -->
+            <div class="mobile-actions-wrapper" bind:this={mobileActionsRef}>
+              <button 
+                class="chat-icon-button mobile-menu-button" 
+                on:click={() => showMobileActionsMenu = !showMobileActionsMenu}
+                title="Menu azioni"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="3" y1="12" x2="21" y2="12"/>
+                  <line x1="3" y1="6" x2="21" y2="6"/>
+                  <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
+              
+              {#if showMobileActionsMenu}
+                <div class="mobile-actions-menu" on:click|stopPropagation>
+                  <button 
+                    class="mobile-action-item" 
+                    on:click={() => { handleAttachFile(); showMobileActionsMenu = false; }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <span>Carica file</span>
+                  </button>
+                  
+                  <button 
+                    class="mobile-action-item" 
+                    on:click={() => { handleAttachImage(); showMobileActionsMenu = false; }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <span>Carica immagine</span>
+                  </button>
+                  
+                  <button 
+                    class="mobile-action-item" 
+                    on:click={() => { handleClearContext(); showMobileActionsMenu = false; }}
+                    disabled={visibleMessages.length === 0}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18"/>
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    </svg>
+                    <span>Pulisci contesto</span>
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {:else}
+            <!-- Su desktop: tutti i pulsanti visibili -->
+            <button 
+              class="chat-icon-button" 
+              on:click={handleAttachFile}
+              title="Carica file"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </button>
+            
+            <button 
+              class="chat-icon-button" 
+              on:click={handleAttachImage}
+              title="Carica immagine"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+            
+            <button 
+              class="chat-icon-button" 
+              on:click={handleClearContext}
+              title="Pulisci contesto"
+              disabled={visibleMessages.length === 0}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"/>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+              </svg>
+            </button>
+          {/if}
           
           <button 
             class="chat-icon-button web-search-button" 
@@ -1868,7 +1939,9 @@
               <line x1="2" y1="12" x2="22" y2="12"/>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
-            <span>Web Search</span>
+            {#if !$isMobile}
+              <span>Web Search</span>
+            {/if}
           </button>
         </div>
         
@@ -2629,6 +2702,16 @@
     .input-wrapper {
       padding: 10px 12px;
       gap: 6px;
+      flex-wrap: nowrap;
+    }
+    
+    .chat-input-icons {
+      flex-shrink: 0;
+    }
+    
+    .message-input {
+      flex: 1;
+      min-width: 0;
     }
 
     .message-image {
@@ -2712,10 +2795,11 @@
     }
 
     .disclaimer {
-      font-size: 11px;
-      padding: 8px 12px;
+      font-size: 10px;
+      padding: 6px 12px;
       text-align: center;
       line-height: 1.4;
+      margin-top: 4px;
     }
 
     .message-input {
@@ -2758,6 +2842,12 @@
 
     .input-wrapper {
       padding: 8px 10px;
+      gap: 4px;
+    }
+    
+    .chat-input-icons {
+      gap: 4px;
+      margin-right: 4px;
     }
 
     .message-image {
@@ -3445,6 +3535,138 @@
 
   .web-search-button.active span {
     color: white;
+  }
+  
+  /* Menu mobile per azioni */
+  .mobile-actions-wrapper {
+    position: relative;
+  }
+  
+  .mobile-menu-button {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  
+  .mobile-actions-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    min-width: 200px;
+    animation: menuSlideUp 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .mobile-action-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s;
+    min-height: 48px;
+    touch-action: manipulation;
+    text-align: left;
+    width: 100%;
+  }
+  
+  .mobile-action-item:hover:not(:disabled) {
+    background-color: var(--hover-bg);
+  }
+  
+  .mobile-action-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .mobile-action-item svg {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+  }
+  
+  @keyframes menuSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .chat-input-icons {
+      gap: 6px;
+      margin-right: 6px;
+    }
+    
+    .chat-icon-button {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+    }
+    
+    .chat-icon-button svg {
+      width: 20px;
+      height: 20px;
+    }
+    
+    .web-search-button {
+      min-width: 40px;
+      padding: 0 10px;
+    }
+    
+    .web-search-button span {
+      display: none;
+    }
+    
+    .mobile-actions-menu {
+      min-width: 180px;
+    }
+    
+    .input-wrapper {
+      gap: 6px;
+    }
+    
+    .message-input {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .chat-input-icons {
+      gap: 4px;
+      margin-right: 4px;
+    }
+    
+    .chat-icon-button {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      min-height: 36px;
+    }
+    
+    .web-search-button {
+      min-width: 36px;
+      padding: 0 8px;
+    }
   }
 
     .attach-menu {
