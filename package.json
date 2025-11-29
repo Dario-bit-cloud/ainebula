@@ -35,6 +35,8 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-svelte": "^0.555.0",
     "marked": "^17.0.1",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0",
     "svelte-store": "^0.0.2"
   }
 }
