@@ -117,7 +117,11 @@ export function getPatreonAuthUrl() {
     redirectUri = 'http://localhost:3001/api/patreon/callback';
   }
   
-  const scope = 'identity identity[email] memberships';
+  // Scope validi per Patreon OAuth 2.0 API v2
+  // identity: accesso base alle informazioni utente
+  // identity[email]: accesso all'email dell'utente
+  // identity.memberships: accesso alle informazioni di membership
+  const scope = 'identity identity[email] identity.memberships';
   const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   
   // Salva state in localStorage per verifica dopo redirect

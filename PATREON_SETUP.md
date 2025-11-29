@@ -35,11 +35,19 @@ PATREON_CREATOR_REFRESH_TOKEN=Vb5aAzykB9meiShokfKv2mRt6h9Ov5kTNRYGVDNp58o
 
 1. Vai su https://www.patreon.com/portal/registration/register-clients
 2. Seleziona la tua app "Nebula AI"
-3. Aggiungi questi Redirect URIs:
+3. Clicca su "Modifica client" (Edit client)
+4. Nella sezione "Redirect URIs", aggiungi questi URI (uno per riga):
    - **Locale (Sviluppo):** `http://localhost:3001/api/patreon/callback` ⚠️ **IMPORTANTE: usa porta 3001 (backend), non 5173 (frontend)**
-   - **Produzione:** `https://tuodominio.com/api/patreon/callback`
+   - **Produzione Vercel:** `https://ainebula.vercel.app/api/patreon/callback`
+   - **Produzione (se hai dominio custom):** `https://tuodominio.com/api/patreon/callback`
 
-**Nota:** In sviluppo locale, il frontend gira su `localhost:5173` ma il backend (dove è il callback) gira su `localhost:3001`. Assicurati di configurare `http://localhost:3001/api/patreon/callback` su Patreon.
+5. **Salva le modifiche** cliccando il pulsante di salvataggio
+
+**Nota:** 
+- In sviluppo locale, il frontend gira su `localhost:5173` ma il backend (dove è il callback) gira su `localhost:3001`. 
+- **Assicurati di aggiungere TUTTI i redirect URI che userai** (sviluppo e produzione)
+- Se usi Vercel, aggiungi `https://ainebula.vercel.app/api/patreon/callback`
+- Se hai un dominio custom, aggiungi anche quello
 
 ### 3. Aggiorna Database
 
@@ -111,17 +119,29 @@ Se l'utente ha già collegato Patreon, può cliccare "Verifica Abbonamento" per 
 
 ## 🐛 Troubleshooting
 
+### Errore "invalid_scope"
+- **Risolto!** Gli scope sono stati corretti a: `identity identity[email] identity.memberships`
+- Se vedi ancora questo errore, assicurati di aver fatto il deploy dell'ultima versione
+
 ### Errore "token_exchange_failed"
 - Verifica che Client ID e Secret siano corretti
 - Controlla che il redirect URI corrisponda esattamente a quello configurato su Patreon
+- Verifica che gli scope richiesti siano supportati dalla tua app Patreon
 
 ### Errore "user_info_failed"
 - Verifica che il Creator Access Token sia valido
 - Controlla che l'app abbia i permessi necessari
+- Assicurati che gli scope includano `identity.memberships` per accedere alle informazioni di membership
+
+### Errore 404 su `/api/auth/me`
+- Questo è un problema separato relativo alle API routes su Vercel
+- Verifica che le API routes siano deployate correttamente
+- Controlla che `vercel.json` sia configurato correttamente
 
 ### Abbonamento non si attiva
 - Verifica che l'utente sia iscritto a un tier ≥ 5€/mese
 - Controlla i log del server per errori API Patreon
+- Assicurati che gli scope includano `identity.memberships` per verificare le membership
 
 ## 📚 Risorse
 
