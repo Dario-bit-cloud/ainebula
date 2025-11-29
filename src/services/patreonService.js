@@ -39,7 +39,7 @@ export async function checkPatreonMembership(patreonUserId) {
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/patreon/check-membership?action=check-membership`, {
+    const response = await fetch(`${API_BASE_URL}/patreon/check-membership`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -183,7 +183,7 @@ export async function unlinkPatreonAccount() {
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/patreon/unlink-account?action=unlink-account`, {
+    const response = await fetch(`${API_BASE_URL}/patreon/unlink-account`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
