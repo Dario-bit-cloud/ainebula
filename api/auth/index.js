@@ -116,12 +116,26 @@ export default async function handler(req, res) {
     
     // Determina l'endpoint dal path o query parameter
     const urlPath = req.url.split('?')[0];
-    const action = req.query.action || req.body.action;
-    const endpoint = urlPath.split('/api/auth/')[1] || '';
+    let action = req.query.action;
+    let endpoint = '';
+    
+    // Estrai endpoint dal path
+    const pathMatch = urlPath.match(/\/api\/auth\/([^/?]+)/);
+    if (pathMatch) {
+      endpoint = pathMatch[1];
+    }
+    
+    // Se non c'è action nel query, prova nel body (solo se è JSON)
+    if (!action && req.body && typeof req.body === 'object') {
+      action = req.body.action;
+    }
+    
+    console.log('🔍 [AUTH] Routing:', { method: req.method, urlPath, endpoint, action, hasBody: !!req.body });
     
     // POST /api/auth/login - Login
     if (req.method === 'POST' && (endpoint === 'login' || action === 'login')) {
-      const { username, password } = req.body;
+      const body = parsedBody || req.body;
+      const { username, password } = body;
       
       if (!username || !password) {
         return res.status(400).json({
@@ -206,7 +220,8 @@ export default async function handler(req, res) {
     
     // POST /api/auth/register - Registrazione
     if (req.method === 'POST' && (endpoint === 'register' || action === 'register')) {
-      const { username, password, referralCode } = req.body;
+      const body = parsedBody || req.body;
+      const { username, password, referralCode } = body;
       
       if (!username || !password) {
         return res.status(400).json({
@@ -346,11 +361,12 @@ export default async function handler(req, res) {
     
     // POST /api/auth/passkey - Passkey operations
     if (req.method === 'POST' && (endpoint === 'passkey' || action === 'passkey')) {
-      const passkeyAction = req.body.action || req.query.action;
+      const body = parsedBody || req.body;
+      const passkeyAction = body.action || req.query.action;
       
       // Passkey Login Start
       if (passkeyAction === 'login-start') {
-        const { username } = req.body;
+        const { username } = body;
         
         if (!username) {
           return res.status(400).json({
@@ -404,7 +420,7 @@ export default async function handler(req, res) {
       
       // Passkey Login Finish
       if (passkeyAction === 'login-finish') {
-        const { username, credential } = req.body;
+        const { username, credential } = body;
         
         if (!username || !credential) {
           return res.status(400).json({
@@ -531,7 +547,7 @@ export default async function handler(req, res) {
       
       // Passkey Register Start
       if (passkeyAction === 'register-start') {
-        const { username } = req.body;
+        const { username } = body;
         
         if (!username) {
           return res.status(400).json({
@@ -582,7 +598,7 @@ export default async function handler(req, res) {
       
       // Passkey Register Finish
       if (passkeyAction === 'register-finish') {
-        const { username, credential } = req.body;
+        const { username, credential } = body;
         
         if (!username || !credential) {
           return res.status(400).json({
@@ -663,7 +679,8 @@ export default async function handler(req, res) {
     
     // POST /api/auth/2fa - 2FA operations
     if (req.method === 'POST' && (endpoint === '2fa' || action === '2fa')) {
-      const twoFactorAction = req.query.action || req.body.action;
+      const body = parsedBody || req.body;
+      const twoFactorAction = req.query.action || body.action;
       
       // GET /api/auth/2fa?action=status
       if (req.method === 'GET' || twoFactorAction === 'status') {
@@ -737,7 +754,7 @@ export default async function handler(req, res) {
           return res.status(auth.status).json({ success: false, message: auth.error });
         }
         
-        const { code } = req.body;
+        const { code } = body;
         
         if (!code) {
           return res.status(400).json({ success: false, message: 'Codice 2FA richiesto' });
@@ -785,7 +802,7 @@ export default async function handler(req, res) {
           return res.status(auth.status).json({ success: false, message: auth.error });
         }
         
-        const { code } = req.body;
+        const { code } = body;
         
         if (!code) {
           return res.status(400).json({ success: false, message: 'Codice 2FA richiesto per disabilitare' });
@@ -992,7 +1009,8 @@ export default async function handler(req, res) {
       }
 
       const userId = auth.user.user_id;
-      const { phone_number } = req.body;
+      const body = parsedBody || req.body;
+      const { phone_number } = body;
 
       // Valida il numero di telefono (opzionale, può essere null o una stringa)
       if (phone_number !== null && phone_number !== undefined && phone_number !== '') {
@@ -1028,7 +1046,8 @@ export default async function handler(req, res) {
       }
 
       const userId = auth.user.user_id;
-      const { username } = req.body;
+      const body = parsedBody || req.body;
+      const { username } = body;
 
       // Validazione
       if (!username || username.trim().length === 0) {
@@ -1080,7 +1099,8 @@ export default async function handler(req, res) {
       }
 
       const userId = auth.user.user_id;
-      const { current_password, new_password } = req.body;
+      const body = parsedBody || req.body;
+      const { current_password, new_password } = body;
 
       // Validazione
       if (!current_password) {
@@ -1134,7 +1154,9 @@ export default async function handler(req, res) {
     console.error('❌ Errore auth:', {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      url: req.url,
+      method: req.method
     });
     
     // Assicurati che la risposta sia sempre JSON valido
@@ -1142,7 +1164,8 @@ export default async function handler(req, res) {
       return res.status(500).json({
         success: false,
         message: 'Errore durante l\'operazione',
-        error: error.message || 'Unknown error'
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
       });
     }
   }
