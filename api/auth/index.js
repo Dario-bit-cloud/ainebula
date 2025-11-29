@@ -125,12 +125,33 @@ export default async function handler(req, res) {
       endpoint = pathMatch[1];
     }
     
-    // Se non c'è action nel query, prova nel body (solo se è JSON)
-    if (!action && req.body && typeof req.body === 'object') {
-      action = req.body.action;
+    // Parse body se necessario (Vercel potrebbe non parsare automaticamente)
+    let parsedBody = req.body;
+    if (parsedBody) {
+      if (typeof parsedBody === 'string' && parsedBody.length > 0) {
+        try {
+          parsedBody = JSON.parse(parsedBody);
+        } catch (e) {
+          console.warn('⚠️ [AUTH] Errore parsing body JSON:', e.message);
+        }
+      }
+      
+      // Se non c'è action nel query, prova nel body
+      if (!action && parsedBody && typeof parsedBody === 'object' && parsedBody.action) {
+        action = parsedBody.action;
+      }
     }
     
-    console.log('🔍 [AUTH] Routing:', { method: req.method, urlPath, endpoint, action, hasBody: !!req.body });
+    console.log('🔍 [AUTH] Routing:', { 
+      method: req.method, 
+      urlPath, 
+      endpoint, 
+      action, 
+      queryAction: req.query.action,
+      hasBody: !!req.body,
+      bodyType: typeof req.body,
+      contentType: req.headers['content-type']
+    });
     
     // POST /api/auth/login - Login
     if (req.method === 'POST' && (endpoint === 'login' || action === 'login')) {
