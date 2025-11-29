@@ -96,11 +96,20 @@ export default async function handler(req, res) {
   try {
     const sql = getDatabaseConnection();
     
-    // Determina l'endpoint dal slug o query parameter
+    // Determina l'endpoint dal slug (per route dinamiche) o query parameter
     const slug = req.query.slug;
     let endpoint = '';
     if (slug) {
       endpoint = Array.isArray(slug) ? slug[0] : slug;
+    }
+    
+    // Se non c'è slug, prova a estrarre dal path
+    if (!endpoint) {
+      const urlPath = req.url.split('?')[0];
+      const pathMatch = urlPath.match(/\/api\/auth\/([^/?]+)/);
+      if (pathMatch) {
+        endpoint = pathMatch[1];
+      }
     }
     
     let action = req.query.action || endpoint;
@@ -447,7 +456,7 @@ export default async function handler(req, res) {
       return;
     }
     
-    // Altri endpoint (passkey, 2fa, ecc.) - da implementare se necessario
+    // Altri endpoint (passkey, 2fa, disconnect-all, delete-account, update-*) - da implementare se necessario
     // Per ora restituiamo 404 per endpoint non gestiti
     return res.status(404).json({ success: false, message: 'Endpoint non trovato', endpoint, action });
     
@@ -455,14 +464,17 @@ export default async function handler(req, res) {
     console.error('❌ Errore auth:', {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      url: req.url,
+      method: req.method
     });
     
     if (!res.headersSent) {
       return res.status(500).json({
         success: false,
         message: 'Errore durante l\'operazione',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
       });
     }
   }
