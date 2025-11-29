@@ -93,9 +93,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Determina il percorso dalla query
-    const slug = req.query.slug || [];
-    const path = Array.isArray(slug) ? slug.join('/') : slug;
+    // Determina il percorso dall'URL
+    // In Vercel, possiamo usare req.url o req.query.slug
+    let path = '';
+    
+    // Prova prima con req.query.slug (route dinamica)
+    if (req.query.slug) {
+      if (Array.isArray(req.query.slug)) {
+        path = req.query.slug.join('/');
+      } else {
+        path = req.query.slug;
+      }
+    }
+    
+    // Se non c'è slug, prova a estrarre dal URL
+    if (!path && req.url) {
+      const urlPath = req.url.split('?')[0]; // Rimuovi query string
+      // Estrai il path dopo /api/patreon/
+      const match = urlPath.match(/\/api\/patreon\/(.+)$/);
+      if (match) {
+        path = match[1];
+      }
+    }
+    
+    // Debug: log per vedere cosa riceviamo
+    console.log('🔍 [PATREON] Path:', path, 'Method:', req.method, 'URL:', req.url, 'Query:', req.query);
     
     // Gestisci callback OAuth Patreon
     if (path === 'callback' && req.method === 'GET') {
@@ -169,8 +191,9 @@ export default async function handler(req, res) {
     // Inizializza la connessione al database per le altre operazioni
     const sql = getDatabaseConnection();
     
-    // GET /api/patreon/link-status - Verifica stato collegamento
-    if (path === 'link-status' && req.method === 'GET') {
+    // GET /api/patreon o /api/patreon/link-status - Verifica stato collegamento
+    // Se path è vuoto, assumiamo che sia link-status (per retrocompatibilità)
+    if ((path === 'link-status' || path === '') && req.method === 'GET') {
       const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
