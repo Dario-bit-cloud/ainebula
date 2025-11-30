@@ -985,30 +985,100 @@
     
     const lowerMessage = message.toLowerCase().trim();
     
-    // Pattern per rilevare richieste di generazione immagini
-    const imageGenerationPatterns = [
-      /genera\s+(un'?|una|un)?\s*immagine/i,
-      /crea\s+(un'?|una|un)?\s*immagine/i,
-      /fai\s+(un'?|una|un)?\s*immagine/i,
-      /disegna\s+(un'?|una|un)?\s*immagine/i,
-      /realizza\s+(un'?|una|un)?\s*immagine/i,
-      /produci\s+(un'?|una|un)?\s*immagine/i,
-      /immagina\s+(un'?|una|un)?/i,
-      /genera\s+immagini/i,
-      /crea\s+immagini/i,
-      /fai\s+immagini/i,
-      /disegna\s+immagini/i,
-      /generate\s+(an?|the)?\s*image/i,
-      /create\s+(an?|the)?\s*image/i,
-      /make\s+(an?|the)?\s*image/i,
-      /draw\s+(an?|the)?\s*image/i,
-      /generate\s+images/i,
-      /create\s+images/i,
-      /make\s+images/i,
-      /draw\s+images/i
+    // Lista di verbi comuni per generazione immagini
+    const verbs = [
+      'genera', 'generare', 'generando', 'generato', 'generi', 'generiamo',
+      'crea', 'creare', 'creando', 'creato', 'crei', 'creiamo',
+      'fai', 'fare', 'facendo', 'fatto', 'facci', 'facciamo',
+      'disegna', 'disegnare', 'disegnando', 'disegnato', 'disegni', 'disegniamo',
+      'realizza', 'realizzare', 'realizzando', 'realizzato', 'realizzi', 'realizziamo',
+      'produci', 'produrre', 'producendo', 'prodotto', 'produciamo',
+      'immagina', 'immaginare', 'immaginando', 'immaginato', 'immagini', 'immaginiamo',
+      'mostra', 'mostrare', 'mostrando', 'mostrato', 'mostri', 'mostriamo',
+      'visualizza', 'visualizzare', 'visualizzando', 'visualizzato', 'visualizzi', 'visualizziamo',
+      'rendi', 'rendere', 'rendendo', 'reso', 'rendiamo',
+      'costruisci', 'costruire', 'costruendo', 'costruito', 'costruiamo',
+      'inventa', 'inventare', 'inventando', 'inventato', 'inventi', 'inventiamo',
+      'concepisci', 'concepire', 'concependo', 'concepito', 'concepiamo',
+      'fai vedere', 'fammi vedere', 'facci vedere',
+      'dammi', 'dare', 'dando', 'dato',
+      'mostrami', 'mostraci',
+      'fammi', 'facci',
+      'voglio', 'vorrei', 'vorremmo',
+      'puoi', 'potresti', 'potreste', 'potete',
+      'sai', 'sapresti', 'sapreste',
+      'generate', 'create', 'make', 'draw', 'show', 'visualize', 'render'
     ];
     
-    return imageGenerationPatterns.some(pattern => pattern.test(lowerMessage));
+    // Lista di sinonimi per "immagine"
+    const imageSynonyms = [
+      'immagine', 'immagini', 'immagina',
+      'foto', 'fotografia', 'fotografie', 'fotografica',
+      'disegno', 'disegni', 'disegno',
+      'illustrazione', 'illustrazioni',
+      'grafica', 'grafiche',
+      'render', 'rendering', 'renders',
+      'picture', 'pictures',
+      'image', 'images',
+      'fotogramma', 'fotogrammi',
+      'ritratto', 'ritratti',
+      'quadro', 'quadri',
+      'stampa', 'stampe',
+      'schizzo', 'schizzi',
+      'bozzetto', 'bozzetti'
+    ];
+    
+    // Pattern flessibili per articoli e preposizioni
+    const articles = "(un'?|una|un|lo|la|gli|le|l'|d'|dell'|della|del|dei|degli|delle)?";
+    const optionalWords = "(di|da|con|per|su|in|a|al|alla|alle|ai|agli)?";
+    
+    // Costruisci pattern combinando verbi e sinonimi
+    const patterns = [];
+    
+    // Pattern: verbo + articolo opzionale + sinonimo
+    verbs.forEach(verb => {
+      imageSynonyms.forEach(synonym => {
+        // Pattern base: verbo + articolo + sinonimo
+        patterns.push(new RegExp(`\\b${verb}\\s+${articles}\\s*${synonym}\\b`, 'i'));
+        // Pattern senza articolo: verbo + sinonimo
+        patterns.push(new RegExp(`\\b${verb}\\s+${synonym}\\b`, 'i'));
+        // Pattern con preposizione: verbo + preposizione + articolo + sinonimo
+        patterns.push(new RegExp(`\\b${verb}\\s+${optionalWords}\\s*${articles}\\s*${synonym}\\b`, 'i'));
+      });
+    });
+    
+    // Pattern specifici comuni
+    const specificPatterns = [
+      // "crea foto di", "genera immagine di", etc.
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render)\s+(di|da|con|per)/i,
+      // "fammi vedere", "mostrami", "facci vedere"
+      /(fammi|mostrami|facci|mostraci|dammi)\s+(vedere|una|un'?|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // "voglio una foto", "vorrei un'immagine"
+      /(voglio|vorrei|vorremmo|desidero|desidererei)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // "puoi creare", "potresti generare"
+      /(puoi|potresti|potreste|potete|sai|sapresti|sapreste)\s+(generare|creare|fare|disegnare|realizzare|produrre|mostrare|visualizzare|rendere|costruire|inventare)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // "crea una foto di un gatto" - pattern con oggetto dopo
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(di|da|con|per|che|dove)/i,
+      // Pattern inglesi
+      /(generate|create|make|draw|show|visualize|render)\s+(an?|the)?\s*(image|picture|photo|photograph|drawing|illustration|graphic|render)/i,
+      /(generate|create|make|draw|show|visualize|render)\s+(images|pictures|photos|photographs|drawings|illustrations|graphics|renders)/i,
+      // Pattern con "nuova" o "nuovo"
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(una|un'?|un)?\s*(nuova|nuovo|nuove|nuovi)?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // Pattern con "per me" o "per favore"
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(per|grazie|prego)/i,
+      // Pattern con errori comuni o varianti
+      /(genera|crea|fai|disegna)\s+(un|una|un')\s*(fot|foto|fotografia|immagine|immagini)/i,
+      // Pattern molto informali
+      /(fai|crea|genera)\s+(un|una|un')\s*(foto|immagine|disegno)/i,
+      // Pattern con "che rappresenta" o "che mostra"
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(che|che\s+rappresenta|che\s+mostra|che\s+raffigura)/i
+    ];
+    
+    // Combina tutti i pattern
+    const allPatterns = [...patterns, ...specificPatterns];
+    
+    // Verifica se almeno un pattern corrisponde
+    return allPatterns.some(pattern => pattern.test(lowerMessage));
   }
   
   // Determina il modello da usare: se web search è attivo, usa il modello search, 
