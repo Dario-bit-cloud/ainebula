@@ -65,10 +65,9 @@
         'Caricamento file e immagini',
         'Esportazione chat base (Markdown)',
         'Supporto via email'
-      ],
-      patreonEnabled: false
-      patreonEnabled: false
-    },
+        ],
+        patreonEnabled: false
+      },
     monthly: {
       name: 'Pro',
       basePrice: 30, // Prezzo mensile base
