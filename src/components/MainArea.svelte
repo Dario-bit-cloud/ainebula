@@ -985,47 +985,68 @@
     
     const lowerMessage = message.toLowerCase().trim();
     
-    // Lista di verbi comuni per generazione immagini
+    // Lista di verbi comuni per generazione immagini (espansa)
     const verbs = [
-      'genera', 'generare', 'generando', 'generato', 'generi', 'generiamo',
-      'crea', 'creare', 'creando', 'creato', 'crei', 'creiamo',
-      'fai', 'fare', 'facendo', 'fatto', 'facci', 'facciamo',
-      'disegna', 'disegnare', 'disegnando', 'disegnato', 'disegni', 'disegniamo',
-      'realizza', 'realizzare', 'realizzando', 'realizzato', 'realizzi', 'realizziamo',
-      'produci', 'produrre', 'producendo', 'prodotto', 'produciamo',
-      'immagina', 'immaginare', 'immaginando', 'immaginato', 'immagini', 'immaginiamo',
-      'mostra', 'mostrare', 'mostrando', 'mostrato', 'mostri', 'mostriamo',
-      'visualizza', 'visualizzare', 'visualizzando', 'visualizzato', 'visualizzi', 'visualizziamo',
-      'rendi', 'rendere', 'rendendo', 'reso', 'rendiamo',
-      'costruisci', 'costruire', 'costruendo', 'costruito', 'costruiamo',
-      'inventa', 'inventare', 'inventando', 'inventato', 'inventi', 'inventiamo',
-      'concepisci', 'concepire', 'concependo', 'concepito', 'concepiamo',
-      'fai vedere', 'fammi vedere', 'facci vedere',
-      'dammi', 'dare', 'dando', 'dato',
-      'mostrami', 'mostraci',
-      'fammi', 'facci',
-      'voglio', 'vorrei', 'vorremmo',
-      'puoi', 'potresti', 'potreste', 'potete',
-      'sai', 'sapresti', 'sapreste',
-      'generate', 'create', 'make', 'draw', 'show', 'visualize', 'render'
+      'genera', 'generare', 'generando', 'generato', 'generi', 'generiamo', 'genereresti', 'genererei',
+      'crea', 'creare', 'creando', 'creato', 'crei', 'creiamo', 'creeresti', 'creerei', 'creami', 'creaci',
+      'fai', 'fare', 'facendo', 'fatto', 'facci', 'facciamo', 'faresti', 'farei', 'fammi', 'facci',
+      'disegna', 'disegnare', 'disegnando', 'disegnato', 'disegni', 'disegniamo', 'disegneresti', 'disegnerei', 'disegnami',
+      'realizza', 'realizzare', 'realizzando', 'realizzato', 'realizzi', 'realizziamo', 'realizzeresti', 'realizzerei',
+      'produci', 'produrre', 'producendo', 'prodotto', 'produciamo', 'produrresti', 'produrrei',
+      'immagina', 'immaginare', 'immaginando', 'immaginato', 'immagini', 'immaginiamo', 'immagineresti', 'immaginerei',
+      'mostra', 'mostrare', 'mostrando', 'mostrato', 'mostri', 'mostriamo', 'mostreresti', 'mostrerei',
+      'visualizza', 'visualizzare', 'visualizzando', 'visualizzato', 'visualizzi', 'visualizziamo', 'visualizzeresti', 'visualizzerei',
+      'rendi', 'rendere', 'rendendo', 'reso', 'rendiamo', 'renderesti', 'renderei',
+      'costruisci', 'costruire', 'costruendo', 'costruito', 'costruiamo', 'costruiresti', 'costruirei',
+      'inventa', 'inventare', 'inventando', 'inventato', 'inventi', 'inventiamo', 'inventeresti', 'inventerei',
+      'concepisci', 'concepire', 'concependo', 'concepito', 'concepiamo', 'concepiresti', 'concepirei',
+      'fai vedere', 'fammi vedere', 'facci vedere', 'facci vedere', 'facci vedere',
+      'dammi', 'dare', 'dando', 'dato', 'daresti', 'darei',
+      'mostrami', 'mostraci', 'mostratemi', 'mostrateci',
+      'fammi', 'facci', 'facciami', 'facciaci',
+      'voglio', 'vorrei', 'vorremmo', 'vorresti', 'vorrebbe', 'vorrebbero',
+      'desidero', 'desidererei', 'desidereresti', 'desidererebbe',
+      'puoi', 'potresti', 'potreste', 'potete', 'potrebbe', 'potrebbero',
+      'sai', 'sapresti', 'sapreste', 'saprebbe', 'saprebbero',
+      'riesci', 'riusciresti', 'riuscireste', 'riuscirebbe', 'riuscirebbero',
+      'posso', 'posso avere', 'posso vedere',
+      'mi serve', 'mi servirebbe', 'ci serve', 'ci servirebbe',
+      'ho bisogno', 'avrei bisogno', 'abbiamo bisogno',
+      'fammi avere', 'facci avere',
+      'genera', 'crea', 'fai', 'disegna', 'realizza', 'produci', 'mostra', 'visualizza', 'rendi', 'costruisci', 'inventa',
+      'generate', 'create', 'make', 'draw', 'show', 'visualize', 'render', 'produce', 'design',
+      'can you', 'could you', 'would you', 'can i', 'could i', 'would i',
+      'i want', 'i would like', 'i need', 'i would need',
+      'make me', 'show me', 'give me', 'create me', 'draw me'
     ];
     
-    // Lista di sinonimi per "immagine"
+    // Lista di sinonimi per "immagine" (espansa)
     const imageSynonyms = [
-      'immagine', 'immagini', 'immagina',
-      'foto', 'fotografia', 'fotografie', 'fotografica',
-      'disegno', 'disegni', 'disegno',
-      'illustrazione', 'illustrazioni',
-      'grafica', 'grafiche',
-      'render', 'rendering', 'renders',
-      'picture', 'pictures',
-      'image', 'images',
-      'fotogramma', 'fotogrammi',
-      'ritratto', 'ritratti',
-      'quadro', 'quadri',
-      'stampa', 'stampe',
-      'schizzo', 'schizzi',
-      'bozzetto', 'bozzetti'
+      'immagine', 'immagini', 'immagina', 'immaginazione',
+      'foto', 'fotografia', 'fotografie', 'fotografica', 'fotografiche', 'fotogramma', 'fotogrammi',
+      'disegno', 'disegni', 'disegnare',
+      'illustrazione', 'illustrazioni', 'illustrare',
+      'grafica', 'grafiche', 'grafico', 'grafici',
+      'render', 'rendering', 'renders', 'renderizzato',
+      'picture', 'pictures', 'picturing',
+      'image', 'images', 'imaging',
+      'ritratto', 'ritratti', 'ritrarre',
+      'quadro', 'quadri', 'quadretto', 'quadretti',
+      'stampa', 'stampe', 'stampare',
+      'schizzo', 'schizzi', 'schizzare',
+      'bozzetto', 'bozzetti', 'bozzettare',
+      'dipinto', 'dipinti', 'dipingere',
+      'pittura', 'pitture', 'pitturare',
+      'raffigurazione', 'raffigurazioni', 'raffigurare',
+      'rappresentazione', 'rappresentazioni', 'rappresentare',
+      'visualizzazione', 'visualizzazioni',
+      'icona', 'icone',
+      'avatar', 'avatars',
+      'logo', 'loghi',
+      'banner', 'banners',
+      'poster', 'posters',
+      'cartellone', 'cartelloni',
+      'manifesto', 'manifesti'
     ];
     
     // Pattern flessibili per articoli e preposizioni
@@ -1047,31 +1068,63 @@
       });
     });
     
-    // Pattern specifici comuni
+    // Pattern specifici comuni (molto espansi)
     const specificPatterns = [
       // "crea foto di", "genera immagine di", etc.
-      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render)\s+(di|da|con|per)/i,
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|fammi|mostrami|dammi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(di|da|con|per)/i,
       // "fammi vedere", "mostrami", "facci vedere"
-      /(fammi|mostrami|facci|mostraci|dammi)\s+(vedere|una|un'?|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      /(fammi|mostrami|facci|mostraci|dammi|facciami|facciaci|mostratemi|mostrateci)\s+(vedere|una|un'?|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
       // "voglio una foto", "vorrei un'immagine"
-      /(voglio|vorrei|vorremmo|desidero|desidererei)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      /(voglio|vorrei|vorremmo|desidero|desidererei|desidereresti|desidererebbe|ho bisogno|avrei bisogno|abbiamo bisogno|mi serve|mi servirebbe|ci serve|ci servirebbe)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
       // "puoi creare", "potresti generare"
-      /(puoi|potresti|potreste|potete|sai|sapresti|sapreste)\s+(generare|creare|fare|disegnare|realizzare|produrre|mostrare|visualizzare|rendere|costruire|inventare)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      /(puoi|potresti|potreste|potete|potrebbe|potrebbero|sai|sapresti|sapreste|saprebbe|saprebbero|riesci|riusciresti|riuscireste|riuscirebbe|riuscirebbero)\s+(generare|creare|fare|disegnare|realizzare|produrre|mostrare|visualizzare|rendere|costruire|inventare|concepire)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
       // "crea una foto di un gatto" - pattern con oggetto dopo
-      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(di|da|con|per|che|dove)/i,
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|fammi|mostrami|dammi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(di|da|con|per|che|dove|che\s+mostra|che\s+rappresenta|che\s+raffigura)/i,
       // Pattern inglesi
-      /(generate|create|make|draw|show|visualize|render)\s+(an?|the)?\s*(image|picture|photo|photograph|drawing|illustration|graphic|render)/i,
-      /(generate|create|make|draw|show|visualize|render)\s+(images|pictures|photos|photographs|drawings|illustrations|graphics|renders)/i,
+      /(generate|create|make|draw|show|visualize|render|produce|design)\s+(an?|the)?\s*(image|picture|photo|photograph|drawing|illustration|graphic|render)/i,
+      /(generate|create|make|draw|show|visualize|render|produce|design)\s+(images|pictures|photos|photographs|drawings|illustrations|graphics|renders)/i,
       // Pattern con "nuova" o "nuovo"
-      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(una|un'?|un)?\s*(nuova|nuovo|nuove|nuovi)?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|fammi|mostrami|dammi)\s+(una|un'?|un|la|l')?\s*(nuova|nuovo|nuove|nuovi|bella|bello|belle|belli|carina|carino|carine|carini)?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
       // Pattern con "per me" o "per favore"
-      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(per|grazie|prego)/i,
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|fammi|mostrami|dammi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(per|grazie|prego|per favore|per cortesia|per me|per noi)/i,
+      // Pattern con numeri (es. "crea 3 immagini")
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(\d+)\s+(foto|fotografie|immagini|disegni|illustrazioni|grafiche|renders|pictures|images)/i,
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(in|di)\s+(\d+)\s+(versioni|varianti|stili)/i,
       // Pattern con errori comuni o varianti
-      /(genera|crea|fai|disegna)\s+(un|una|un')\s*(fot|foto|fotografia|immagine|immagini)/i,
+      /(genera|crea|fai|disegna|realizza|produci)\s+(un|una|un')\s*(fot|foto|fotografia|immagine|immagini|disegno|disegni)/i,
       // Pattern molto informali
-      /(fai|crea|genera)\s+(un|una|un')\s*(foto|immagine|disegno)/i,
+      /(fai|crea|genera|dammi|fammi|mostrami)\s+(un|una|un')\s*(foto|immagine|disegno|fotografia)/i,
       // Pattern con "che rappresenta" o "che mostra"
-      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(che|che\s+rappresenta|che\s+mostra|che\s+raffigura)/i
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|fammi|mostrami|dammi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(che|che\s+rappresenta|che\s+mostra|che\s+raffigura|che\s+raffiguri|che\s+mostri|che\s+rappresenti)/i,
+      // Pattern con domande
+      /(puoi|potresti|potreste|potete|sai|sapresti|sapreste|riesci|riusciresti|riuscireste)\s+(generare|creare|fare|disegnare|realizzare|produrre|mostrare|visualizzare|rendere|costruire|inventare)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\??/i,
+      /(posso|potrei|potremmo)\s+(avere|vedere|ricevere)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\??/i,
+      // Pattern con stili o tipi specifici
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(in|con|stile|tipo|tipo di|stile di)\s+(realistico|realistica|cartoon|anime|3d|3D|vettoriale|vettoriali|digitale|digitali|artistica|artistico)/i,
+      // Pattern con aggettivi descrittivi
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(bella|bello|belle|belli|carina|carino|carine|carini|fantastica|fantastico|fantastiche|fantastici|meravigliosa|meraviglioso|meravigliose|meravigliosi)\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // Pattern con "come" o "tipo"
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+(come|tipo|simile|simile a|tipo di)/i,
+      // Pattern con "con" seguito da descrizione
+      /(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)\s+con\s+/i,
+      // Pattern con spazi irregolari o punteggiatura
+      /(genera|crea|fai|disegna)\s*[.,;:!?]?\s*(un|una|un')\s*(foto|immagine|disegno)/i,
+      // Pattern con "mi" o "ci" prima del verbo
+      /(mi|ci)\s+(generi|crei|fai|disegni|realizzi|produci|mostri|visualizzi|rendi|costruisci|inventi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // Pattern con "ti prego" o "per favore" all'inizio
+      /(ti prego|per favore|per cortesia|grazie|please)\s*[,.]?\s*(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|fammi|mostrami|dammi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // Pattern inglesi espansi
+      /(can you|could you|would you|can i|could i|would i|i want|i would like|i need|i would need)\s+(generate|create|make|draw|show|visualize|render|produce|design|give me|show me|make me|create me|draw me)\s+(an?|the)?\s*(image|picture|photo|photograph|drawing|illustration|graphic|render)/i,
+      // Pattern con "please" in inglese
+      /(please|pls|plz)\s*[,.]?\s*(generate|create|make|draw|show|visualize|render|produce|design|give me|show me|make me|create me|draw me)\s+(an?|the)?\s*(image|picture|photo|photograph|drawing|illustration|graphic|render)/i,
+      // Pattern con "ai" o "artificial intelligence" (richieste esplicite)
+      /(ai|artificial intelligence|intelligenza artificiale)\s*[,.]?\s*(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|generate|create|make|draw)\s+(un'?|una|un|an?|the)?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // Pattern con "dall-e" o "midjourney" (riferimenti a generatori)
+      /(dall-e|dalle|midjourney|stable diffusion|dall\s*e)\s*[,.]?\s*(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|generate|create|make|draw)\s+(un'?|una|un|an?|the)?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // Pattern con "voglio che tu" o "vorrei che tu"
+      /(voglio|vorrei|vorremmo|desidero|desidererei)\s+che\s+tu\s+(generi|crei|fai|disegni|realizzi|produci|mostri|visualizzi|rendi|costruisci|inventi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i,
+      // Pattern con "se puoi" o "se riesci"
+      /(se puoi|se potresti|se riesci|se riuscissi|se riusciresti)\s*[,.]?\s*(genera|crea|fai|disegna|realizza|produci|mostra|visualizza|rendi|costruisci|inventa|fammi|mostrami|dammi)\s+(un'?|una|un|la|l')?\s*(foto|fotografia|immagine|disegno|illustrazione|grafica|render|picture|image)/i
     ];
     
     // Combina tutti i pattern
