@@ -7,6 +7,7 @@ export default defineConfig({
     port: 5173
   },
   build: {
+    outDir: 'dist',
     // Ottimizzazioni per ridurre la dimensione del bundle
     minify: 'esbuild', // Più veloce di terser e già incluso
     // Rimuove console.log in produzione tramite esbuild
