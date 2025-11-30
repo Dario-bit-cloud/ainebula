@@ -1,4 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
   "installCommand": "npm ci --prefer-offline --no-audit --legacy-peer-deps",
   "functions": {
     "api/**/*.js": {
@@ -86,4 +88,3 @@
     }
   ]
 }
-
