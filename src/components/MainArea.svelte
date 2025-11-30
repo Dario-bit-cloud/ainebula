@@ -572,6 +572,12 @@
         
         const messageIndex = currentChatData.messages.length - 1;
         
+        // Rileva se è una richiesta di generazione immagini
+        const isImageRequest = isImageGenerationRequest(messageText);
+        
+        // Se è una richiesta di generazione immagini, usa Gemini Flash Image
+        const modelToUse = isImageRequest ? 'gemini-2.5-flash-image' : effectiveModel;
+        
         // Generazione testo normale
         let fullResponse = '';
         const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
@@ -581,7 +587,7 @@
         
         for await (const chunk of generateResponseStream(
           messageText, 
-          effectiveModel, 
+          modelToUse, 
           chatHistory,
           [],
           abortController,
@@ -973,8 +979,43 @@
     }
   }
   
-  // Determina il modello da usare: se web search è attivo, usa il modello search, altrimenti quello selezionato
-  $: effectiveModel = webSearchEnabled ? 'gpt-4o-mini-search-preview-2025-03-11' : $selectedModel;
+  // Funzione per rilevare se il messaggio contiene una richiesta di generazione immagini
+  function isImageGenerationRequest(message) {
+    if (!message || typeof message !== 'string') return false;
+    
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // Pattern per rilevare richieste di generazione immagini
+    const imageGenerationPatterns = [
+      /genera\s+(un'?|una|un)?\s*immagine/i,
+      /crea\s+(un'?|una|un)?\s*immagine/i,
+      /fai\s+(un'?|una|un)?\s*immagine/i,
+      /disegna\s+(un'?|una|un)?\s*immagine/i,
+      /realizza\s+(un'?|una|un)?\s*immagine/i,
+      /produci\s+(un'?|una|un)?\s*immagine/i,
+      /immagina\s+(un'?|una|un)?/i,
+      /genera\s+immagini/i,
+      /crea\s+immagini/i,
+      /fai\s+immagini/i,
+      /disegna\s+immagini/i,
+      /generate\s+(an?|the)?\s*image/i,
+      /create\s+(an?|the)?\s*image/i,
+      /make\s+(an?|the)?\s*image/i,
+      /draw\s+(an?|the)?\s*image/i,
+      /generate\s+images/i,
+      /create\s+images/i,
+      /make\s+images/i,
+      /draw\s+images/i
+    ];
+    
+    return imageGenerationPatterns.some(pattern => pattern.test(lowerMessage));
+  }
+  
+  // Determina il modello da usare: se web search è attivo, usa il modello search, 
+  // se è una richiesta di generazione immagini usa Gemini Flash Image, altrimenti quello selezionato
+  $: effectiveModel = webSearchEnabled 
+    ? 'gpt-4o-mini-search-preview-2025-03-11' 
+    : $selectedModel;
   
   async function handleImageSelect(event) {
     const files = Array.from(event.target.files || []);
