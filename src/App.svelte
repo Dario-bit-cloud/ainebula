@@ -15,6 +15,8 @@
   import { showConfirm, showAlert } from './services/dialogService.js';
   import { linkPatreonAccount } from './services/patreonService.js';
   import { showSuccess as showToastSuccess, showError, showWarning, showInfo } from './services/toastService.js';
+  import { isMobileDevice } from './utils/platform.js';
+  import { hasPWAInstallPromptBeenShown, markPWAInstallPromptAsShown, isPWAInstalled } from './utils/mobile.js';
   
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
@@ -519,6 +521,20 @@
         root.style.setProperty('--text-secondary', '#525252');
         root.style.setProperty('--border-color', '#d4d4d4');
       }
+    }
+    
+    // Mostra automaticamente il prompt di installazione PWA su mobile (solo una volta)
+    if (isMobileDevice() && !isPWAInstalled() && !hasPWAInstallPromptBeenShown()) {
+      // Aspetta un po' per non disturbare l'utente all'avvio
+      setTimeout(async () => {
+        // Carica il modal se non è già caricato
+        await loadDownloadAppModal();
+        await tick();
+        // Mostra il modal
+        isDownloadAppModalOpen.set(true);
+        // Segna che il prompt è stato mostrato
+        markPWAInstallPromptAsShown();
+      }, 3000); // Mostra dopo 3 secondi
     }
   });
   

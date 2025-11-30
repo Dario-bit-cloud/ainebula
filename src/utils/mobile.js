@@ -141,6 +141,42 @@ export function handleVirtualKeyboard() {
   });
 }
 
+/**
+ * Verifica se il prompt di installazione PWA è già stato mostrato
+ */
+export function hasPWAInstallPromptBeenShown() {
+  if (typeof window === 'undefined') return true;
+  return localStorage.getItem('nebula-pwa-prompt-shown') === 'true';
+}
+
+/**
+ * Segna che il prompt di installazione PWA è stato mostrato
+ */
+export function markPWAInstallPromptAsShown() {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('nebula-pwa-prompt-shown', 'true');
+}
+
+/**
+ * Resetta il flag del prompt di installazione PWA (per permettere di mostrarlo di nuovo)
+ */
+export function resetPWAInstallPrompt() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('nebula-pwa-prompt-shown');
+}
+
+/**
+ * Verifica se l'app è già installata come PWA
+ */
+export function isPWAInstalled() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         (window.navigator.standalone === true) ||
+         document.referrer.includes('android-app://');
+}
+
+
+
 
 
 

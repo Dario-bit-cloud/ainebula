@@ -14,6 +14,9 @@
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
   import { availableLanguages } from '../utils/i18n.js';
   import { currentLanguage, t, setLanguage } from '../stores/language.js';
+  import { isMobileDevice } from '../utils/platform.js';
+  import { resetPWAInstallPrompt, isPWAInstalled } from '../utils/mobile.js';
+  import { isDownloadAppModalOpen } from '../stores/app.js';
   
   let activeSection = 'generale';
   let theme = 'system';
@@ -760,6 +763,15 @@
     isSettingsOpen.set(false);
   }
   
+  async function handleShowInstallPrompt() {
+    // Resetta il flag per permettere di mostrare di nuovo il prompt
+    resetPWAInstallPrompt();
+    // Apri il modal di installazione
+    isDownloadAppModalOpen.set(true);
+    // Chiudi le impostazioni
+    isSettingsOpen.set(false);
+  }
+  
   $: subscription = $userStore.subscription;
   $: isActive = subscription?.active && hasActiveSubscription();
   $: planName = getPlanName(subscription?.plan);
@@ -895,6 +907,41 @@
                 {/each}
               </select>
             </div>
+            
+            {#if isMobileDevice()}
+              <div class="setting-section" class:section-visible={activeSection === 'generale'}>
+                <h3 class="setting-title">Installa App</h3>
+                {#if isPWAInstalled()}
+                  <div class="setting-row" class:row-visible={activeSection === 'generale'}>
+                    <div class="setting-info">
+                      <div class="setting-label">App Installata</div>
+                      <div class="setting-description">Nebula AI è già installata sul tuo dispositivo come app.</div>
+                    </div>
+                    <div class="installed-badge">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <span>Installata</span>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="setting-row" class:row-visible={activeSection === 'generale'}>
+                    <div class="setting-info">
+                      <div class="setting-label">Crea Shortcut</div>
+                      <div class="setting-description">Aggiungi Nebula AI alla schermata home del tuo dispositivo per un accesso rapido.</div>
+                    </div>
+                    <button class="manage-button" on:click={handleShowInstallPrompt}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      Mostra Istruzioni
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            {/if}
           {/if}
           
           <!-- Abbonamento -->
@@ -2137,6 +2184,23 @@
   .phone-cancel-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .installed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.1) 100%);
+    border: 1px solid #22c55e;
+    border-radius: 6px;
+    color: #22c55e;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  
+  .installed-badge svg {
+    flex-shrink: 0;
   }
 
   /* Rimuovi stili duplicati - già gestiti sopra */

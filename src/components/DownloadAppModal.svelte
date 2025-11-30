@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { markPWAInstallPromptAsShown } from '../utils/mobile.js';
   
   export let isOpen = false;
   
@@ -21,6 +22,8 @@
   
   function closeModal() {
     isOpen = false;
+    // Segna che il prompt è stato mostrato quando l'utente chiude il modal
+    markPWAInstallPromptAsShown();
   }
   
   function handleBackdropClick(event) {
@@ -42,6 +45,8 @@
       if (outcome === 'accepted') {
         isInstalled = true;
         installPrompt = null;
+        // Segna che il prompt è stato mostrato e l'installazione è stata accettata
+        markPWAInstallPromptAsShown();
       }
     }
   }
