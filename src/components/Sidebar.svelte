@@ -461,7 +461,7 @@
         class="new-chat-button" 
         role="button"
         aria-label={$t('newChat')}
-        title={$t('newChat')}
+        title={$isSidebarCollapsed && !$isMobile ? $t('newChat') : ''}
       >
         {#if !$isSidebarCollapsed || $isMobile}
           {$t('newChat')}
@@ -557,6 +557,7 @@
             class="nav-item" 
             class:active={activeItem === item.id}
             on:click={() => handleMenuClick(item.id)}
+            title={$isSidebarCollapsed && !$isMobile ? item.label : ''}
           >
             {#if item.customIcon}
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1060,7 +1061,7 @@
   </nav>
   
   <div class="user-section">
-    <button class="user-info" on:click={() => isUserMenuOpen.set(!$isUserMenuOpen)}>
+    <button class="user-info" on:click={() => isUserMenuOpen.set(!$isUserMenuOpen)} title={$isSidebarCollapsed && !$isMobile ? ($userStore?.name || $authUser?.username || $t('user')) : ''}>
       <div class="user-avatar">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -1519,13 +1520,21 @@
   }
   
   .sidebar.collapsed .new-chat-button {
-    padding: 10px;
-    min-width: 44px;
-    width: 44px;
+    padding: 12px;
+    min-width: 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--md-sys-shape-corner-medium);
   }
   
   .sidebar.collapsed .new-chat-button svg {
     margin: 0;
+    width: 20px;
+    height: 20px;
+  }
+  
+  .sidebar.collapsed .new-chat-button:hover {
+    transform: scale(1.05);
   }
   
   .new-chat-button:hover {
@@ -1587,9 +1596,11 @@
   
   .sidebar.collapsed .nav-item {
     justify-content: center;
-    padding: 8px;
-    min-width: 44px;
-    width: 44px;
+    padding: 10px;
+    min-width: 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--md-sys-shape-corner-medium);
   }
   
   .sidebar.collapsed .nav-item span {
@@ -1597,10 +1608,22 @@
     width: 0;
     overflow: hidden;
     white-space: nowrap;
+    position: absolute;
   }
   
   .sidebar.collapsed .nav-item:hover {
-    transform: translateX(0);
+    transform: translateX(0) scale(1.05);
+    background-color: var(--md-sys-color-surface-container-high);
+  }
+  
+  .sidebar.collapsed .nav-item.active {
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+  
+  .sidebar.collapsed .nav-item svg {
+    width: 20px;
+    height: 20px;
   }
 
   .nav-item:hover {
@@ -1681,6 +1704,68 @@
     opacity: 0;
     pointer-events: none;
     overflow: hidden;
+    height: 0;
+    margin: 0;
+  }
+  
+  .sidebar.collapsed .nav-item-wrapper {
+    justify-content: center;
+  }
+  
+  /* Tooltip migliorato per sidebar compressa */
+  .sidebar.collapsed .nav-item[title]:hover::after,
+  .sidebar.collapsed .new-chat-button[title]:hover::after,
+  .sidebar.collapsed .user-info[title]:hover::after,
+  .sidebar.collapsed .invite-button[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: var(--md-sys-color-inverse-surface);
+    color: var(--md-sys-color-inverse-on-surface);
+    padding: 8px 12px;
+    border-radius: var(--md-sys-shape-corner-small);
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0;
+    animation: tooltipFadeIn 0.2s ease-out 0.3s forwards;
+    box-shadow: var(--md-sys-elevation-level3);
+    font-family: var(--md-sys-typescale-label-medium-font);
+  }
+  
+  @keyframes tooltipFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-50%) translateX(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(-50%) translateX(0);
+    }
+  }
+  
+  /* Freccia per tooltip */
+  .sidebar.collapsed .nav-item[title]:hover::before,
+  .sidebar.collapsed .new-chat-button[title]:hover::before,
+  .sidebar.collapsed .user-info[title]:hover::before,
+  .sidebar.collapsed .invite-button[title]:hover::before {
+    content: '';
+    position: absolute;
+    left: calc(100% + 4px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid var(--md-sys-color-inverse-surface);
+    z-index: 10001;
+    opacity: 0;
+    animation: tooltipFadeIn 0.2s ease-out 0.3s forwards;
+    pointer-events: none;
   }
 
   .nav-item-wrapper {
@@ -2180,13 +2265,34 @@
   
   .sidebar.collapsed .user-info {
     justify-content: center;
-    padding: 6px;
+    padding: 8px;
+    min-width: 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--md-sys-shape-corner-medium);
+  }
+  
+  .sidebar.collapsed .user-info:hover {
+    background-color: var(--md-sys-color-surface-container-high);
+    transform: scale(1.05);
   }
   
   .sidebar.collapsed .user-details {
     opacity: 0;
     width: 0;
     overflow: hidden;
+    position: absolute;
+  }
+  
+  .sidebar.collapsed .user-avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+  
+  .sidebar.collapsed .user-avatar svg {
+    width: 20px;
+    height: 20px;
   }
 
   .user-info:hover {
@@ -2263,9 +2369,12 @@
   }
   
   .sidebar.collapsed .invite-button {
-    padding: 8px;
-    min-width: 44px;
-    width: 44px;
+    padding: 10px;
+    min-width: 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--md-sys-shape-corner-medium);
+    justify-content: center;
   }
   
   .sidebar.collapsed .invite-button span {
@@ -2273,6 +2382,16 @@
     width: 0;
     overflow: hidden;
     white-space: nowrap;
+    position: absolute;
+  }
+  
+  .sidebar.collapsed .invite-button svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .sidebar.collapsed .invite-button:hover {
+    transform: scale(1.05);
   }
 
   .invite-button:hover {
