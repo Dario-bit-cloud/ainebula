@@ -56,12 +56,13 @@
   const plans = {
     premium: {
       name: 'Premium',
-      basePrice: 5, // Prezzo mensile base
+      basePrice: 15, // Prezzo mensile base
       badge: 'Patreon',
-      description: 'Piano base con accesso a funzionalità essenziali di Nebula AI. Perfetto per iniziare.',
+      description: 'Piano base con accesso a tutti i modelli gratuiti di Nebula AI. Perfetto per iniziare.',
       features: [
-        'Accesso a tutti i modelli gratuiti',
-        'Chat illimitate',
+        'Accesso a Flash, Flash Thinking, Imagenerator, Codex e Surfer',
+        'Accesso a ChatGPT, Gemini, Grok e DeepSeek',
+        'Chat illimitate con tutti i modelli gratuiti',
         'Caricamento file e immagini',
         'Esportazione chat base (Markdown)',
         'Supporto via email'
@@ -72,11 +73,12 @@
       name: 'Pro',
       basePrice: 30, // Prezzo mensile base
       badge: 'Popolare',
-      description: 'Accesso completo a 4.1 e tutte le funzionalità avanzate.',
+      description: 'Accesso completo a 4.1 e tutti i modelli gratuiti. Il modello 4.1 offre 1M di contesto per conversazioni lunghe e compiti complessi.',
       features: [
-        'Accesso a 4.1 (modello premium avanzato)',
-        'Accesso a tutti i modelli gratuiti',
-        'Chat illimitate',
+        'Accesso esclusivo a 4.1 (1M di contesto, visione, function calling)',
+        'Accesso a tutti i modelli gratuiti (Flash, Flash Thinking, Imagenerator, Codex, Surfer)',
+        'Accesso a ChatGPT, Gemini, Grok e DeepSeek',
+        'Chat illimitate con tutti i modelli',
         'Caricamenti illimitati di file e immagini',
         'Esportazione chat avanzata (Markdown, PDF, JSON)',
         'Supporto prioritario',
@@ -87,12 +89,13 @@
       name: 'Massimo',
       basePrice: 300, // Prezzo mensile base
       badge: null,
-      description: 'Il piano completo con accesso a tutti i modelli premium e funzionalità esclusive.',
+      description: 'Il piano completo con accesso a o3, 4.1 e tutti i modelli. o3 è il modello più potente per matematica, scienze e ragionamento complesso.',
       features: [
-        'Accesso a o3 (il modello più avanzato)',
-        'Accesso a 4.1 incluso',
-        'Accesso a tutti i modelli gratuiti',
-        'Chat illimitate',
+        'Accesso esclusivo a o3 (ragionamento avanzato, visione, 200K contesto)',
+        'Accesso a 4.1 incluso (1M di contesto)',
+        'Accesso a tutti i modelli gratuiti (Flash, Flash Thinking, Imagenerator, Codex, Surfer)',
+        'Accesso a ChatGPT, Gemini, Grok e DeepSeek',
+        'Chat illimitate con tutti i modelli premium e gratuiti',
         'Caricamenti illimitati di file e immagini',
         'Esportazione chat avanzata (Markdown, PDF, JSON)',
         'Supporto prioritario dedicato',
@@ -145,6 +148,15 @@
     return totalPrice / durationOption.months;
   }
   
+  // Variabili reattive per il preview della durata
+  $: selectedDurationOption = durationOptions.find(d => d.value === selectedDuration) || durationOptions[0];
+  $: selectedDurationMonths = selectedDurationOption.months;
+  $: currentBasePrice = getBasePriceForDuration();
+  $: currentDiscount = getDurationDiscount();
+  $: currentPriceWithDiscount = getPriceWithDurationDiscount();
+  $: currentSavings = currentBasePrice - currentPriceWithDiscount;
+  $: formattedDurationLabel = formatDuration(selectedDurationMonths);
+  
   function closeModal() {
     isPremiumModalOpen.set(false);
     showPaymentForm = false;
@@ -190,13 +202,8 @@
       }, 100);
     }
     
-    // Se è il piano premium, mostra opzione Patreon invece del form di pagamento
-    if (plan === 'premium') {
-      // Non aprire subito il form, mostra opzione Patreon
-      showPaymentForm = false;
-    } else {
-      showPaymentForm = true;
-    }
+    // Apri sempre il form di pagamento per tutti i piani
+    showPaymentForm = true;
   }
   
   async function handlePatreonLink() {
@@ -614,7 +621,7 @@
       </div>
       
       <div class="modal-body">
-        {#if !showPaymentForm && selectedPlan !== 'premium'}
+        {#if !showPaymentForm}
           <!-- Selezione Piano -->
           <div class="plans-selection">
             <div class="plans-header">
@@ -748,76 +755,31 @@
               {#if selectedPlan && selectedDuration}
                 <div class="duration-preview">
                   <div class="preview-row">
-                    <span>Prezzo base ({formatDuration(durationOptions.find(d => d.value === selectedDuration)?.months || 1)}):</span>
-                    <span>€{getBasePriceForDuration().toFixed(2)}</span>
+                    <span>Prezzo base ({formattedDurationLabel}):</span>
+                    <span>€{currentBasePrice.toFixed(2)}</span>
                   </div>
-                  {#if getDurationDiscount() > 0}
+                  {#if currentDiscount > 0}
                     <div class="preview-row discount">
-                      <span>Sconto durata ({getDurationDiscount()}%):</span>
-                      <span>-€{calculateSavings().toFixed(2)}</span>
+                      <span>Sconto durata ({currentDiscount}%):</span>
+                      <span>-€{currentSavings.toFixed(2)}</span>
                     </div>
                   {/if}
                   <div class="preview-row total">
                     <span>Totale:</span>
-                    <span>€{getPriceWithDurationDiscount().toFixed(2)}</span>
+                    <span>€{currentPriceWithDiscount.toFixed(2)}</span>
                   </div>
-                  {#if getDurationDiscount() > 0}
+                  {#if currentDiscount > 0}
                     <div class="savings-info">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2L2 7l10 5 10-5-10-5z"/>
                         <path d="M2 17l10 5 10-5"/>
                         <path d="M2 12l10 5 10-5"/>
                       </svg>
-                      <span>Risparmi €{calculateSavings().toFixed(2)} pagando in anticipo!</span>
+                      <span>Risparmi €{currentSavings.toFixed(2)} pagando in anticipo!</span>
                     </div>
                   {/if}
                 </div>
               {/if}
-            </div>
-          </div>
-        {:else if selectedPlan === 'premium'}
-          <!-- Patreon in Manutenzione -->
-          <div class="patreon-selection">
-            <div class="patreon-header">
-              <div class="patreon-icon maintenance">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                </svg>
-              </div>
-              <h3>Patreon in Manutenzione</h3>
-              <p class="patreon-description">
-                L'integrazione con Patreon è temporaneamente in manutenzione. Stiamo lavorando per migliorare il servizio.
-              </p>
-              <div class="maintenance-badge">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                </svg>
-                <span>In Manutenzione</span>
-              </div>
-            </div>
-            
-            <div class="patreon-alternative">
-              <button 
-                class="alternative-button" 
-                on:click={() => {
-                  selectedPlan = 'monthly';
-                  showPaymentForm = true;
-                }}
-              >
-                Scegli il piano Pro
-              </button>
-            </div>
-            
-            <div class="patreon-back">
-              <button 
-                class="back-button" 
-                on:click={() => {
-                  selectedPlan = 'premium';
-                  showPaymentForm = false;
-                }}
-              >
-                ← Torna alla selezione piani
-              </button>
             </div>
           </div>
         {:else}
@@ -834,16 +796,16 @@
                   </div>
                   <div class="summary-row">
                     <span>Durata:</span>
-                    <span>{formatDuration(durationOptions.find(d => d.value === selectedDuration)?.months || 1)}</span>
+                    <span>{formattedDurationLabel}</span>
                   </div>
                   <div class="summary-row">
                     <span>Prezzo base:</span>
-                    <span>€{getBasePriceForDuration().toFixed(2)}</span>
+                    <span>€{currentBasePrice.toFixed(2)}</span>
                   </div>
-                  {#if getDurationDiscount() > 0}
+                  {#if currentDiscount > 0}
                     <div class="summary-row discount">
-                      <span>Sconto durata ({getDurationDiscount()}%):</span>
-                      <span>-€{calculateSavings().toFixed(2)}</span>
+                      <span>Sconto durata ({currentDiscount}%):</span>
+                      <span>-€{currentSavings.toFixed(2)}</span>
                     </div>
                   {/if}
                   {#if couponApplied}
