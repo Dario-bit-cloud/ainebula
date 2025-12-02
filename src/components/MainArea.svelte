@@ -2724,23 +2724,44 @@
   }
   
   .privacy-card {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 24px;
+    background: linear-gradient(135deg, var(--md-sys-color-surface-container) 0%, var(--md-sys-color-surface-container-high) 100%);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: 20px;
+    padding: 32px;
     animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--md-sys-elevation-level1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .privacy-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 50%, var(--md-sys-color-tertiary) 100%);
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .privacy-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    border-color: var(--accent-blue);
+    transform: translateY(-4px);
+    box-shadow: var(--md-sys-elevation-level4);
+    border-color: var(--md-sys-color-primary);
+    background: linear-gradient(135deg, var(--md-sys-color-surface-container-high) 0%, var(--md-sys-color-surface-container) 100%);
+  }
+  
+  .privacy-card:hover::before {
+    opacity: 1;
   }
   
   .privacy-card:active {
-    transform: translateY(0);
+    transform: translateY(-2px);
+    box-shadow: var(--md-sys-elevation-level2);
   }
   
   .privacy-card-header {
@@ -2757,44 +2778,58 @@
   }
   
   .privacy-icon-header {
-    color: var(--accent-blue);
+    color: var(--md-sys-color-primary);
     flex-shrink: 0;
     opacity: 0.9;
-    transition: opacity 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 24px;
+    height: 24px;
   }
   
   .privacy-card:hover .privacy-icon-header {
     opacity: 1;
+    transform: rotate(15deg) scale(1.1);
+    filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.4));
   }
   
   .privacy-card-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--md-sys-color-on-surface);
+    letter-spacing: -0.3px;
+    font-family: var(--md-sys-typescale-title-medium-font);
   }
   
   .privacy-card-close {
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--md-sys-color-on-surface-variant);
     cursor: pointer;
-    padding: 4px;
+    padding: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
-    transition: all 0.2s;
+    border-radius: var(--md-sys-shape-corner-small);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 32px;
+    height: 32px;
   }
   
   .privacy-card-close:hover {
-    background-color: var(--hover-bg);
-    color: var(--text-primary);
+    background-color: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface);
+    transform: rotate(90deg);
+  }
+  
+  .privacy-card-close:active {
+    transform: rotate(90deg) scale(0.9);
   }
   
   .privacy-features {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
+    gap: 20px;
+    margin-top: 8px;
   }
   
   @media (max-width: 1024px) {
@@ -2816,30 +2851,58 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    padding: 16px;
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  
+  .privacy-feature:hover {
+    background-color: var(--md-sys-color-surface-container);
+    transform: translateY(-2px);
   }
   
   .privacy-icon {
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(255, 152, 0, 0.15) 100%);
+    border-radius: 14px;
+    margin-bottom: 8px;
     color: #ff6b35;
-    margin-bottom: 4px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  
+  .privacy-feature:hover .privacy-icon {
+    transform: scale(1.1) rotate(5deg);
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.25) 0%, rgba(255, 152, 0, 0.25) 100%);
+    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+  }
+  
+  .privacy-icon svg {
+    width: 28px;
+    height: 28px;
+    filter: drop-shadow(0 2px 4px rgba(255, 107, 53, 0.3));
   }
   
   .privacy-feature-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--md-sys-color-on-surface);
     margin: 0;
+    font-family: var(--md-sys-typescale-title-small-font);
+    letter-spacing: -0.2px;
   }
   
   .privacy-feature-description {
     font-size: 14px;
-    color: var(--text-secondary);
-    line-height: 1.6;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.7;
     margin: 0;
+    font-family: var(--md-sys-typescale-body-medium-font);
   }
   
   .privacy-card-footer {
@@ -2847,30 +2910,40 @@
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 20px;
+    margin-top: 24px;
     padding-top: 20px;
-    border-top: 1px solid var(--border-color);
-    color: var(--accent-blue);
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    color: var(--md-sys-color-primary);
     font-size: 14px;
     font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .privacy-card:hover .privacy-card-footer {
+    border-top-color: var(--md-sys-color-primary);
   }
   
   .privacy-card-link {
-    color: var(--accent-blue);
-    transition: color 0.2s;
+    color: var(--md-sys-color-primary);
+    transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: var(--md-sys-typescale-label-large-font);
+    font-weight: var(--md-sys-typescale-label-large-weight);
   }
   
   .privacy-card:hover .privacy-card-link {
-    color: #60a5fa;
+    color: var(--md-sys-color-primary);
+    text-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
   }
   
   .privacy-card-footer svg {
-    color: var(--accent-blue);
+    color: var(--md-sys-color-primary);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 18px;
+    height: 18px;
   }
   
   .privacy-card:hover .privacy-card-footer svg {
-    transform: translateX(4px);
+    transform: translateX(6px);
   }
 
   @media (max-width: 768px) {
