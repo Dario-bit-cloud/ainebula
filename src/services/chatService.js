@@ -132,8 +132,10 @@ export async function getChatsFromDatabase() {
       const user = getCurrentUser();
       if (user && user.id) {
         // Ottieni la password dalla cache
+        console.log(`🔍 [CHAT SERVICE] Ricerca password per utente ${user.id}...`);
         const password = getCachedPassword(user.id);
         if (password) {
+          console.log(`✅ [CHAT SERVICE] Password trovata per utente ${user.id}`);
           const encryptionKey = await getEncryptionKeyForUser(user.id, password);
           if (encryptionKey) {
             console.log('🔓 [CHAT SERVICE] Decrittografia messaggi e metadati delle chat...');
@@ -187,7 +189,8 @@ export async function getChatsFromDatabase() {
             console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
           }
         } else {
-          console.log('⚠️ [CHAT SERVICE] Password non in cache, messaggi rimangono crittografati');
+          console.log(`⚠️ [CHAT SERVICE] Password non in cache per utente ${user.id}, messaggi rimangono crittografati`);
+          console.log(`💡 [CHAT SERVICE] Suggerimento: fai logout e login per ripristinare la password in cache`);
         }
       }
     }
@@ -239,8 +242,10 @@ export async function saveChatToDatabase(chat) {
     // Crittografa i messaggi e i metadati se la crittografia è disponibile
     const user = getCurrentUser();
     if (user && user.id) {
+      console.log(`🔍 [CHAT SERVICE] Ricerca password per crittografia, utente ${user.id}...`);
       const password = getCachedPassword(user.id);
       if (password) {
+        console.log(`✅ [CHAT SERVICE] Password trovata per crittografia, utente ${user.id}`);
         const encryptionKey = await getEncryptionKeyForUser(user.id, password);
         if (encryptionKey) {
           console.log('🔒 [CHAT SERVICE] Crittografia messaggi e metadati prima del salvataggio...');
@@ -268,7 +273,8 @@ export async function saveChatToDatabase(chat) {
           console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, salvataggio in chiaro');
         }
       } else {
-        console.log('⚠️ [CHAT SERVICE] Password non in cache, salvataggio in chiaro');
+        console.log(`⚠️ [CHAT SERVICE] Password non in cache per utente ${user.id}, salvataggio in chiaro`);
+        console.log(`💡 [CHAT SERVICE] Suggerimento: fai logout e login per ripristinare la password in cache`);
       }
     }
     

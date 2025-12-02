@@ -10,8 +10,11 @@ const CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minuti
 // Timeout per rimuovere la password dalla cache
 const passwordTimeouts = new Map();
 
+// Chiave per sessionStorage (si cancella quando si chiude il tab/browser)
+const SESSION_STORAGE_KEY = 'nebula_encryption_password';
+
 /**
- * Memorizza temporaneamente la password in memoria (solo per questa sessione)
+ * Memorizza temporaneamente la password in memoria e sessionStorage
  * @param {string} userId - ID dell'utente
  * @param {string} password - Password dell'utente
  */
@@ -21,14 +24,31 @@ export function cachePassword(userId, password) {
     clearTimeout(passwordTimeouts.get(userId));
   }
   
-  // Memorizza la password in cache
+  // Memorizza la password in cache in memoria
   passwordCache.set(userId, password);
   
-  // Rimuovi la password dalla cache dopo il timeout
+  // Memorizza anche in sessionStorage per persistere durante la sessione del browser
+  // sessionStorage si cancella automaticamente quando si chiude il tab/browser
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const sessionData = {
+        userId,
+        password,
+        timestamp: Date.now()
+      };
+      window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+      console.log(`✅ [ENCRYPTION] Password memorizzata in sessionStorage per utente ${userId}`);
+    }
+  } catch (error) {
+    console.warn('⚠️ [ENCRYPTION] Impossibile salvare password in sessionStorage:', error);
+    // Continua comunque con la cache in memoria
+  }
+  
+  // Rimuovi la password dalla cache dopo il timeout (solo dalla memoria, sessionStorage rimane)
   const timeoutId = setTimeout(() => {
     passwordCache.delete(userId);
     passwordTimeouts.delete(userId);
-    console.log(`🔒 [ENCRYPTION] Password rimossa dalla cache per utente ${userId}`);
+    console.log(`🔒 [ENCRYPTION] Password rimossa dalla cache in memoria per utente ${userId} (sessionStorage rimane)`);
   }, CACHE_TIMEOUT_MS);
   
   passwordTimeouts.set(userId, timeoutId);
@@ -37,15 +57,51 @@ export function cachePassword(userId, password) {
 
 /**
  * Ottiene la password dalla cache se disponibile
+ * Cerca prima in memoria, poi in sessionStorage
  * @param {string} userId - ID dell'utente
  * @returns {string|null} - Password o null se non disponibile
  */
 export function getCachedPassword(userId) {
-  return passwordCache.get(userId) || null;
+  // Prima cerca in memoria (più veloce)
+  const memoryPassword = passwordCache.get(userId);
+  if (memoryPassword) {
+    return memoryPassword;
+  }
+  
+  // Se non in memoria, cerca in sessionStorage
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const sessionDataStr = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (sessionDataStr) {
+        const sessionData = JSON.parse(sessionDataStr);
+        // Verifica che sia per lo stesso utente
+        if (sessionData.userId === userId && sessionData.password) {
+          // Ripristina anche in memoria per performance
+          passwordCache.set(userId, sessionData.password);
+          // Rinnova il timeout
+          if (passwordTimeouts.has(userId)) {
+            clearTimeout(passwordTimeouts.get(userId));
+          }
+          const timeoutId = setTimeout(() => {
+            passwordCache.delete(userId);
+            passwordTimeouts.delete(userId);
+            console.log(`🔒 [ENCRYPTION] Password rimossa dalla cache in memoria per utente ${userId}`);
+          }, CACHE_TIMEOUT_MS);
+          passwordTimeouts.set(userId, timeoutId);
+          console.log(`✅ [ENCRYPTION] Password recuperata da sessionStorage per utente ${userId}`);
+          return sessionData.password;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [ENCRYPTION] Errore lettura sessionStorage:', error);
+  }
+  
+  return null;
 }
 
 /**
- * Rimuove la password dalla cache
+ * Rimuove la password dalla cache (memoria e sessionStorage)
  * @param {string} userId - ID dell'utente
  */
 export function clearCachedPassword(userId) {
@@ -54,6 +110,23 @@ export function clearCachedPassword(userId) {
     clearTimeout(passwordTimeouts.get(userId));
     passwordTimeouts.delete(userId);
   }
+  
+  // Rimuovi anche da sessionStorage
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const sessionDataStr = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (sessionDataStr) {
+        const sessionData = JSON.parse(sessionDataStr);
+        // Rimuovi solo se è per lo stesso utente
+        if (sessionData.userId === userId) {
+          window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [ENCRYPTION] Errore rimozione da sessionStorage:', error);
+  }
+  
   console.log(`🔒 [ENCRYPTION] Password rimossa dalla cache per utente ${userId}`);
 }
 
