@@ -1678,7 +1678,7 @@
                     <path d="M8.9834 2.95255C8.90632 2.59374 8.55322 2.3651 8.19434 2.44181C6.76126 2.74892 5.46855 3.41405 4.42871 4.33536L4.22461 4.52286C3.95829 4.77577 3.94729 5.19697 4.2002 5.46329C4.42146 5.69604 4.77088 5.73328 5.0332 5.56973L5.13965 5.4877C6.03496 4.63748 7.18337 4.0189 8.47266 3.74259C8.83177 3.66563 9.06036 3.31166 8.9834 2.95255Z"></path>
                     <path d="M15.5713 4.33536C14.5314 3.41405 13.2387 2.74892 11.8057 2.44181C11.4468 2.3651 11.0937 2.59374 11.0166 2.95255C10.9396 3.31166 11.1682 3.66563 11.5273 3.74259C12.7361 4.00163 13.8209 4.56095 14.6895 5.33048L14.8604 5.4877L14.9668 5.56973C15.2291 5.73327 15.5785 5.69604 15.7998 5.46329C16.0211 5.23026 16.0403 4.87903 15.8633 4.6254L15.7754 4.52286L15.5713 4.33536Z"></path>
                   </svg>
-                  <span class="privacy-card-title">Qualunque cosa mi chiedi è:</span>
+                  <span class="privacy-card-title">Le tue conversazioni sono:</span>
                 </div>
                 <button class="privacy-card-close" on:click|stopPropagation={() => showPrivacyCard = false} title="Chiudi">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1690,33 +1690,36 @@
               <div class="privacy-features">
                 <div class="privacy-feature">
                   <div class="privacy-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                      <path d="M9 12l2 2 4-4"/>
+                      <path d="M9 12l2 2 4-4" stroke-width="2.5"/>
                     </svg>
                   </div>
-                  <h3 class="privacy-feature-title">Privata</h3>
-                  <p class="privacy-feature-description">A differenza di altri assistenti, non registro le nostre conversazioni.</p>
+                  <h3 class="privacy-feature-title">Completamente Privata</h3>
+                  <p class="privacy-feature-description">Non registriamo né conserviamo le tue conversazioni. A differenza di altri assistenti, la tua privacy è la nostra priorità.</p>
                 </div>
                 <div class="privacy-feature">
                   <div class="privacy-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-width="2.5"/>
+                      <circle cx="12" cy="16" r="1" fill="currentColor"/>
                     </svg>
                   </div>
-                  <h3 class="privacy-feature-title">Protetta</h3>
-                  <p class="privacy-feature-description">Le tue conversazioni sono crittografate e sicure.</p>
+                  <h3 class="privacy-feature-title">Crittografata e Sicura</h3>
+                  <p class="privacy-feature-description">Tutte le tue conversazioni sono protette con crittografia end-to-end. I tuoi dati sono al sicuro.</p>
                 </div>
                 <div class="privacy-feature">
                   <div class="privacy-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                      <path d="M9 12l2 2 4-4"/>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M20 6L9 17l-5-5"/>
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                      <path d="M2 17l10 5 10-5"/>
+                      <path d="M2 12l10 5 10-5"/>
                     </svg>
                   </div>
-                  <h3 class="privacy-feature-title">Trattato con rispetto</h3>
-                  <p class="privacy-feature-description">Le nostre conversazioni non vengono mai usate per l'addestramento.</p>
+                  <h3 class="privacy-feature-title">Rispettata e Protetta</h3>
+                  <p class="privacy-feature-description">Le tue conversazioni non vengono mai utilizzate per addestrare modelli AI. Il tuo contenuto rimane solo tuo.</p>
                 </div>
               </div>
               <div class="privacy-card-footer">
@@ -2651,15 +2654,18 @@
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    min-height: 60vh;
+    min-height: auto;
+    max-height: calc(100vh - 200px);
     width: 100%;
-    padding: 40px 24px;
+    padding: 24px 24px 120px 24px;
+    overflow-y: auto;
+    box-sizing: border-box;
   }
   
   .welcome-content {
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 24px;
     max-width: 1200px;
     width: 100%;
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2669,37 +2675,40 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 32px;
+    gap: 24px;
     width: 100%;
+    margin-bottom: 8px;
   }
   
   .welcome-text-section {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
   
   .welcome-title {
-    font-size: 48px;
+    font-size: 42px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--md-sys-color-on-surface);
     margin: 0;
-    line-height: 1.2;
-    letter-spacing: -1px;
+    line-height: 1.15;
+    letter-spacing: -0.8px;
+    font-family: var(--md-sys-typescale-headline-large-font);
   }
   
   .welcome-subtitle {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 400;
-    color: var(--text-secondary);
+    color: var(--md-sys-color-on-surface-variant);
     margin: 0;
     line-height: 1.6;
+    font-family: var(--md-sys-typescale-body-large-font);
   }
   
   .welcome-logo {
-    width: 120px;
-    height: 120px;
+    width: 100px;
+    height: 100px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2727,13 +2736,14 @@
     background: linear-gradient(135deg, var(--md-sys-color-surface-container) 0%, var(--md-sys-color-surface-container-high) 100%);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-radius: 20px;
-    padding: 32px;
+    padding: 28px;
     animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--md-sys-elevation-level1);
     position: relative;
     overflow: hidden;
+    margin-top: 8px;
   }
   
   .privacy-card::before {
@@ -2828,22 +2838,86 @@
   .privacy-features {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+    gap: 16px;
     margin-top: 8px;
+  }
+  
+  @media (max-width: 1200px) {
+    .privacy-features {
+      gap: 14px;
+    }
   }
   
   @media (max-width: 1024px) {
     .privacy-features {
       grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    
+    .privacy-card {
+      padding: 24px;
+    }
+  }
+  
+  @media (max-width: 900px) {
+    .privacy-features {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    
+    .privacy-feature {
+      text-align: left;
+    }
+    
+    .privacy-icon {
+      margin-bottom: 12px;
+    }
+  }
+  
+  @media (max-width: 1024px) {
+    .welcome-message {
+      padding: 20px 20px 120px 20px;
+    }
+    
+    .welcome-content {
       gap: 20px;
     }
     
+    .privacy-features {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    
+    .privacy-card {
+      padding: 24px;
+    }
+    
     .welcome-title {
-      font-size: 40px;
+      font-size: 38px;
     }
     
     .welcome-subtitle {
-      font-size: 18px;
+      font-size: 17px;
+    }
+    
+    .welcome-logo {
+      width: 90px;
+      height: 90px;
+    }
+  }
+  
+  @media (max-width: 900px) {
+    .privacy-features {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    
+    .privacy-feature {
+      text-align: left;
+    }
+    
+    .privacy-icon {
+      margin-bottom: 12px;
     }
   }
   
@@ -2889,18 +2963,19 @@
   }
   
   .privacy-feature-title {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
     color: var(--md-sys-color-on-surface);
-    margin: 0;
+    margin: 0 0 6px 0;
     font-family: var(--md-sys-typescale-title-small-font);
     letter-spacing: -0.2px;
+    line-height: 1.3;
   }
   
   .privacy-feature-description {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--md-sys-color-on-surface-variant);
-    line-height: 1.7;
+    line-height: 1.6;
     margin: 0;
     font-family: var(--md-sys-typescale-body-medium-font);
   }
@@ -2948,24 +3023,27 @@
 
   @media (max-width: 768px) {
     .welcome-message {
-      min-height: 50vh;
-      padding: 20px 12px;
+      min-height: auto;
+      max-height: calc(100vh - 180px);
+      padding: 16px 12px 100px 12px;
     }
     
     .welcome-content {
-      gap: 20px;
+      gap: 16px;
     }
     
     .welcome-header {
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
       align-items: center;
       text-align: center;
+      margin-bottom: 4px;
     }
     
     .welcome-title {
-      font-size: 28px;
-      line-height: 1.2;
+      font-size: 32px;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
     }
     
     .welcome-subtitle {
@@ -2974,25 +3052,54 @@
     }
     
     .welcome-logo {
-      width: 70px;
-      height: 70px;
+      width: 80px;
+      height: 80px;
     }
     
     .privacy-card {
-      display: none;
+      padding: 20px;
+      margin-top: 4px;
     }
     
     .privacy-features {
       grid-template-columns: 1fr;
       gap: 16px;
+      margin-top: 4px;
     }
     
     .privacy-feature {
-      text-align: center;
+      text-align: left;
+      padding: 12px;
     }
     
     .privacy-icon {
-      margin: 0 auto 8px;
+      margin-bottom: 10px;
+      width: 48px;
+      height: 48px;
+    }
+    
+    .privacy-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+    
+    .privacy-feature-title {
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    
+    .privacy-feature-description {
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    
+    .privacy-card-title {
+      font-size: 16px;
+    }
+    
+    .privacy-card-footer {
+      margin-top: 16px;
+      padding-top: 16px;
     }
 
     .welcome-text {
