@@ -17,6 +17,7 @@
   import { isMobileDevice } from '../utils/platform.js';
   import { resetPWAInstallPrompt, isPWAInstalled } from '../utils/mobile.js';
   import { isDownloadAppModalOpen } from '../stores/app.js';
+  import { applyTheme, setTheme, getTheme } from '../utils/theme.js';
   
   let activeSection = 'generale';
   let theme = 'system';
@@ -46,11 +47,8 @@
   
   onMount(() => {
     // Carica tema salvato
-    const savedTheme = localStorage.getItem('nebula-theme');
-    if (savedTheme) {
-      theme = savedTheme;
-      applyTheme(savedTheme);
-    }
+    const savedTheme = getTheme();
+    theme = savedTheme;
     
     // Carica stile UI salvato
     const savedUIStyle = localStorage.getItem('nebula-ui-style');
@@ -169,52 +167,9 @@
     }, 300);
   }
   
-  function applyTheme(newTheme) {
-    const root = document.documentElement;
-    const body = document.body;
-    if (newTheme === 'light') {
-      root.style.setProperty('--bg-primary', '#ffffff');
-      root.style.setProperty('--bg-secondary', '#f5f5f5');
-      root.style.setProperty('--bg-tertiary', '#e5e5e5');
-      root.style.setProperty('--text-primary', '#171717');
-      root.style.setProperty('--text-secondary', '#525252');
-      root.style.setProperty('--border-color', '#d4d4d4');
-      body.setAttribute('data-theme', 'light');
-    } else if (newTheme === 'dark') {
-      root.style.setProperty('--bg-primary', '#171717');
-      root.style.setProperty('--bg-secondary', '#1f1f1f');
-      root.style.setProperty('--bg-tertiary', '#2a2a2a');
-      root.style.setProperty('--text-primary', '#ffffff');
-      root.style.setProperty('--text-secondary', '#a0a0a0');
-      root.style.setProperty('--border-color', '#3a3a3a');
-      body.setAttribute('data-theme', 'dark');
-    } else {
-      // Sistema - usa preferenza sistema
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (prefersDark) {
-        root.style.setProperty('--bg-primary', '#171717');
-        root.style.setProperty('--bg-secondary', '#1f1f1f');
-        root.style.setProperty('--bg-tertiary', '#2a2a2a');
-        root.style.setProperty('--text-primary', '#ffffff');
-        root.style.setProperty('--text-secondary', '#a0a0a0');
-        root.style.setProperty('--border-color', '#3a3a3a');
-        body.setAttribute('data-theme', 'dark');
-      } else {
-        root.style.setProperty('--bg-primary', '#ffffff');
-        root.style.setProperty('--bg-secondary', '#f5f5f5');
-        root.style.setProperty('--bg-tertiary', '#e5e5e5');
-        root.style.setProperty('--text-primary', '#171717');
-        root.style.setProperty('--text-secondary', '#525252');
-        root.style.setProperty('--border-color', '#d4d4d4');
-        body.setAttribute('data-theme', 'light');
-      }
-    }
-  }
-  
   function handleThemeChange(newTheme) {
     theme = newTheme;
-    localStorage.setItem('nebula-theme', newTheme);
-    applyTheme(newTheme);
+    setTheme(newTheme);
   }
   
   function applyUIStyle(newStyle) {

@@ -11,63 +11,21 @@ import {
   preventPullToRefresh,
   handleVirtualKeyboard 
 } from './utils/mobile.js';
+import { initTheme } from './utils/theme.js';
 
 // Inizializza il tema PRIMA che l'app venga montata per evitare flash
-function initTheme() {
-  const savedTheme = localStorage.getItem('nebula-theme') || 'system';
-  const root = document.documentElement;
-  const body = document.body;
-  
-  // Applica tema colore
-  if (savedTheme === 'light') {
-    root.style.setProperty('--bg-primary', '#ffffff');
-    root.style.setProperty('--bg-secondary', '#f5f5f5');
-    root.style.setProperty('--bg-tertiary', '#e5e5e5');
-    root.style.setProperty('--text-primary', '#171717');
-    root.style.setProperty('--text-secondary', '#525252');
-    root.style.setProperty('--border-color', '#d4d4d4');
-    body.setAttribute('data-theme', 'light');
-  } else if (savedTheme === 'dark') {
-    root.style.setProperty('--bg-primary', '#171717');
-    root.style.setProperty('--bg-secondary', '#1f1f1f');
-    root.style.setProperty('--bg-tertiary', '#2a2a2a');
-    root.style.setProperty('--text-primary', '#ffffff');
-    root.style.setProperty('--text-secondary', '#a0a0a0');
-    root.style.setProperty('--border-color', '#3a3a3a');
-    body.setAttribute('data-theme', 'dark');
-  } else {
-    // Sistema - usa preferenza sistema
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (prefersDark) {
-      root.style.setProperty('--bg-primary', '#171717');
-      root.style.setProperty('--bg-secondary', '#1f1f1f');
-      root.style.setProperty('--bg-tertiary', '#2a2a2a');
-      root.style.setProperty('--text-primary', '#ffffff');
-      root.style.setProperty('--text-secondary', '#a0a0a0');
-      root.style.setProperty('--border-color', '#3a3a3a');
-      body.setAttribute('data-theme', 'dark');
-    } else {
-      root.style.setProperty('--bg-primary', '#ffffff');
-      root.style.setProperty('--bg-secondary', '#f5f5f5');
-      root.style.setProperty('--bg-tertiary', '#e5e5e5');
-      root.style.setProperty('--text-primary', '#171717');
-      root.style.setProperty('--text-secondary', '#525252');
-      root.style.setProperty('--border-color', '#d4d4d4');
-      body.setAttribute('data-theme', 'light');
-    }
-  }
-  
-  // Applica stile UI (Material Design o Liquid Glass)
+// Questo gestisce anche la sincronizzazione in tempo reale con le preferenze di sistema
+initTheme();
+
+// Applica stile UI (Material Design o Liquid Glass)
+if (typeof window !== 'undefined') {
   const savedUIStyle = localStorage.getItem('nebula-ui-style') || 'material';
   if (savedUIStyle === 'liquid') {
-    body.classList.add('liquid-glass');
+    document.body.classList.add('liquid-glass');
   } else {
-    body.classList.remove('liquid-glass');
+    document.body.classList.remove('liquid-glass');
   }
 }
-
-// Inizializza il tema immediatamente
-initTheme();
 
 // Ottimizzazioni mobile
 if (typeof window !== 'undefined') {

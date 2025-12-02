@@ -1017,32 +1017,6 @@
     imageInput?.click();
   }
   
-  function handleClearContext() {
-    if (visibleMessages.length === 0) {
-      return;
-    }
-    showPrompt(
-      'Sei sicuro di voler pulire il contesto della chat? Tutti i messaggi verranno eliminati.',
-      'Pulisci contesto',
-      async () => {
-        const chatId = $currentChatId;
-        if (chatId) {
-          const allChats = get(chats);
-          const chat = allChats.find(c => c.id === chatId);
-          if (chat) {
-            chat.messages = [];
-            chats.set(allChats);
-            await saveChatsToStorage();
-            await tick();
-            scrollToBottom();
-          }
-        }
-      },
-      'Pulisci',
-      'Annulla'
-    );
-  }
-  
   function handleToggleThinking() {
     toggleThinkingMode();
   }
@@ -2145,17 +2119,32 @@
                     <span>Carica immagine</span>
                   </button>
                   
+                  {#if supportsThinkingMode}
+                    <button 
+                      class="mobile-action-item" 
+                      class:active={$isThinkingModeEnabled}
+                      on:click={() => { handleToggleThinking(); showMobileActionsMenu = false; }}
+                      disabled={$isGenerating}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                      </svg>
+                      <span>Modalità Thinking</span>
+                    </button>
+                  {/if}
+                  
                   <button 
                     class="mobile-action-item" 
-                    on:click={() => { handleClearContext(); showMobileActionsMenu = false; }}
-                    disabled={visibleMessages.length === 0}
+                    class:active={webSearchEnabled}
+                    on:click={() => { handleToggleWebSearch(); showMobileActionsMenu = false; }}
+                    disabled={$isGenerating}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M3 6h18"/>
-                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="2" y1="12" x2="22" y2="12"/>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </svg>
-                    <span>Pulisci contesto</span>
+                    <span>Ricerca web</span>
                   </button>
                 </div>
               {/if}
@@ -2187,33 +2176,35 @@
             </button>
           {/if}
           
-          {#if supportsThinkingMode}
+          {#if !$isMobile}
+            {#if supportsThinkingMode}
+              <button 
+                class="chat-icon-button thinking-button" 
+                class:active={$isThinkingModeEnabled}
+                on:click={handleToggleThinking}
+                title="Modalità Thinking"
+                disabled={$isGenerating}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+              </button>
+            {/if}
+            
             <button 
-              class="chat-icon-button thinking-button" 
-              class:active={$isThinkingModeEnabled}
-              on:click={handleToggleThinking}
-              title="Modalità Thinking"
+              class="chat-icon-button web-search-button" 
+              class:active={webSearchEnabled}
+              on:click={handleToggleWebSearch}
+              title="Ricerca web"
               disabled={$isGenerating}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </svg>
             </button>
           {/if}
-          
-          <button 
-            class="chat-icon-button web-search-button" 
-            class:active={webSearchEnabled}
-            on:click={handleToggleWebSearch}
-            title="Ricerca web"
-            disabled={$isGenerating}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-          </button>
         </div>
         
       <input 
@@ -4131,6 +4122,15 @@
   .mobile-action-item:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  
+  .mobile-action-item.active {
+    background-color: var(--accent-blue);
+    color: white;
+  }
+  
+  .mobile-action-item.active svg {
+    color: white;
   }
   
   .mobile-action-item svg {
