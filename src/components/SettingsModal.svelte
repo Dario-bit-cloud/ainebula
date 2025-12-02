@@ -1458,6 +1458,9 @@
     .modal-body-container {
       flex-direction: column;
       overflow: hidden;
+      flex: 1;
+      min-height: 0;
+      display: flex;
     }
   }
 
@@ -1490,6 +1493,8 @@
       scroll-padding: 0 16px;
       position: relative;
       scroll-behavior: smooth;
+      flex-shrink: 0;
+      min-height: 60px;
     }
     
     .settings-sidebar::-webkit-scrollbar {
@@ -1605,8 +1610,12 @@
   @media (max-width: 768px) {
     .settings-content {
       padding: 20px 16px;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
       overflow-y: auto;
+      overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
+      flex: 1;
+      min-height: 0;
     }
     
     .setting-section {
