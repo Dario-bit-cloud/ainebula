@@ -3057,8 +3057,7 @@
     }
     
     .privacy-card {
-      padding: 20px;
-      margin-top: 4px;
+      display: none;
     }
     
     .privacy-features {
