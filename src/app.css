@@ -298,6 +298,46 @@ button, a, input, select, textarea {
       -webkit-backdrop-filter: blur(10px);
     }
   }
+  
+  /* Miglioramenti viewport e layout */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  
+  /* Previeni scroll orizzontale */
+  body {
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+  }
+  
+  /* Migliora gestione immagini su mobile */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  /* Ottimizza tabelle su mobile */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Ottimizzazioni per schermi molto piccoli */
+@media (max-width: 480px) {
+  /* Riduci ulteriormente padding e margini */
+  body {
+    font-size: 14px;
+  }
+  
+  /* Touch targets ancora più grandi su schermi piccoli */
+  button, a, input[type="button"], input[type="submit"], .clickable {
+    min-height: 48px;
+    min-width: 48px;
+  }
 }
 
 /* Performance optimizations for all devices */
@@ -306,6 +346,78 @@ button, a, input, select, textarea {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* Ottimizzazioni generali modals su mobile */
+@media (max-width: 768px) {
+  /* Modal backdrop ottimizzato */
+  .modal-backdrop,
+  [class*="modal-backdrop"],
+  [class*="modal-overlay"] {
+    padding: 0;
+    align-items: flex-end;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  
+  /* Modal content fullscreen su mobile */
+  .modal-content,
+  [class*="modal-content"],
+  [class*="modal"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3) !important;
+  }
+  
+  /* Modal header con safe area */
+  .modal-header,
+  [class*="modal-header"] {
+    padding-top: calc(16px + env(safe-area-inset-top)) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
+  }
+  
+  /* Modal body con safe area */
+  .modal-body,
+  [class*="modal-body"] {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  
+  /* Close button ottimizzato */
+  .close-button,
+  [class*="close-button"],
+  [class*="modal-close"] {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    touch-action: manipulation;
+    border-radius: 12px;
+  }
+  
+  /* Input fields nei modals */
+  .modal-content input,
+  .modal-content textarea,
+  .modal-content select {
+    font-size: 16px !important; /* Previene zoom su iOS */
+    min-height: 48px !important;
+    padding: 14px 16px !important;
+  }
+  
+  /* Buttons nei modals */
+  .modal-content button:not(.close-button) {
+    min-height: 48px !important;
+    touch-action: manipulation;
+    font-size: 15px !important;
+  }
 }
 
 /* Reduce motion for accessibility */

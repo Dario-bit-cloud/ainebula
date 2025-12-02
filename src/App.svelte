@@ -652,23 +652,23 @@
       /* Supporto safe area per iOS */
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
+      min-height: 0;
+      overflow: hidden;
     }
 
     .app-container {
       overflow: hidden;
       position: fixed;
       width: 100vw;
+      width: 100dvw; /* Dynamic viewport width per mobile */
       height: 100vh;
       height: 100dvh; /* Dynamic viewport height per mobile */
       /* Supporto safe area per iOS */
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
-    }
-  }
-
-  /* Previeni scroll orizzontale su mobile */
-  @media (max-width: 768px) {
-    .app-container {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+      /* Previeni scroll orizzontale */
       overflow-x: hidden;
       /* Touch action ottimizzato */
       touch-action: pan-y pinch-zoom;
@@ -677,6 +677,21 @@
     /* Ottimizzazioni performance mobile */
     .app-container * {
       -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Migliora gestione viewport su mobile */
+    .app-container {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: none;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .app-container {
+      width: 100vw;
+      width: 100dvw;
+      height: 100vh;
+      height: 100dvh;
     }
   }
 </style>

@@ -60,8 +60,8 @@
       badge: 'Patreon',
       description: 'Piano base con accesso a funzionalità essenziali di Nebula AI. Perfetto per iniziare.',
       features: [
-        'Accesso a modelli standard (Nebula AI 1.5, Pro, Coder)',
-        'Token generosi per chat',
+        'Accesso a tutti i modelli gratuiti',
+        'Chat illimitate',
         'Caricamento file e immagini',
         'Esportazione chat base (Markdown)',
         'Supporto via email'
@@ -72,11 +72,11 @@
       name: 'Pro',
       basePrice: 30, // Prezzo mensile base
       badge: 'Popolare',
-      description: 'Accesso completo a Nebula AI Premium Pro e tutte le funzionalità avanzate.',
+      description: 'Accesso completo a 4.1 e tutte le funzionalità avanzate.',
       features: [
-        'Accesso a Nebula AI Premium Pro (modello premium avanzato)',
-        'Accesso a tutti i modelli standard (Nebula AI 1.5, Pro, Coder)',
-        'Token illimitati per chat',
+        'Accesso a 4.1 (modello premium avanzato)',
+        'Accesso a tutti i modelli gratuiti',
+        'Chat illimitate',
         'Caricamenti illimitati di file e immagini',
         'Esportazione chat avanzata (Markdown, PDF, JSON)',
         'Supporto prioritario',
@@ -89,10 +89,10 @@
       badge: null,
       description: 'Il piano completo con accesso a tutti i modelli premium e funzionalità esclusive.',
       features: [
-        'Accesso a Nebula AI Premium Max (il modello più avanzato)',
-        'Accesso a Nebula AI Premium Pro incluso',
-        'Accesso a tutti i modelli standard (Nebula AI 1.5, Pro, Coder)',
-        'Token illimitati per chat',
+        'Accesso a o3 (il modello più avanzato)',
+        'Accesso a 4.1 incluso',
+        'Accesso a tutti i modelli gratuiti',
+        'Chat illimitate',
         'Caricamenti illimitati di file e immagini',
         'Esportazione chat avanzata (Markdown, PDF, JSON)',
         'Supporto prioritario dedicato',
@@ -122,6 +122,27 @@
     const basePrice = getBasePriceForDuration();
     const discount = getDurationDiscount();
     return basePrice * (1 - discount / 100);
+  }
+  
+  // Calcola il prezzo per un piano specifico in base alla durata selezionata
+  function getPlanPriceForDuration(planKey) {
+    const plan = plans[planKey];
+    if (!plan) return 0;
+    
+    const durationOption = durationOptions.find(d => d.value === selectedDuration);
+    if (!durationOption) return plan.basePrice;
+    
+    const basePrice = plan.basePrice * durationOption.months;
+    const discount = durationDiscounts[selectedDuration] || 0;
+    return basePrice * (1 - discount / 100);
+  }
+  
+  // Calcola il prezzo mensile equivalente per un piano in base alla durata
+  function getMonthlyEquivalentPrice(planKey) {
+    const totalPrice = getPlanPriceForDuration(planKey);
+    const durationOption = durationOptions.find(d => d.value === selectedDuration);
+    if (!durationOption || durationOption.months === 0) return 0;
+    return totalPrice / durationOption.months;
   }
   
   function closeModal() {
@@ -596,7 +617,18 @@
         {#if !showPaymentForm && selectedPlan !== 'premium'}
           <!-- Selezione Piano -->
           <div class="plans-selection">
-            <p class="section-description">Scegli il piano che fa per te</p>
+            <div class="plans-header">
+              <h3 class="plans-title">Scegli il piano che fa per te</h3>
+              <div class="users-count-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span>Unisciti ad altri 8 utenti abbonati!</span>
+              </div>
+            </div>
             
             <div class="plans-grid" bind:this={plansContainerRef} on:scroll={handlePlansScroll}>
               <div class="plan-card" class:selected={selectedPlan === 'premium'} data-plan="premium" role="button" tabindex="0" on:click={() => selectPlan('premium')} on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), selectPlan('premium'))}>
@@ -606,9 +638,15 @@
                 <div class="plan-header">
                   <h3>{plans.premium.name}</h3>
                   <div class="plan-price">
-                    <span class="price-amount">€{plans.premium.basePrice.toFixed(2)}</span>
+                    <span class="price-amount">€{getMonthlyEquivalentPrice('premium').toFixed(2)}</span>
                     <span class="price-period">/mese</span>
                   </div>
+                  {#if selectedDuration !== 1}
+                    <div class="plan-total-price">
+                      <span class="total-label">Totale:</span>
+                      <span class="total-amount">€{getPlanPriceForDuration('premium').toFixed(2)}</span>
+                    </div>
+                  {/if}
                 </div>
                 <p class="plan-description">{plans.premium.description}</p>
                 <ul class="plan-features">
@@ -631,9 +669,15 @@
                 <div class="plan-header">
                   <h3>{plans.monthly.name}</h3>
                   <div class="plan-price">
-                    <span class="price-amount">€{plans.monthly.basePrice.toFixed(2)}</span>
+                    <span class="price-amount">€{getMonthlyEquivalentPrice('monthly').toFixed(2)}</span>
                     <span class="price-period">/mese</span>
                   </div>
+                  {#if selectedDuration !== 1}
+                    <div class="plan-total-price">
+                      <span class="total-label">Totale:</span>
+                      <span class="total-amount">€{getPlanPriceForDuration('monthly').toFixed(2)}</span>
+                    </div>
+                  {/if}
                 </div>
                 <p class="plan-description">{plans.monthly.description}</p>
                 <ul class="plan-features">
@@ -656,9 +700,15 @@
                 <div class="plan-header">
                   <h3>{plans.yearly.name}</h3>
                   <div class="plan-price">
-                    <span class="price-amount">€{plans.yearly.basePrice.toFixed(2)}</span>
+                    <span class="price-amount">€{getMonthlyEquivalentPrice('yearly').toFixed(2)}</span>
                     <span class="price-period">/mese</span>
                   </div>
+                  {#if selectedDuration !== 1}
+                    <div class="plan-total-price">
+                      <span class="total-label">Totale:</span>
+                      <span class="total-amount">€{getPlanPriceForDuration('yearly').toFixed(2)}</span>
+                    </div>
+                  {/if}
                 </div>
                 <p class="plan-description">{plans.yearly.description}</p>
                 <ul class="plan-features">
@@ -1022,8 +1072,8 @@
   .modal-content {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    max-width: 600px;
+    border-radius: 16px;
+    max-width: 1200px;
     width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -1147,6 +1197,36 @@
     overflow-y: auto;
   }
 
+  .plans-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  
+  .plans-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 16px 0;
+  }
+  
+  .users-count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 24px;
+    color: var(--accent-blue);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  
+  .users-count-badge svg {
+    flex-shrink: 0;
+    color: var(--accent-blue);
+  }
+  
   .section-description {
     text-align: center;
     color: var(--text-secondary);
@@ -1156,9 +1236,23 @@
 
   .plans-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 16px;
     margin-bottom: 0;
+  }
+  
+  @media (max-width: 1024px) {
+    .plans-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+  }
+  
+  @media (max-width: 900px) {
+    .plans-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
   }
   
   @media (max-width: 768px) {
@@ -1185,11 +1279,14 @@
   .plan-card {
     background-color: var(--bg-tertiary);
     border: 2px solid var(--border-color);
-    border-radius: 12px;
-    padding: 16px;
+    border-radius: 16px;
+    padding: 24px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
   
   @media (max-width: 768px) {
@@ -1210,7 +1307,9 @@
 
   .plan-card.selected {
     border-color: #fbbf24;
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%);
+    box-shadow: 0 8px 24px rgba(251, 191, 36, 0.2);
+    transform: translateY(-4px);
   }
 
   .plan-badge {
@@ -1232,10 +1331,10 @@
   }
 
   .plan-header h3 {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 700;
     color: var(--text-primary);
-    margin: 0 0 8px 0;
+    margin: 0 0 12px 0;
   }
 
   .plan-price {
@@ -1254,6 +1353,26 @@
   .price-period {
     font-size: 16px;
     color: var(--text-secondary);
+  }
+  
+  .plan-total-price {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+  }
+  
+  .total-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  
+  .total-amount {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
   }
 
 
@@ -1292,20 +1411,26 @@
 
   .select-plan-button {
     width: 100%;
-    padding: 10px;
+    padding: 14px;
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     color: #000;
-    font-weight: 600;
-    font-size: 13px;
+    font-weight: 700;
+    font-size: 14px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-top: auto;
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
   }
 
   .select-plan-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(251, 191, 36, 0.5);
+  }
+  
+  .select-plan-button:active {
+    transform: translateY(0);
   }
 
   /* Payment Modal Wrapper */
@@ -1668,22 +1793,24 @@
 
   /* Duration Selection */
   .duration-selection {
-    margin-top: 32px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border-color);
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 2px solid var(--border-color);
   }
 
   .duration-title {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 700;
     color: var(--text-primary);
     margin: 0 0 8px 0;
+    text-align: center;
   }
 
   .duration-description {
     font-size: 14px;
     color: var(--text-secondary);
-    margin: 0 0 20px 0;
+    margin: 0 0 24px 0;
+    text-align: center;
   }
 
   .duration-options {

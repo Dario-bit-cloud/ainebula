@@ -9,14 +9,41 @@
   $: cancelText = dialog.cancelText;
   $: type = dialog.type;
   
+  let isProcessing = false;
+  let lastKeydownTime = 0;
+  const KEYDOWN_THROTTLE_MS = 500; // Prevenire spam di Enter
+  
   function handleConfirm() {
+    // Prevenire chiamate multiple
+    if (isProcessing) {
+      return;
+    }
+    
+    // Throttle per prevenire spam di Enter
+    const now = Date.now();
+    if (now - lastKeydownTime < KEYDOWN_THROTTLE_MS) {
+      return;
+    }
+    lastKeydownTime = now;
+    
+    isProcessing = true;
+    
     if (dialog.resolve) {
       dialog.resolve(true);
     }
     confirmDialogState.set({ ...dialog, isOpen: false, resolve: null });
+    
+    // Reset dopo un breve delay
+    setTimeout(() => {
+      isProcessing = false;
+    }, KEYDOWN_THROTTLE_MS);
   }
   
   function handleCancel() {
+    if (isProcessing) {
+      return;
+    }
+    
     if (dialog.resolve) {
       dialog.resolve(false);
     }
@@ -30,11 +57,19 @@
   }
   
   function handleKeydown(event) {
-    if (event.key === 'Escape' && isOpen) {
+    if (event.key === 'Escape' && isOpen && !isProcessing) {
       handleCancel();
-    } else if (event.key === 'Enter' && isOpen) {
+    } else if (event.key === 'Enter' && isOpen && !isProcessing) {
+      event.preventDefault();
+      event.stopPropagation();
       handleConfirm();
     }
+  }
+  
+  // Reset quando il dialog si chiude
+  $: if (!isOpen) {
+    isProcessing = false;
+    lastKeydownTime = 0;
   }
 </script>
 
@@ -55,7 +90,7 @@
         <button class="button button-cancel" on:click={handleCancel}>
           {cancelText}
         </button>
-        <button class="button button-confirm" class:type-danger={type === 'danger'} class:type-warning={type === 'warning'} on:click={handleConfirm}>
+        <button class="button button-confirm" class:type-danger={type === 'danger'} class:type-warning={type === 'warning'} on:click={handleConfirm} disabled={isProcessing}>
           {confirmText}
         </button>
       </div>
@@ -166,24 +201,30 @@
     color: white;
   }
 
-  .button-confirm:hover {
+  .button-confirm:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   }
-
+  
+  .button-confirm:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
   .button-confirm.type-danger {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   }
-
-  .button-confirm.type-danger:hover {
+  
+  .button-confirm.type-danger:hover:not(:disabled) {
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
   }
-
+  
   .button-confirm.type-warning {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   }
-
-  .button-confirm.type-warning:hover {
+  
+  .button-confirm.type-warning:hover:not(:disabled) {
     box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
   }
 

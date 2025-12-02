@@ -2,11 +2,12 @@
   import { onMount, tick, afterUpdate } from 'svelte';
   import { get } from 'svelte/store';
   import { createEventDispatcher } from 'svelte';
-  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, saveChatsToStorage } from '../stores/chat.js';
+  import { chats, currentChatId, currentChat, isGenerating, addMessage, createNewChat, updateMessage, deleteMessage, saveChatsToStorage, saveChatImmediately } from '../stores/chat.js';
   import { selectedModel, availableModels } from '../stores/models.js';
   import { hasActiveSubscription, user as userStore } from '../stores/user.js';
   import { isAuthenticatedStore } from '../stores/auth.js';
   import { generateResponseStream, generateResponse } from '../services/aiService.js';
+  import { isThinkingModeEnabled, toggleThinkingMode } from '../stores/thinkingMode.js';
   import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView, isSidebarOpen, isIncognitoMode } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
   import { renderMarkdown, initCodeCopyButtons, normalizeTextSpacing } from '../utils/markdown.js';
@@ -55,6 +56,12 @@
   $: currentModel = $availableModels.find(m => m.id === $selectedModel);
   $: hasWebSearch = currentModel?.webSearch || false;
   $: allowsPremiumFeatures = currentModel?.allowsPremiumFeatures || false;
+  
+  // Verifica se il modello corrente supporta thinking mode
+  $: supportsThinkingMode = $selectedModel === 'gemini-2.5-flash-preview-09-2025' || $selectedModel === 'gemini-2.5-flash-preview-09-2025-thinking';
+  
+  // Thinking mode è abilitato solo se esplicitamente attivato dall'utente e il modello è Flash
+  $: isThinkingModel = $isThinkingModeEnabled && supportsThinkingMode;
   let isPrivacyModalOpen = false;
   let mainAreaElement;
   let deepResearchEnabled = false;
@@ -415,6 +422,34 @@
     scrollToBottom(false);
   }, 100); // Max una volta ogni 100ms
   
+  // Batch DOM updates durante streaming per migliorare le performance
+  let pendingUpdate = null;
+  let rafId = null;
+  
+  function scheduleUpdate(updateFn) {
+    if (pendingUpdate) {
+      // Se c'è già un update in coda, combinalo
+      const oldUpdate = pendingUpdate;
+      pendingUpdate = () => {
+        oldUpdate();
+        updateFn();
+      };
+    } else {
+      pendingUpdate = updateFn;
+    }
+    
+    // Usa requestAnimationFrame per batchizzare gli aggiornamenti
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
+        if (pendingUpdate) {
+          pendingUpdate();
+          pendingUpdate = null;
+        }
+        rafId = null;
+      });
+    }
+  }
+  
   function scrollToTop() {
     if (messagesContainer) {
       messagesContainer.scrollTo({
@@ -575,8 +610,13 @@
         // Rileva se è una richiesta di generazione immagini
         const isImageRequest = isImageGenerationRequest(messageText);
         
-        // Se è una richiesta di generazione immagini, usa Gemini Flash Image
-        const modelToUse = isImageRequest ? 'gemini-2.5-flash-image' : effectiveModel;
+        // Determina il modello da usare
+        let modelToUse = isImageRequest ? 'gemini-2.5-flash-image' : effectiveModel;
+        
+        // Se thinking mode è abilitato e il modello è Flash, usa la versione thinking
+        if ($isThinkingModeEnabled && (modelToUse === 'gemini-2.5-flash-preview-09-2025' || modelToUse === 'gemini-2.5-flash-preview-09-2025-thinking')) {
+          modelToUse = 'gemini-2.5-flash-preview-09-2025-thinking';
+        }
         
         // Generazione testo normale
         let fullResponse = '';
@@ -594,16 +634,20 @@
           deepResearchEnabled,
           customSystemPrompt
         )) {
-          fullResponse += chunk;
+          // Gestisci sia oggetti che stringhe (per compatibilità)
+          const chunkContent = typeof chunk === 'string' ? chunk : (chunk.content || '');
+          fullResponse += chunkContent;
           // Aggiorna il messaggio in tempo reale SENZA normalizzazione (più veloce)
-          updateMessage(chatId, messageIndex, { content: fullResponse });
+          // skipSave = true per evitare salvataggi durante lo streaming
+          updateMessage(chatId, messageIndex, { content: fullResponse }, true);
           await tick();
           throttledScrollToBottom(); // Scroll throttled per performance
         }
         
         // Normalizza e salva la risposta finale (solo una volta alla fine)
         const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
-        updateMessage(chatId, messageIndex, { content: normalizedFinalResponse });
+        // skipSave = true qui perché salveremo dopo che isGenerating è false
+        updateMessage(chatId, messageIndex, { content: normalizedFinalResponse }, true);
         
         currentStreamingMessageId = null;
         
@@ -637,6 +681,17 @@
         setAbortController(null);
         await tick();
         scrollToBottom();
+        
+        // Salva la chat dopo che la generazione è completata
+        // Questo evita salvataggi multipli durante lo streaming
+        const currentChatData = get(currentChat);
+        if (currentChatData && currentChatData.id === chatId) {
+          try {
+            await saveChatImmediately(currentChatData);
+          } catch (error) {
+            logError('Errore durante salvataggio chat dopo generazione:', error);
+          }
+        }
       }
     } catch (error) {
       logError('Error in handleSubmit:', error);
@@ -812,13 +867,19 @@
           deepResearchEnabled,
           customSystemPromptForRegen
         )) {
-          fullResponse += chunk;
+          // Gestisci sia oggetti che stringhe (per compatibilità)
+          const chunkContent = typeof chunk === 'string' ? chunk : (chunk.content || '');
+          fullResponse += chunkContent;
           // Aggiorna senza normalizzazione durante streaming (più veloce)
-          const currentChatData = get(currentChat);
-          if (currentChatData && currentChatData.messages.length > 0) {
-            updateMessage(chatId, currentChatData.messages.length - 1, { content: fullResponse });
-          }
-          await tick();
+          // skipSave = true per evitare salvataggi durante lo streaming
+          // Usa scheduleUpdate per batchizzare gli aggiornamenti DOM
+          scheduleUpdate(() => {
+            const currentChatData = get(currentChat);
+            if (currentChatData && currentChatData.messages.length > 0) {
+              updateMessage(chatId, currentChatData.messages.length - 1, { content: fullResponse }, true);
+            }
+          });
+          // Non aspettare tick() ad ogni chunk - lascia che requestAnimationFrame gestisca il batching
           throttledScrollToBottom();
         }
         
@@ -826,7 +887,8 @@
         const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
         const currentChatData = get(currentChat);
         if (currentChatData && currentChatData.messages.length > 0) {
-          updateMessage(chatId, currentChatData.messages.length - 1, { content: normalizedFinalResponse });
+          // skipSave = true qui perché salveremo dopo che isGenerating è false
+          updateMessage(chatId, currentChatData.messages.length - 1, { content: normalizedFinalResponse }, true);
         }
         currentStreamingMessageId = null;
         
@@ -858,6 +920,17 @@
         setAbortController(null);
         await tick();
         scrollToBottom();
+        
+        // Salva la chat dopo che la generazione è completata
+        // Questo evita salvataggi multipli durante lo streaming
+        const currentChatData = get(currentChat);
+        if (currentChatData && currentChatData.id === chatId) {
+          try {
+            await saveChatImmediately(currentChatData);
+          } catch (error) {
+            logError('Errore durante salvataggio chat dopo rigenerazione:', error);
+          }
+        }
       }
     }
   }
@@ -968,6 +1041,10 @@
       'Pulisci',
       'Annulla'
     );
+  }
+  
+  function handleToggleThinking() {
+    toggleThinkingMode();
   }
   
   function handleToggleWebSearch() {
@@ -2105,17 +2182,18 @@
                 <polyline points="21 15 16 10 5 21"/>
               </svg>
             </button>
-            
+          {/if}
+          
+          {#if supportsThinkingMode}
             <button 
-              class="chat-icon-button" 
-              on:click={handleClearContext}
-              title="Pulisci contesto"
-              disabled={visibleMessages.length === 0}
+              class="chat-icon-button thinking-button" 
+              class:active={$isThinkingModeEnabled}
+              on:click={handleToggleThinking}
+              title="Modalità Thinking"
+              disabled={$isGenerating}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 6h18"/>
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
               </svg>
             </button>
           {/if}
@@ -2132,9 +2210,6 @@
               <line x1="2" y1="12" x2="22" y2="12"/>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
-            {#if !$isMobile}
-              <span>Web Search</span>
-            {/if}
           </button>
         </div>
         
@@ -2801,31 +2876,33 @@
   @media (max-width: 768px) {
     .welcome-message {
       min-height: 50vh;
-      padding: 24px 16px;
+      padding: 20px 12px;
     }
     
     .welcome-content {
-      gap: 24px;
+      gap: 20px;
     }
     
     .welcome-header {
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
       align-items: center;
       text-align: center;
     }
     
     .welcome-title {
-      font-size: 32px;
+      font-size: 28px;
+      line-height: 1.2;
     }
     
     .welcome-subtitle {
-      font-size: 16px;
+      font-size: 15px;
+      line-height: 1.5;
     }
     
     .welcome-logo {
-      width: 80px;
-      height: 80px;
+      width: 70px;
+      height: 70px;
     }
     
     .privacy-card {
@@ -2846,79 +2923,95 @@
     }
 
     .welcome-text {
-      font-size: 22px;
+      font-size: 20px;
       padding: 0 12px;
+      line-height: 1.4;
     }
 
     .messages-container {
-      padding: 12px 8px;
-      padding-bottom: calc(150px + env(safe-area-inset-bottom));
-      gap: 12px;
+      padding: 16px 12px;
+      padding-bottom: calc(160px + env(safe-area-inset-bottom));
+      gap: 16px;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
     }
 
     .message {
-      max-width: 90%;
+      max-width: 92%;
       min-width: 0;
-      padding: 10px 12px;
-      font-size: 14px;
-      line-height: 1.5;
+      padding: 12px 14px;
+      font-size: 15px;
+      line-height: 1.6;
       word-wrap: break-word;
       overflow-wrap: break-word;
       hyphens: auto;
+      border-radius: 16px;
     }
 
     .user-message {
-      max-width: 90%;
+      max-width: 92%;
+      align-self: flex-end;
     }
 
     .ai-message {
-      max-width: 90%;
+      max-width: 92%;
+      align-self: flex-start;
     }
 
     .message-content {
-      font-size: 14px;
-      line-height: 1.5;
+      font-size: 15px;
+      line-height: 1.6;
       word-wrap: break-word;
       overflow-wrap: break-word;
       overflow-x: hidden;
     }
 
     .input-container {
-      padding: 10px 12px;
-      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      padding: 12px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
       position: sticky;
       bottom: 0;
-      background-color: transparent;
+      background: linear-gradient(to top, var(--bg-primary) 0%, var(--bg-primary) 80%, transparent 100%);
       z-index: 100;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
     .input-wrapper {
-      padding: 10px 12px;
-      gap: 6px;
+      padding: 10px 14px;
+      gap: 8px;
       flex-wrap: nowrap;
+      border-radius: 24px;
+      min-height: 52px;
     }
     
     .chat-input-icons {
       flex-shrink: 0;
+      gap: 6px;
     }
     
     .message-input {
       flex: 1;
       min-width: 0;
+      font-size: 16px; /* Previene zoom su iOS */
+      padding: 12px 16px;
+      min-height: 28px;
+      line-height: 1.5;
     }
 
     .message-image {
       max-width: 100%;
-      max-height: 150px;
+      max-height: 200px;
       width: auto;
       height: auto;
-      border-radius: 8px;
+      border-radius: 12px;
       object-fit: contain;
     }
 
     .message-images {
       width: 100%;
       max-width: 100%;
+      gap: 8px;
     }
 
     .user-message .message-images,
@@ -2928,26 +3021,28 @@
     }
 
     .attached-images {
-      gap: 8px;
-      margin-bottom: 8px;
-      padding: 0 4px;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 0 6px;
     }
 
     .image-preview {
-      width: 100px;
-      height: 100px;
+      width: 110px;
+      height: 110px;
     }
     
     .image-actions-bar {
       flex-direction: column;
       align-items: stretch;
+      gap: 8px;
     }
     
     .image-action-button {
       width: 100%;
       justify-content: center;
-      min-height: 44px;
-      font-size: 14px;
+      min-height: 48px;
+      font-size: 15px;
+      padding: 12px 16px;
     }
     
     .styles-menu {
@@ -2957,24 +3052,28 @@
       right: 0;
       top: auto;
       margin: 0;
-      border-radius: 16px 16px 0 0;
-      max-height: 60vh;
+      border-radius: 20px 20px 0 0;
+      max-height: 70vh;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: env(safe-area-inset-bottom);
     }
     
     .styles-grid {
       grid-template-columns: repeat(2, 1fr);
       gap: 12px;
-      padding: 8px;
+      padding: 16px;
     }
     
     .style-option {
       padding: 12px;
+      border-radius: 12px;
     }
     
     .style-option img {
       width: 80px;
       height: 80px;
+      border-radius: 8px;
     }
     
     .image-description-input {
@@ -2983,68 +3082,133 @@
     }
     
     .image-description-input input {
-      min-height: 44px;
+      min-height: 48px;
       font-size: 16px; /* Previene zoom su iOS */
+      padding: 12px 16px;
     }
 
     .disclaimer {
-      font-size: 10px;
-      padding: 6px 12px;
+      font-size: 11px;
+      padding: 8px 12px;
       text-align: center;
-      line-height: 1.4;
-      margin-top: 4px;
+      line-height: 1.5;
+      margin-top: 6px;
     }
 
-    .message-input {
-      font-size: 16px; /* Previene zoom su iOS */
-      padding: 10px 16px;
-      min-height: 24px;
-    }
-    
     .input-wrapper.input-empty .message-input {
       font-size: 16px;
-      padding: 10px 16px;
+      padding: 12px 16px;
+      min-height: 28px;
+    }
+    
+    /* Miglioramenti scroll to top */
+    .scroll-to-top {
+      bottom: calc(100px + env(safe-area-inset-bottom));
+      right: 16px;
+      width: 44px;
+      height: 44px;
+    }
+    
+    /* Ottimizzazioni token counter */
+    .token-counter {
+      padding: 10px 12px;
+      font-size: 11px;
     }
   }
 
   @media (max-width: 480px) {
     .welcome-text {
-      font-size: 20px;
+      font-size: 18px;
+      padding: 0 10px;
+    }
+    
+    .welcome-title {
+      font-size: 24px;
+    }
+    
+    .welcome-subtitle {
+      font-size: 14px;
     }
 
     .messages-container {
-      padding: 12px 8px;
-      padding-bottom: calc(150px + env(safe-area-inset-bottom));
-      gap: 12px;
+      padding: 12px 10px;
+      padding-bottom: calc(170px + env(safe-area-inset-bottom));
+      gap: 14px;
     }
 
     .message {
-      max-width: 90%;
-      padding: 8px 12px;
-      font-size: 13px;
+      max-width: 94%;
+      padding: 10px 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      border-radius: 14px;
+    }
+    
+    .message-content {
+      font-size: 14px;
+      line-height: 1.5;
     }
 
     .input-container {
-      padding: 8px;
-      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      padding: 10px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
       position: sticky;
       bottom: 0;
-      background-color: transparent;
+      background: linear-gradient(to top, var(--bg-primary) 0%, var(--bg-primary) 85%, transparent 100%);
       z-index: 100;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
     .input-wrapper {
-      padding: 8px 10px;
-      gap: 4px;
+      padding: 8px 12px;
+      gap: 6px;
+      min-height: 48px;
+      border-radius: 24px;
     }
     
     .chat-input-icons {
       gap: 4px;
       margin-right: 4px;
     }
+    
+    .chat-icon-button {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+    }
 
     .message-image {
-      max-height: 130px;
+      max-height: 180px;
+      border-radius: 10px;
+    }
+    
+    .image-preview {
+      width: 100px;
+      height: 100px;
+    }
+    
+    .styles-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      padding: 12px;
+    }
+    
+    .style-option {
+      padding: 10px;
+    }
+    
+    .style-option img {
+      width: 70px;
+      height: 70px;
+    }
+    
+    .scroll-to-top {
+      bottom: calc(90px + env(safe-area-inset-bottom));
+      right: 12px;
+      width: 40px;
+      height: 40px;
     }
   }
 
@@ -3698,21 +3862,11 @@
   }
 
   .web-search-button {
-    border-radius: 20px;
-    padding: 0 12px;
-    width: auto;
-    min-width: 100px;
-    gap: 6px;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .web-search-button span {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-primary);
+    border-radius: 50%;
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
   }
 
   .web-search-button.active {
@@ -3726,7 +3880,22 @@
     color: white;
   }
 
-  .web-search-button.active span {
+  .thinking-button {
+    border-radius: 50%;
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+  
+  .thinking-button.active {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: white;
+    opacity: 1;
+  }
+  
+  .thinking-button.active svg {
     color: white;
   }
   
@@ -3809,10 +3978,11 @@
     }
     
     .chat-icon-button {
-      width: 40px;
-      height: 40px;
-      min-width: 40px;
-      min-height: 40px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
     }
     
     .chat-icon-button svg {
@@ -3821,20 +3991,28 @@
     }
     
     .web-search-button {
-      min-width: 40px;
-      padding: 0 10px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
     }
     
-    .web-search-button span {
-      display: none;
+    .thinking-button {
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
     }
     
     .mobile-actions-menu {
-      min-width: 180px;
+      min-width: 200px;
+      padding-bottom: env(safe-area-inset-bottom);
     }
     
     .input-wrapper {
-      gap: 6px;
+      gap: 8px;
     }
     
     .message-input {
@@ -3844,11 +4022,12 @@
     
     .send-button,
     .stop-button {
-      width: 40px;
-      height: 40px;
-      min-width: 40px;
-      min-height: 40px;
-      padding: 8px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 10px;
+      touch-action: manipulation;
     }
     
     .send-button svg,
@@ -3865,15 +4044,32 @@
     }
     
     .chat-icon-button {
-      width: 36px;
-      height: 36px;
-      min-width: 36px;
-      min-height: 36px;
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
     }
     
     .web-search-button {
-      min-width: 36px;
-      padding: 0 8px;
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+    }
+    
+    .thinking-button {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+    }
+    
+    .send-button,
+    .stop-button {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
     }
   }
 
@@ -4085,15 +4281,30 @@
   @media (max-width: 768px) {
     .message-input {
       font-size: 16px; /* Previene zoom su iOS */
-      padding: 10px 16px;
-      min-height: 24px;
+      padding: 12px 16px;
+      min-height: 28px;
+      line-height: 1.5;
     }
 
     .input-wrapper.input-empty .message-input {
       font-size: 16px;
-      padding: 10px 16px;
-      min-height: 24px;
+      padding: 12px 16px;
+      min-height: 28px;
       height: auto;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .message-input {
+      font-size: 16px;
+      padding: 10px 14px;
+      min-height: 26px;
+    }
+    
+    .input-wrapper.input-empty .message-input {
+      font-size: 16px;
+      padding: 10px 14px;
+      min-height: 26px;
     }
   }
 
@@ -4327,22 +4538,41 @@
 
   @media (max-width: 768px) {
     .generation-progress {
-      bottom: 70px;
-      padding: 10px 16px;
-      min-width: 180px;
+      bottom: calc(80px + env(safe-area-inset-bottom));
+      padding: 12px 18px;
+      min-width: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 20px;
     }
 
     .progress-bar {
-      width: 80px;
+      width: 100px;
     }
 
     .progress-text {
-      font-size: 12px;
+      font-size: 13px;
     }
 
     .loading-messages {
       padding: 20px 16px;
       gap: 16px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .generation-progress {
+      bottom: calc(70px + env(safe-area-inset-bottom));
+      padding: 10px 16px;
+      min-width: 180px;
+    }
+    
+    .progress-bar {
+      width: 80px;
+    }
+    
+    .progress-text {
+      font-size: 12px;
     }
   }
 

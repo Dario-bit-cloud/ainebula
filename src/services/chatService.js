@@ -3,7 +3,11 @@
 import { 
   encryptMessages, 
   decryptMessages, 
-  getEncryptionKeyForUser 
+  decryptChatMetadata,
+  encryptChatMetadata,
+  getEncryptionKeyForUser,
+  getCachedPassword,
+  decryptRecoveryKey
 } from './encryptionService.js';
 import { getCurrentUser } from './authService.js';
 
@@ -123,27 +127,67 @@ export async function getChatsFromDatabase() {
       }
     }
     
-    // Decrittografa i messaggi se la crittografia è disponibile
+    // Decrittografa i messaggi quando vengono caricati dal database
     if (data && data.success && data.chats && Array.isArray(data.chats)) {
       const user = getCurrentUser();
       if (user && user.id) {
-        const encryptionKey = await getEncryptionKeyForUser(user.id);
-        if (encryptionKey) {
-          console.log('🔓 [CHAT SERVICE] Decrittografia messaggi...');
-          for (const chat of data.chats) {
-            if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
-              try {
-                chat.messages = await decryptMessages(chat.messages, encryptionKey);
-                console.log(`✅ [CHAT SERVICE] Decrittografati ${chat.messages.length} messaggi per chat ${chat.id}`);
-              } catch (error) {
-                console.error(`❌ [CHAT SERVICE] Errore decrittografia chat ${chat.id}:`, error);
-                // Continua anche se la decrittografia fallisce (per retrocompatibilità)
-              }
+        // Ottieni la password dalla cache
+        const password = getCachedPassword(user.id);
+        if (password) {
+          const encryptionKey = await getEncryptionKeyForUser(user.id, password);
+          if (encryptionKey) {
+            console.log('🔓 [CHAT SERVICE] Decrittografia messaggi e metadati delle chat...');
+            try {
+              // Decrittografa tutti i messaggi e metadati di tutte le chat
+              const decryptedChats = await Promise.all(
+                data.chats.map(async (chat) => {
+                  // Controlla se ci sono dati crittografati (messaggi o titolo)
+                  const hasEncryptedData = 
+                    (chat.messages && Array.isArray(chat.messages) && chat.messages.some(msg => 
+                      msg.content && typeof msg.content === 'string' && msg.content.startsWith('encrypted:')
+                    )) ||
+                    (chat.title && typeof chat.title === 'string' && chat.title.startsWith('encrypted:'));
+                  
+                  if (hasEncryptedData) {
+                    try {
+                      // Prova prima con la chiave corrente
+                      return await decryptChatMetadata(chat, encryptionKey);
+                    } catch (error) {
+                      // Se fallisce, prova con la chiave di recupero (per messaggi vecchi)
+                      console.log(`⚠️ [CHAT SERVICE] Decrittografia fallita, provo con chiave di recupero per chat ${chat.id}`);
+                      try {
+                        const recoveryKeys = JSON.parse(localStorage.getItem('recovery_keys') || '{}');
+                        const recoveryKey = recoveryKeys[user.id];
+                        if (recoveryKey) {
+                          const currentPassword = getCachedPassword(user.id);
+                          if (currentPassword) {
+                            const oldKey = await decryptRecoveryKey(recoveryKey, currentPassword, user.id);
+                            return await decryptChatMetadata(chat, oldKey);
+                          }
+                        }
+                      } catch (recoveryError) {
+                        console.error('❌ [CHAT SERVICE] Errore decrittografia con chiave di recupero:', recoveryError);
+                      }
+                      // Se anche la chiave di recupero fallisce, restituisci la chat originale
+                      return chat;
+                    }
+                  }
+                  return chat;
+                })
+              );
+              
+              // Sostituisci le chat con quelle decrittografate
+              data.chats = decryptedChats;
+              console.log(`✅ [CHAT SERVICE] Decrittografate ${data.chats.length} chat`);
+            } catch (error) {
+              console.error('❌ [CHAT SERVICE] Errore durante decrittografia messaggi:', error);
+              // In caso di errore, mantieni le chat originali (potrebbero essere in chiaro)
             }
+          } else {
+            console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
           }
-          console.log('🔓 [CHAT SERVICE] Decrittografia completata');
         } else {
-          console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
+          console.log('⚠️ [CHAT SERVICE] Password non in cache, messaggi rimangono crittografati');
         }
       }
     }
@@ -192,42 +236,39 @@ export async function saveChatToDatabase(chat) {
     // Prepara i messaggi per il salvataggio
     let messagesToSave = chat.messages || [];
     
-    // Crittografa i messaggi se la crittografia è disponibile
+    // Crittografa i messaggi e i metadati se la crittografia è disponibile
     const user = getCurrentUser();
     if (user && user.id) {
-      const encryptionKey = await getEncryptionKeyForUser(user.id);
-      if (encryptionKey && messagesToSave.length > 0) {
-        console.log('🔒 [CHAT SERVICE] Crittografia messaggi prima del salvataggio...');
-        try {
-          // Crittografa solo i messaggi che non sono già crittografati
-          const messagesToEncrypt = [];
-          const messageIndices = [];
-          
-          messagesToSave.forEach((msg, index) => {
-            if (msg.content && 
-                typeof msg.content === 'string' && 
-                !msg.content.startsWith('encrypted:')) {
-              messagesToEncrypt.push(msg);
-              messageIndices.push(index);
+      const password = getCachedPassword(user.id);
+      if (password) {
+        const encryptionKey = await getEncryptionKeyForUser(user.id, password);
+        if (encryptionKey) {
+          console.log('🔒 [CHAT SERVICE] Crittografia messaggi e metadati prima del salvataggio...');
+          try {
+            // Crittografa sia i metadati (titolo) che i messaggi
+            const chatToEncrypt = {
+              ...chat,
+              messages: messagesToSave
+            };
+            
+            const encryptedChat = await encryptChatMetadata(chatToEncrypt, encryptionKey);
+            
+            // Aggiorna i messaggi e il titolo con quelli crittografati
+            messagesToSave = encryptedChat.messages || messagesToSave;
+            if (encryptedChat.title) {
+              chat.title = encryptedChat.title;
             }
-          });
-          
-          if (messagesToEncrypt.length > 0) {
-            const encryptedMessages = await encryptMessages(messagesToEncrypt, encryptionKey);
-            // Sostituisci i messaggi originali con quelli crittografati
-            messageIndices.forEach((originalIndex, encryptedIndex) => {
-              messagesToSave[originalIndex] = encryptedMessages[encryptedIndex];
-            });
-            console.log(`✅ [CHAT SERVICE] Crittografati ${encryptedMessages.length} messaggi`);
-          } else {
-            console.log('ℹ️ [CHAT SERVICE] Tutti i messaggi sono già crittografati');
+            
+            console.log(`✅ [CHAT SERVICE] Crittografati messaggi e metadati della chat`);
+          } catch (error) {
+            console.error('❌ [CHAT SERVICE] Errore crittografia messaggi:', error);
+            // Continua comunque con il salvataggio (per retrocompatibilità)
           }
-        } catch (error) {
-          console.error('❌ [CHAT SERVICE] Errore crittografia messaggi:', error);
-          // Continua comunque con il salvataggio (per retrocompatibilità)
+        } else {
+          console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, salvataggio in chiaro');
         }
       } else {
-        console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, salvataggio in chiaro');
+        console.log('⚠️ [CHAT SERVICE] Password non in cache, salvataggio in chiaro');
       }
     }
     
@@ -310,10 +351,16 @@ export async function saveChatToDatabase(chat) {
  * Elimina una chat dal database
  */
 export async function deleteChatFromDatabase(chatId) {
+  console.log('🗑️ [CHAT SERVICE] Eliminazione chat dal database:', {
+    chatId,
+    timestamp: new Date().toISOString()
+  });
+  
   try {
     const token = localStorage.getItem('auth_token');
     
     if (!token) {
+      console.warn('⚠️ [CHAT SERVICE] Nessun token trovato per eliminare chat');
       return { success: false, message: 'Non autenticato' };
     }
     
@@ -325,9 +372,47 @@ export async function deleteChatFromDatabase(chatId) {
       }
     });
     
+    console.log('📥 [CHAT SERVICE] Risposta eliminazione:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Errore sconosciuto');
+      console.error('❌ [CHAT SERVICE] Risposta non OK:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      
+      return {
+        success: false,
+        message: errorData.message || `Errore server: ${response.status} ${response.statusText}`,
+        error: errorText
+      };
+    }
+    
     const data = await response.json();
+    
+    if (data.success) {
+      console.log('✅ [CHAT SERVICE] Chat eliminata con successo:', chatId);
+    } else {
+      console.warn('⚠️ [CHAT SERVICE] Eliminazione fallita:', data);
+    }
+    
     return data;
   } catch (error) {
+    console.error('❌ [CHAT SERVICE] Errore durante eliminazione chat:', {
+      name: error.name,
+      message: error.message,
+      chatId,
+      timestamp: new Date().toISOString()
+    });
+    
     return {
       success: false,
       message: 'Errore nella comunicazione con il server',

@@ -1,6 +1,6 @@
 // Servizio per gestire l'autenticazione
 
-import { initializeEncryption, clearEncryptionKey } from './encryptionService.js';
+import { initializeEncryption, clearEncryptionKey, cachePassword } from './encryptionService.js';
 
 // Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
@@ -493,6 +493,7 @@ export async function updateUsername(username) {
 
 /**
  * Aggiorna la password dell'utente corrente
+ * Gestisce anche le chiavi di recupero per i messaggi crittografati
  */
 export async function updatePassword(currentPassword, newPassword) {
   const url = `${API_BASE_URL}/update-password`;
@@ -506,6 +507,25 @@ export async function updatePassword(currentPassword, newPassword) {
   }
   
   try {
+    const user = getCurrentUser();
+    if (!user || !user.id) {
+      return {
+        success: false,
+        message: 'Utente non trovato'
+      };
+    }
+    
+    // Crea una chiave di recupero per i messaggi vecchi
+    let recoveryKey = null;
+    try {
+      const { createRecoveryKey } = await import('./encryptionService.js');
+      recoveryKey = await createRecoveryKey(currentPassword, newPassword, user.id);
+      console.log('✅ [UPDATE PASSWORD] Chiave di recupero creata');
+    } catch (error) {
+      console.error('❌ [UPDATE PASSWORD] Errore creazione chiave di recupero:', error);
+      // Non bloccare il cambio password se la chiave di recupero fallisce
+    }
+    
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -515,11 +535,28 @@ export async function updatePassword(currentPassword, newPassword) {
       credentials: 'include', // Importante: include i cookie nella richiesta
       body: JSON.stringify({
         current_password: currentPassword,
-        new_password: newPassword
+        new_password: newPassword,
+        recovery_key: recoveryKey ? recoveryKey.encryptedOldKey : null
       })
     });
     
     const data = await response.json();
+    
+    // Se il cambio password è riuscito, aggiorna la cache
+    if (data.success) {
+      // Aggiorna la password in cache
+      const { cachePassword } = await import('./encryptionService.js');
+      cachePassword(user.id, newPassword);
+      
+      // Salva la chiave di recupero in localStorage (per decrittografare messaggi vecchi)
+      if (recoveryKey) {
+        const recoveryKeyStorage = JSON.parse(localStorage.getItem('recovery_keys') || '{}');
+        recoveryKeyStorage[user.id] = recoveryKey.encryptedOldKey;
+        localStorage.setItem('recovery_keys', JSON.stringify(recoveryKeyStorage));
+        console.log('✅ [UPDATE PASSWORD] Chiave di recupero salvata');
+      }
+    }
+    
     return data;
   } catch (error) {
     console.error('Errore durante aggiornamento password:', error);

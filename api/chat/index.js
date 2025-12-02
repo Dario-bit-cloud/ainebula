@@ -310,14 +310,22 @@ export default async function handler(req, res) {
         // Elimina i messaggi esistenti per questa chat
         await sql`DELETE FROM messages WHERE chat_id = ${id}`;
         
-        // Inserisci i nuovi messaggi
-        for (const message of messages) {
-          if (!message.hidden) {
-            await sql`
+        // Filtra solo i messaggi non nascosti
+        const visibleMessages = messages.filter(msg => !msg.hidden);
+        
+        // Batch insert: inserisci tutti i messaggi in batch (molto più veloce del loop sequenziale)
+        if (visibleMessages.length > 0) {
+          // Inserisci in batch usando Promise.all per parallelizzare
+          // Questo è più veloce di un loop sequenziale ma mantiene la compatibilità
+          const insertPromises = visibleMessages.map(msg => 
+            sql`
               INSERT INTO messages (chat_id, type, content, hidden, timestamp)
-              VALUES (${id}, ${message.type}, ${message.content}, ${message.hidden || false}, ${message.timestamp || new Date().toISOString()})
-            `;
-          }
+              VALUES (${id}, ${msg.type}, ${msg.content}, ${msg.hidden || false}, ${msg.timestamp || new Date().toISOString()})
+            `
+          );
+          
+          // Esegui tutti gli insert in parallelo
+          await Promise.all(insertPromises);
         }
       }
       

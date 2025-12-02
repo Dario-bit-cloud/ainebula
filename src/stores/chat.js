@@ -135,44 +135,152 @@ export async function addMessage(chatId, message) {
   }
 }
 
+// Flag per prevenire eliminazioni multiple simultanee
+const deletingChats = new Set();
+
 export async function deleteChat(chatId) {
   if (!chatId) return;
   
+  // Prevenire eliminazioni multiple simultanee della stessa chat
+  if (deletingChats.has(chatId)) {
+    logWarn(`⚠️ [CHAT STORE] Eliminazione chat ${chatId} già in corso, skip`);
+    return;
+  }
+  
+  // Prevenire eliminazioni multiple rapide (debounce)
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
   if (!chat) return;
   
+  // Aggiungi alla lista delle eliminazioni in corso
+  deletingChats.add(chatId);
+  
   const incognito = get(isIncognitoMode);
   const currentId = get(currentChatId);
+  const wasCurrentChat = currentId === chatId;
   
-  // Rimuovi la chat dallo store
-  chats.update(allChats => allChats.filter(c => c.id !== chatId));
+  // Importa il servizio toast per il feedback
+  const { showSuccess, showError } = await import('../services/toastService.js');
   
-  // Se era la chat corrente, resetta il currentChatId
-  if (currentId === chatId) {
-    currentChatId.set(null);
-  }
-  
-  // Elimina dal database solo se non è in modalità incognito e se autenticato
+  // Elimina dal database PRIMA di rimuovere dallo store (per permettere rollback)
   if (!incognito && get(isAuthenticatedStore)) {
     try {
-      await deleteChatFromDatabase(chatId);
+      const result = await deleteChatFromDatabase(chatId);
+      
+      if (!result.success) {
+        // Se l'eliminazione dal database fallisce, non rimuovere dallo store
+        logError('Errore durante eliminazione chat dal database:', result.message || result.error);
+        showError(result.message || 'Errore durante l\'eliminazione della chat');
+        deletingChats.delete(chatId); // Rimuovi dalla lista delle eliminazioni in corso
+        return;
+      }
     } catch (error) {
+      // Se c'è un errore di rete o altro, non rimuovere dallo store
       logError('Errore durante eliminazione chat dal database:', error);
+      showError('Errore di connessione durante l\'eliminazione della chat');
+      deletingChats.delete(chatId); // Rimuovi dalla lista delle eliminazioni in corso
+      return;
     }
   }
   
-  // Aggiorna localStorage per rimuovere la chat eliminata
-  // (importante per le chat temporanee)
+  // Rimuovi la chat dallo store solo se l'eliminazione dal database è riuscita
+  // (o se è in modalità incognito/non autenticato)
+  chats.update(allChats => allChats.filter(c => c.id !== chatId));
+  
+  // Rimuovi IMMEDIATAMENTE la chat dal localStorage per evitare che venga ripristinata
+  // Questo deve essere fatto PRIMA di qualsiasi altra operazione
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const localChats = JSON.parse(stored);
+        if (Array.isArray(localChats)) {
+          const filteredChats = localChats.filter(c => c.id !== chatId);
+          if (filteredChats.length === 0) {
+            localStorage.removeItem(STORAGE_KEY);
+          } else {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredChats));
+          }
+        }
+      }
+    } catch (error) {
+      logError('Errore durante rimozione chat da localStorage:', error);
+    }
+  }
+  
+  // Se era la chat corrente, gestisci la transizione
+  if (wasCurrentChat) {
+    const remainingChats = get(chats);
+    
+    // Se ci sono altre chat, carica la prima disponibile
+    if (remainingChats.length > 0) {
+      await loadChat(remainingChats[0].id);
+    } else {
+      // Altrimenti, crea una nuova chat
+      currentChatId.set(null);
+      await createNewChat();
+    }
+  }
+  
+  // Aggiorna localStorage con lo stato corrente (per sicurezza)
   saveChatsToStorage();
+  
+  // Mostra feedback di successo
+  showSuccess('Chat eliminata con successo');
+  
+  // Rimuovi dalla lista delle eliminazioni in corso
+  deletingChats.delete(chatId);
 }
 
-export function loadChat(chatId) {
+export async function loadChat(chatId) {
   currentChatId.set(chatId);
+  
+  // Lazy decryption: decrittografa i messaggi della chat quando viene aperta
+  const allChats = get(chats);
+  const chat = allChats.find(c => c.id === chatId);
+  
+  if (chat && chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+    // Controlla se i messaggi sono crittografati (hanno il prefisso "encrypted:")
+    const hasEncryptedMessages = chat.messages.some(msg => 
+      msg.content && typeof msg.content === 'string' && msg.content.startsWith('encrypted:')
+    );
+    
+    if (hasEncryptedMessages) {
+      // Decrittografa solo questa chat (lazy decryption)
+      const { getCurrentUser } = await import('../services/authService.js');
+      const { getEncryptionKeyForUser } = await import('../services/encryptionService.js');
+      const { decryptMessages } = await import('../services/encryptionService.js');
+      
+      const user = getCurrentUser();
+      if (user && user.id) {
+        const { getCachedPassword } = await import('../services/encryptionService.js');
+        const password = getCachedPassword(user.id);
+        if (password) {
+          const encryptionKey = await getEncryptionKeyForUser(user.id, password);
+          if (encryptionKey) {
+            try {
+              const { decryptChatMetadata } = await import('../services/encryptionService.js');
+              const decryptedChat = await decryptChatMetadata(chat, encryptionKey);
+              // Aggiorna la chat con i messaggi e metadati decrittografati
+              chats.update(allChats => 
+                allChats.map(c => 
+                  c.id === chatId 
+                    ? decryptedChat
+                    : c
+                )
+              );
+            } catch (error) {
+              logError(`Errore decrittografia chat ${chatId}:`, error);
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 // Aggiorna un messaggio specifico
-export async function updateMessage(chatId, messageIndex, updates) {
+export async function updateMessage(chatId, messageIndex, updates, skipSave = false) {
   chats.update(allChats => {
     return allChats.map(chat => {
       if (chat.id === chatId) {
@@ -189,6 +297,12 @@ export async function updateMessage(chatId, messageIndex, updates) {
       return chat;
     });
   });
+  
+  // Non salvare durante la generazione (skipSave = true) o se isGenerating è true
+  // Questo evita salvataggi multipli durante lo streaming
+  if (skipSave || get(isGenerating)) {
+    return;
+  }
   
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
@@ -337,6 +451,14 @@ export function saveChatsToStorage() {
 }
 
 export function loadChatsFromStorage() {
+  // IMPORTANTE: Non caricare da localStorage se l'utente è autenticato
+  // Le chat devono venire solo dal database quando autenticato
+  // Questo previene che chat eliminate vengano ripristinate
+  if (get(isAuthenticatedStore)) {
+    log('ℹ️ [CHAT STORE] Utente autenticato, skip loadChatsFromStorage (chat vengono dal database)');
+    return;
+  }
+  
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -458,13 +580,84 @@ export async function syncChatsOnLogin() {
       }
     }
     
+    // Prima di sovrascrivere, salva le chat locali che potrebbero non essere nel database
+    const stored = localStorage.getItem(STORAGE_KEY);
+    let localChatsToMigrate = [];
+    if (stored) {
+      try {
+        const localChats = JSON.parse(stored);
+        if (Array.isArray(localChats)) {
+          const existingChatIds = new Set(dbChats.map(c => c.id));
+          // Trova chat locali che non sono nel database (nuove chat da migrare)
+          localChatsToMigrate = localChats.filter(chat => 
+            !existingChatIds.has(chat.id) && 
+            chat.messages && 
+            chat.messages.length > 0 &&
+            chat.messages.some(msg => !msg.hidden)
+          );
+        }
+      } catch (error) {
+        logError('Errore durante lettura localStorage per migrazione:', error);
+      }
+    }
+    
     // Imposta le chat dal database
     chats.set(dbChats);
     log(`✅ [CHAT STORE] Totale chat caricate: ${dbChats.length}`);
     
-    // Migra le chat da localStorage al database (solo se non ci sono già chat nel database)
-    // Non migrare chat temporanee
-    await migrateChatsFromLocalStorage();
+    // IMPORTANTE: SOVRASCRIVI il localStorage con le chat dal database
+    // Questo previene che chat eliminate vengano ripristinate
+    // Salva solo le chat che hanno messaggi visibili
+    const chatsToSave = dbChats.filter(chat => {
+      return chat.messages && 
+             chat.messages.length > 0 &&
+             chat.messages.some(msg => !msg.hidden);
+    });
+    
+    if (chatsToSave.length === 0) {
+      localStorage.removeItem(STORAGE_KEY);
+      log('🗑️ localStorage pulito: nessuna chat da salvare');
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(chatsToSave));
+      log(`💾 ${chatsToSave.length} chat salvate in localStorage (sincronizzate con database)`);
+    }
+    
+    // Migra le nuove chat locali che non sono nel database
+    if (localChatsToMigrate.length > 0) {
+      log(`🔄 Trovate ${localChatsToMigrate.length} nuove chat locali da migrare`);
+      let migratedCount = 0;
+      for (const chat of localChatsToMigrate) {
+        try {
+          const saveResult = await saveChatToDatabase(chat);
+          if (saveResult.success) {
+            migratedCount++;
+            log(`✅ Migrata chat: ${chat.title || chat.id}`);
+          }
+        } catch (error) {
+          logError(`❌ Errore migrazione chat ${chat.id}:`, error);
+        }
+      }
+      
+      // Ricarica le chat dal database dopo la migrazione
+      if (migratedCount > 0) {
+        const updatedResult = await getChatsFromDatabase();
+        if (updatedResult.success && updatedResult.chats) {
+          chats.set(updatedResult.chats);
+          // Aggiorna localStorage con le chat aggiornate
+          const updatedChatsToSave = updatedResult.chats.filter(chat => {
+            return chat.messages && 
+                   chat.messages.length > 0 &&
+                   chat.messages.some(msg => !msg.hidden);
+          });
+          if (updatedChatsToSave.length === 0) {
+            localStorage.removeItem(STORAGE_KEY);
+          } else {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedChatsToSave));
+          }
+          log(`✅ Dopo migrazione, caricate ${updatedResult.chats.length} chat totali`);
+        }
+      }
+    }
   } catch (error) {
     logError('❌ [CHAT STORE] Errore in syncChatsOnLogin:', error);
     // In caso di errore, prova comunque a migrare da localStorage
@@ -480,6 +673,9 @@ export async function syncChatsOnLogin() {
 }
 
 // Migra le chat da localStorage al database
+// IMPORTANTE: Questa funzione viene chiamata DOPO che syncChatsOnLogin ha già sovrascritto il localStorage
+// Quindi qui dobbiamo solo gestire eventuali chat che erano in localStorage PRIMA della sincronizzazione
+// e che non sono ancora nel database (nuove chat locali non ancora migrate)
 export async function migrateChatsFromLocalStorage() {
   if (!get(isAuthenticatedStore)) {
     return;
@@ -489,6 +685,14 @@ export async function migrateChatsFromLocalStorage() {
     return;
   }
   
+  // Carica le chat attuali dal database
+  const dbResult = await getChatsFromDatabase();
+  const existingChatIds = new Set();
+  if (dbResult.success && dbResult.chats) {
+    dbResult.chats.forEach(chat => existingChatIds.add(chat.id));
+  }
+  
+  // Carica le chat dal localStorage (potrebbero essere state sovrascritte da syncChatsOnLogin)
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) {
     return;
@@ -500,80 +704,67 @@ export async function migrateChatsFromLocalStorage() {
       return;
     }
     
-    log(`🔄 Trovate ${localChats.length} chat locali da migrare`);
+    // Trova solo le chat che sono in localStorage ma NON nel database
+    // Queste sono nuove chat locali che devono essere migrate
+    const chatsToMigrate = localChats.filter(chat => {
+      // Deve avere messaggi
+      if (!chat.messages || chat.messages.length === 0) {
+        return false;
+      }
+      // Non deve esistere già nel database
+      return !existingChatIds.has(chat.id);
+    });
     
-    // Carica le chat attuali dal database per evitare duplicati
-    const dbResult = await getChatsFromDatabase();
-    const existingChatIds = new Set();
-    if (dbResult.success && dbResult.chats) {
-      dbResult.chats.forEach(chat => existingChatIds.add(chat.id));
+    if (chatsToMigrate.length === 0) {
+      log('ℹ️ Nessuna chat da migrare: tutte le chat in localStorage sono già nel database');
+      return;
     }
+    
+    log(`🔄 Trovate ${chatsToMigrate.length} nuove chat locali da migrare`);
     
     let migratedCount = 0;
     let failedCount = 0;
     
-    // Salva ogni chat locale nel database
-    for (const chat of localChats) {
-      // Salta chat senza messaggi
-      if (!chat.messages || chat.messages.length === 0) {
-        continue;
-      }
-      
-      // Salta se la chat esiste già nel database
-      if (existingChatIds.has(chat.id)) {
-        log(`⏭️ Chat ${chat.id} già presente nel database, skip`);
-        continue;
-      }
-      
-      // Salva solo chat con messaggi
-      if (chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
-        try {
-          const saveResult = await saveChatToDatabase(chat);
-          if (saveResult.success) {
-            migratedCount++;
-            log(`✅ Migrata chat: ${chat.title || chat.id}`);
-          } else {
-            failedCount++;
-            logWarn(`⚠️ Errore migrazione chat ${chat.id}:`, saveResult.message);
-          }
-        } catch (error) {
+    // Migra solo le nuove chat
+    for (const chat of chatsToMigrate) {
+      try {
+        const saveResult = await saveChatToDatabase(chat);
+        if (saveResult.success) {
+          migratedCount++;
+          log(`✅ Migrata chat: ${chat.title || chat.id}`);
+        } else {
           failedCount++;
-          logError(`❌ Errore migrazione chat ${chat.id}:`, error);
+          logWarn(`⚠️ Errore migrazione chat ${chat.id}:`, saveResult.message);
         }
+      } catch (error) {
+        failedCount++;
+        logError(`❌ Errore migrazione chat ${chat.id}:`, error);
       }
     }
     
-    // Pulisci localStorage solo se la migrazione è andata a buon fine per almeno una chat
-    if (migratedCount > 0) {
-      // Rimuovi solo le chat migrate con successo
-      const remainingChats = localChats.filter(chat => {
-        if (existingChatIds.has(chat.id)) {
-          return false; // Già presente nel database
-        }
-        // Se la migrazione è fallita, mantieni la chat in localStorage
-        return true;
+    // Dopo la migrazione, ricarica le chat dal database e sovrascrivi localStorage
+    const updatedResult = await getChatsFromDatabase();
+    if (updatedResult.success && updatedResult.chats) {
+      chats.set(updatedResult.chats);
+      
+      // Sovrascrivi localStorage con le chat dal database (incluse quelle appena migrate)
+      const chatsToSave = updatedResult.chats.filter(chat => {
+        return chat.messages && 
+               chat.messages.length > 0 &&
+               chat.messages.some(msg => !msg.hidden);
       });
       
-      if (remainingChats.length === 0) {
+      if (chatsToSave.length === 0) {
         localStorage.removeItem(STORAGE_KEY);
-        log('🗑️ localStorage pulito dopo migrazione completa');
       } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingChats));
-        log(`💾 ${remainingChats.length} chat rimaste in localStorage`);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(chatsToSave));
       }
       
-      // Ricarica le chat dal database dopo la migrazione
-      const updatedResult = await getChatsFromDatabase();
-      if (updatedResult.success && updatedResult.chats) {
-        chats.set(updatedResult.chats);
-        log(`✅ Dopo migrazione, caricate ${updatedResult.chats.length} chat totali`);
-      }
-      
-      if (migratedCount > 0) {
-        log(`✅ Migrazione completata: ${migratedCount} chat migrate, ${failedCount} fallite`);
-      }
-    } else {
-      log(`ℹ️ Nessuna chat da migrare o tutte già presenti nel database`);
+      log(`✅ Dopo migrazione, caricate ${updatedResult.chats.length} chat totali dal database`);
+    }
+    
+    if (migratedCount > 0) {
+      log(`✅ Migrazione completata: ${migratedCount} chat migrate, ${failedCount} fallite`);
     }
   } catch (error) {
     logError('❌ Errore durante migrazione chat:', error);

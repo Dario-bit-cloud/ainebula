@@ -265,11 +265,28 @@
     }
   }
   
+  let isDeletingChat = false;
+  
   async function handleDeleteChat(event, chatId) {
     event.stopPropagation();
-    const confirmed = await showConfirm(get(t)('deleteChatConfirm'), get(t)('deleteChat'), get(t)('delete'), get(t)('cancel'), 'danger');
-    if (confirmed) {
-      await deleteChat(chatId);
+    
+    // Prevenire click multipli rapidi
+    if (isDeletingChat) {
+      return;
+    }
+    
+    isDeletingChat = true;
+    
+    try {
+      const confirmed = await showConfirm(get(t)('deleteChatConfirm'), get(t)('deleteChat'), get(t)('delete'), get(t)('cancel'), 'danger');
+      if (confirmed) {
+        await deleteChat(chatId);
+      }
+    } finally {
+      // Reset dopo un breve delay per prevenire spam
+      setTimeout(() => {
+        isDeletingChat = false;
+      }, 1000);
     }
   }
   
@@ -411,7 +428,7 @@
         <span class="logo-text">Nebula AI</span>
       </div>
       <button class="close-sidebar-btn" on:click={closeSidebar}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/>
           <line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
@@ -425,7 +442,7 @@
         <span class="logo-text">Nebula AI</span>
       </div>
       <button class="collapse-toggle-btn" on:click={() => isSidebarCollapsed.update(v => !v)} title={$isSidebarCollapsed ? $t('expandSidebar') : $t('collapseSidebar')}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           {#if $isSidebarCollapsed}
             <polyline points="9 18 15 12 9 6"/>
           {:else}
@@ -466,7 +483,7 @@
             ></path>
           </svg>
         {:else}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
@@ -495,7 +512,7 @@
               }}
               title={$isSidebarCollapsed && !$isMobile ? $t('expandSidebar') : item.label}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d={item.icon} />
               </svg>
               {#if !$isSidebarCollapsed || $isMobile}
@@ -542,13 +559,13 @@
             on:click={() => handleMenuClick(item.id)}
           >
             {#if item.customIcon}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                 <line x1="3" y1="9" x2="21" y2="9"/>
                 <line x1="9" y1="21" x2="9" y2="9"/>
               </svg>
             {:else}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d={item.icon} />
               </svg>
             {/if}
@@ -618,7 +635,7 @@
                   on:drop={(e) => handleDrop(e, project.id)}
                 >
                   <div class="project-icon-wrapper" style="background-color: {project.color}20; color: {project.color}">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d={project.icon}/>
                     </svg>
                   </div>
@@ -1045,7 +1062,7 @@
   <div class="user-section">
     <button class="user-info" on:click={() => isUserMenuOpen.set(!$isUserMenuOpen)}>
       <div class="user-avatar">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/>
           <path d="M2 17l10 5 10-5"/>
           <path d="M2 12l10 5 10-5"/>
@@ -1113,7 +1130,7 @@
   }
   
   .sidebar-header {
-    padding: 20px 16px;
+    padding: 12px 12px;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
@@ -1123,7 +1140,7 @@
   }
   
   .sidebar.collapsed .sidebar-header {
-    padding: 20px 12px;
+    padding: 12px 8px;
     justify-content: center;
   }
   
@@ -1134,8 +1151,8 @@
   }
   
   .logo-img {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     object-fit: contain;
   }
   
@@ -1256,9 +1273,10 @@
       position: fixed;
       top: 0;
       left: 0;
-      width: 280px;
+      width: 300px;
       max-width: 85vw;
       height: 100vh;
+      height: 100dvh;
       z-index: 1001;
       transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1266,6 +1284,8 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     .sidebar.sidebar-open {
@@ -1275,6 +1295,9 @@
     .sidebar-header-mobile {
       display: flex;
       flex-shrink: 0;
+      padding: 16px;
+      padding-top: calc(16px + env(safe-area-inset-top));
+      border-bottom: 1px solid var(--border-color);
     }
 
     .sidebar-header {
@@ -1286,35 +1309,135 @@
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding: 8px;
     }
 
     .nav-item {
       padding: 12px 14px;
       font-size: 15px;
+      min-height: 48px;
+      touch-action: manipulation;
+      border-radius: 12px;
+    }
+
+    .new-chat-button {
+      padding: 12px 20px;
+      min-height: 48px;
+      font-size: 15px;
+      touch-action: manipulation;
     }
 
     .chat-item {
-      padding: 10px 12px;
+      padding: 12px 14px;
       font-size: 14px;
+      min-height: 48px;
+      touch-action: manipulation;
+      border-radius: 10px;
     }
 
     .user-section {
       flex-shrink: 0;
-      padding: 10px 12px;
+      padding: 12px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
       border-top: 1px solid var(--border-color);
       background-color: var(--bg-secondary);
-      margin-top: -20px;
+    }
+
+    .user-info {
+      padding: 10px;
+      margin-bottom: 10px;
+      min-height: 48px;
+      touch-action: manipulation;
+      border-radius: 12px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      min-height: 32px;
+    }
+
+    .username {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .workspace {
+      font-size: 12px;
+    }
+
+    .invite-button {
+      padding: 12px 16px;
+      font-size: 13px;
+      min-height: 48px;
+      touch-action: manipulation;
+      border-radius: 12px;
+    }
+
+    .invite-button span {
+      font-size: 13px;
+    }
+    
+    .close-sidebar-btn {
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
+      border-radius: 8px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .sidebar {
+      width: 280px;
+      max-width: 90vw;
+    }
+
+    .sidebar-header-mobile {
+      padding: 14px 12px;
+      padding-top: calc(14px + env(safe-area-inset-top));
+    }
+
+    .sidebar-nav {
+      padding: 8px;
+    }
+
+    .nav-item {
+      padding: 10px 12px;
+      font-size: 14px;
+      min-height: 44px;
+    }
+    
+    .new-chat-button {
+      padding: 10px 16px;
+      min-height: 44px;
+      font-size: 14px;
+    }
+
+    .chat-item {
+      padding: 10px 12px;
+      font-size: 13px;
+      min-height: 44px;
+    }
+
+    .user-section {
+      padding: 10px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
     }
 
     .user-info {
       padding: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      min-height: 44px;
     }
 
     .user-avatar {
       width: 28px;
       height: 28px;
       min-width: 28px;
+      min-height: 28px;
     }
 
     .username {
@@ -1326,81 +1449,24 @@
     }
 
     .invite-button {
-      padding: 10px 12px;
+      padding: 10px 14px;
       font-size: 12px;
+      min-height: 44px;
     }
 
     .invite-button span {
       font-size: 12px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .sidebar {
-      width: 260px;
-      max-width: 90vw;
-    }
-
-    .sidebar-header {
-      padding: 16px 12px;
-    }
-
-    .sidebar-nav {
-      padding: 10px;
-    }
-
-    .nav-item {
-      padding: 10px 12px;
-      font-size: 14px;
-    }
-
-    .chat-item {
-      padding: 8px 10px;
-      font-size: 13px;
-    }
-
-    .user-section {
-      padding: 8px 10px;
-      margin-top: -20px;
-    }
-
-    .user-info {
-      padding: 6px;
-      margin-bottom: 8px;
-    }
-
-    .user-avatar {
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
-    }
-
-    .username {
-      font-size: 12px;
-    }
-
-    .workspace {
-      font-size: 10px;
-    }
-
-    .invite-button {
-      padding: 8px 10px;
-      font-size: 11px;
-    }
-
-    .invite-button span {
-      font-size: 11px;
     }
   }
 
   .sidebar-nav {
     flex: 1;
-    padding: 12px;
+    padding: 8px;
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     min-height: 0;
   }
   
@@ -1410,8 +1476,8 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    margin-top: 16px;
-    margin-bottom: 16px;
+    margin-top: 8px;
+    margin-bottom: 8px;
     cursor: pointer;
   }
   
@@ -1437,25 +1503,25 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    padding: 12px 32px;
+    padding: 10px 24px;
     background-color: var(--md-sys-color-primary);
     border: none;
     border-radius: var(--md-sys-shape-corner-large);
     color: var(--md-sys-color-on-primary);
-    font-size: var(--md-sys-typescale-label-large-size);
-    font-weight: var(--md-sys-typescale-label-large-weight);
-    font-family: var(--md-sys-typescale-label-large-font);
+    font-size: var(--md-sys-typescale-label-medium-size);
+    font-weight: var(--md-sys-typescale-label-medium-weight);
+    font-family: var(--md-sys-typescale-label-medium-font);
     cursor: pointer;
     transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
     z-index: 1;
     box-shadow: var(--md-sys-elevation-level1);
-    gap: 8px;
+    gap: 6px;
   }
   
   .sidebar.collapsed .new-chat-button {
-    padding: 12px;
-    min-width: 48px;
-    width: 48px;
+    padding: 10px;
+    min-width: 44px;
+    width: 44px;
   }
   
   .sidebar.collapsed .new-chat-button svg {
@@ -1502,16 +1568,16 @@
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
+    gap: 8px;
+    padding: 8px 10px;
     background: none;
     border: none;
     color: var(--md-sys-color-on-surface-variant);
     cursor: pointer;
     border-radius: var(--md-sys-shape-corner-medium);
-    font-size: var(--md-sys-typescale-body-medium-size);
-    font-weight: var(--md-sys-typescale-body-medium-weight);
-    font-family: var(--md-sys-typescale-body-medium-font);
+    font-size: var(--md-sys-typescale-body-small-size);
+    font-weight: var(--md-sys-typescale-body-small-weight);
+    font-family: var(--md-sys-typescale-body-small-font);
     transition: all var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
     position: relative;
     text-align: left;
@@ -1521,9 +1587,9 @@
   
   .sidebar.collapsed .nav-item {
     justify-content: center;
-    padding: 10px;
-    min-width: 48px;
-    width: 48px;
+    padding: 8px;
+    min-width: 44px;
+    width: 44px;
   }
   
   .sidebar.collapsed .nav-item span {
@@ -1557,6 +1623,8 @@
 
   .nav-item svg {
     flex-shrink: 0;
+    width: 16px;
+    height: 16px;
   }
 
   .plus-icon {
@@ -1600,12 +1668,12 @@
   }
 
   .chat-list {
-    margin-top: 8px;
+    margin-top: 4px;
     flex: 1;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     transition: opacity var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
   }
   
@@ -1619,8 +1687,8 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
+    gap: 4px;
+    margin-bottom: 2px;
   }
 
   .search-button {
@@ -1654,19 +1722,19 @@
   .search-input {
     font-family: inherit;
     width: 100%;
-    height: 45px;
-    padding-left: 2.5rem;
-    padding-right: 2.5rem;
+    height: 38px;
+    padding-left: 2.25rem;
+    padding-right: 2.25rem;
     box-shadow: 0 0 0 1.5px var(--border-color);
     border: 0;
-    border-radius: 12px;
+    border-radius: 10px;
     background-color: var(--bg-tertiary);
     outline: none;
     color: var(--text-primary);
     transition: all 0.25s cubic-bezier(0.19, 1, 0.22, 1);
     cursor: text;
     z-index: 0;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .search-input::placeholder {
@@ -1734,32 +1802,55 @@
 
   @media (max-width: 768px) {
     .search-input {
-      height: 42px;
-      font-size: 13px;
-      padding-left: 2.25rem;
-      padding-right: 2.25rem;
+      height: 48px;
+      font-size: 16px; /* Previene zoom su iOS */
+      padding-left: 2.5rem;
+      padding-right: 2.5rem;
+      min-height: 48px;
+      border-radius: 12px;
     }
 
     .search-icon {
-      width: 0.9rem;
-      height: 0.9rem;
-      left: 0.875rem;
+      width: 1rem;
+      height: 1rem;
+      left: 1rem;
     }
 
     .search-close-button {
+      right: 0.75rem;
+      padding: 6px;
+      min-width: 36px;
+      min-height: 36px;
+      touch-action: manipulation;
+      border-radius: 8px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .search-input {
+      height: 44px;
+      font-size: 16px;
+      padding-left: 2.25rem;
+      padding-right: 2.25rem;
+      min-height: 44px;
+    }
+    
+    .search-close-button {
       right: 0.625rem;
-      padding: 3px;
+      padding: 4px;
+      min-width: 32px;
+      min-height: 32px;
     }
   }
 
   .chat-item {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: var(--md-sys-shape-corner-small);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     transition: all var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
     animation: chatItemSlideIn var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
     animation-fill-mode: both;
@@ -1800,16 +1891,16 @@
   }
 
   .chat-title {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
 
   .chat-date {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-secondary);
   }
 
@@ -1854,14 +1945,14 @@
   }
 
   .project-folder {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   .project-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 6px 10px;
     border-radius: 6px;
     cursor: pointer;
     transition: background-color 0.2s;
@@ -1878,8 +1969,8 @@
   }
 
   .project-icon-wrapper {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     border-radius: 4px;
     display: flex;
     align-items: center;
@@ -1887,22 +1978,27 @@
     flex-shrink: 0;
   }
 
+  .project-icon-wrapper svg {
+    width: 14px;
+    height: 14px;
+  }
+
   .project-name {
     flex: 1;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--text-primary);
     text-align: left;
   }
 
   .project-count {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-secondary);
   }
 
   .expand-icon {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     color: var(--text-secondary);
     transition: transform 0.2s;
     flex-shrink: 0;
@@ -1936,15 +2032,15 @@
   }
 
   .project-chats {
-    margin-left: 32px;
-    margin-top: 4px;
+    margin-left: 28px;
+    margin-top: 2px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
   }
 
   .chat-item.nested {
-    padding: 8px 12px;
+    padding: 6px 10px;
     margin-left: 0;
   }
 
@@ -2054,7 +2150,7 @@
   }
 
   .user-section {
-    padding: 12px;
+    padding: 8px;
     border-top: 1px solid var(--border-color);
     flex-shrink: 0;
     background-color: var(--bg-secondary);
@@ -2064,15 +2160,15 @@
   }
   
   .sidebar.collapsed .user-section {
-    padding: 12px 8px;
+    padding: 8px 6px;
   }
 
   .user-info {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-    padding: 8px;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 6px;
     border-radius: 8px;
     background: none;
     border: none;
@@ -2084,7 +2180,7 @@
   
   .sidebar.collapsed .user-info {
     justify-content: center;
-    padding: 8px;
+    padding: 6px;
   }
   
   .sidebar.collapsed .user-details {
@@ -2098,9 +2194,9 @@
   }
 
   .user-avatar {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent-blue), #8b5cf6);
     display: flex;
@@ -2110,6 +2206,11 @@
     flex-shrink: 0;
   }
 
+  .user-avatar svg {
+    width: 18px;
+    height: 18px;
+  }
+
   .user-details {
     flex: 1;
     min-width: 0;
@@ -2117,7 +2218,7 @@
   }
 
   .username {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--text-primary);
     white-space: nowrap;
@@ -2128,38 +2229,43 @@
   }
 
   .workspace {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     display: block;
     width: 100%;
-    margin-top: 2px;
+    margin-top: 1px;
   }
 
   .invite-button {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: 6px;
+    padding: 8px 10px;
     background-color: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     transform: translateY(0);
     min-width: 0;
     justify-content: center;
   }
+
+  .invite-button svg {
+    width: 14px;
+    height: 14px;
+  }
   
   .sidebar.collapsed .invite-button {
-    padding: 10px;
-    min-width: 48px;
-    width: 48px;
+    padding: 8px;
+    min-width: 44px;
+    width: 44px;
   }
   
   .sidebar.collapsed .invite-button span {

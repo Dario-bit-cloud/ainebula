@@ -130,10 +130,8 @@
       }
 
       // Per image-to-image, aggiungi l'URL dell'immagine
+      // Il servizio convertirà automaticamente il data URL in un URL pubblico
       if (selectedModel === 'kontext' && imageToImageUrl) {
-        // Se è un data URL, dobbiamo convertirlo in un URL pubblico
-        // Per ora, usiamo il data URL direttamente (Pollinations potrebbe non supportarlo)
-        // In produzione, dovresti caricare l'immagine su un server pubblico
         options.image = imageToImageUrl;
       }
 
@@ -364,9 +362,9 @@
         </div>
         <div class="input-hint warning-hint">
           <Clock size={14} />
-          <span>Rate limit: 1 richiesta ogni 15 secondi per utenti anonimi.</span>
+          <span>Rate limit: 1 richiesta ogni 15 secondi per utenti anonimi. Il sistema gestisce automaticamente i retry e rispetta i limiti.</span>
           {#if numImages > 1}
-            <span class="time-estimate">Tempo stimato: ~{Math.ceil((numImages - 1) * 15 / 60)} minuti</span>
+            <span class="time-estimate">Tempo stimato: ~{Math.ceil((numImages - 1) * 15 / 60)} minuti (con gestione automatica del rate limit)</span>
           {/if}
         </div>
       </div>

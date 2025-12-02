@@ -5,6 +5,164 @@
 
 const POLLINATIONS_API_BASE = 'https://image.pollinations.ai';
 
+// URL base del server per caricare immagini temporanee
+const getServerBaseURL = () => {
+  // In produzione, usa l'URL del server
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    const protocol = window.location.protocol;
+    
+    // Se siamo su localhost, usa la porta 3001
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `${protocol}//${hostname}:3001`;
+    }
+    
+    // Altrimenti usa lo stesso host (per Vercel/produzione)
+    return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+  }
+  
+  return 'http://localhost:3001';
+};
+
+/**
+ * Carica un'immagine sul server e ottiene un URL pubblico temporaneo
+ * @param {string} imageDataUrl - Data URL dell'immagine (base64)
+ * @returns {Promise<string>} URL pubblico dell'immagine
+ */
+async function uploadImageToServer(imageDataUrl) {
+  try {
+    const serverBaseURL = getServerBaseURL();
+    const response = await fetch(`${serverBaseURL}/api/image/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ imageData: imageDataUrl })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Errore durante il caricamento dell\'immagine sul server');
+    }
+
+    const data = await response.json();
+    return data.imageUrl;
+  } catch (error) {
+    console.error('Errore upload immagine:', error);
+    throw new Error(`Impossibile caricare l'immagine sul server: ${error.message}`);
+  }
+}
+
+// Rate limit tracking
+let lastRequestTime = 0;
+const MIN_REQUEST_INTERVAL = 15000; // 15 secondi minimo tra le richieste
+
+// Cache semplice per evitare richieste duplicate
+const requestCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minuti
+
+/**
+ * Genera una chiave di cache per la richiesta
+ */
+function getCacheKey(prompt, options) {
+  return JSON.stringify({
+    prompt: prompt.trim(),
+    model: options.model || 'flux',
+    width: options.width || 1024,
+    height: options.height || 1024,
+    seed: options.seed || null,
+    enhance: options.enhance || false,
+    image: options.image || null
+  });
+}
+
+/**
+ * Attendi fino a quando è possibile fare una nuova richiesta
+ */
+async function waitForRateLimit() {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+    console.log(`⏳ [RATE LIMIT] Attendo ${waitTime}ms prima della prossima richiesta`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastRequestTime = Date.now();
+}
+
+/**
+ * Esegue una richiesta con retry automatico e backoff esponenziale
+ */
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // Attendi prima di ogni tentativo (tranne il primo)
+      if (attempt > 0) {
+        // Backoff esponenziale: 2^attempt * 2 secondi (minimo 4s, massimo 32s)
+        const backoffTime = Math.min(Math.pow(2, attempt) * 2000, 32000);
+        console.log(`🔄 [RETRY] Tentativo ${attempt + 1}/${maxRetries + 1} dopo ${backoffTime}ms`);
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
+      }
+      
+      // Attendi per rispettare il rate limit
+      await waitForRateLimit();
+      
+      const response = await fetch(url, options);
+      
+      // Se riceviamo un 429, controlla l'header Retry-After
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        if (retryAfter) {
+          const waitSeconds = parseInt(retryAfter, 10);
+          console.log(`⏳ [RATE LIMIT] Server richiede attesa di ${waitSeconds} secondi`);
+          await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+          // Riprova immediatamente dopo aver atteso
+          continue;
+        }
+        
+        // Se non c'è Retry-After, usa il backoff esponenziale
+        if (attempt < maxRetries) {
+          lastError = new Error('Rate limit raggiunto. Riprovo automaticamente...');
+          continue;
+        }
+        
+        throw new Error('Rate limit raggiunto. Attendi qualche secondo e riprova. (Rate limit: 1 richiesta ogni 15s per utenti anonimi)');
+      }
+      
+      // Se la richiesta è andata a buon fine, ritorna la risposta
+      if (response.ok) {
+        return response;
+      }
+      
+      // Per altri errori, lancia un'eccezione
+      const errorText = await response.text();
+      throw new Error(`Errore API: ${response.status} ${response.statusText}. ${errorText}`);
+      
+    } catch (error) {
+      lastError = error;
+      
+      // Se è un AbortError, non riprovare
+      if (error.name === 'AbortError') {
+        throw error;
+      }
+      
+      // Se abbiamo ancora tentativi disponibili, continua
+      if (attempt < maxRetries) {
+        console.warn(`⚠️ [RETRY] Errore al tentativo ${attempt + 1}:`, error.message);
+        continue;
+      }
+    }
+  }
+  
+  // Se tutti i tentativi sono falliti, lancia l'ultimo errore
+  throw lastError;
+}
+
 /**
  * Modelli disponibili su Pollinations.AI
  */
@@ -87,9 +245,29 @@ export async function generateImage(prompt, options = {}, abortController = null
     url.searchParams.set('private', 'true');
   }
 
-  // Per image-to-image
-  if (image) {
-    url.searchParams.set('image', image);
+  // Per image-to-image, converti il data URL in un URL pubblico se necessario
+  let publicImageUrl = image;
+  if (image && image.startsWith('data:image/')) {
+    // Se è un data URL, caricalo sul server per ottenere un URL pubblico
+    console.log('📤 [IMAGE UPLOAD] Caricamento immagine sul server...');
+    publicImageUrl = await uploadImageToServer(image);
+    console.log('✅ [IMAGE UPLOAD] Immagine caricata:', publicImageUrl);
+  }
+  
+  if (publicImageUrl) {
+    url.searchParams.set('image', publicImageUrl);
+  }
+
+  // Controlla la cache prima di fare la richiesta
+  const cacheKey = getCacheKey(prompt, { model, width, height, seed, enhance, image });
+  const cached = requestCache.get(cacheKey);
+  
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    console.log('✅ [CACHE] Immagine recuperata dalla cache');
+    return {
+      ...cached.data,
+      imageUrl: URL.createObjectURL(cached.data.blob) // Ricrea l'URL dal blob
+    };
   }
 
   console.log(`Generating image with Pollinations.AI:`, {
@@ -104,7 +282,8 @@ export async function generateImage(prompt, options = {}, abortController = null
   const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minuti timeout
 
   try {
-    const response = await fetch(url.toString(), {
+    // Usa fetchWithRetry per gestire automaticamente i rate limit
+    const response = await fetchWithRetry(url.toString(), {
       method: 'GET',
       signal: controller.signal,
       headers: {
@@ -114,26 +293,15 @@ export async function generateImage(prompt, options = {}, abortController = null
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      
-      // Gestisci errori specifici
-      if (response.status === 429) {
-        throw new Error('Troppe richieste. Attendi qualche secondo e riprova. (Rate limit: 1 richiesta ogni 15s per utenti anonimi)');
-      }
-      
-      if (response.status === 400) {
-        throw new Error('Richiesta non valida. Controlla il prompt e i parametri.');
-      }
-
-      throw new Error(`Errore API: ${response.status} ${response.statusText}. ${errorText}`);
+    if (response.status === 400) {
+      throw new Error('Richiesta non valida. Controlla il prompt e i parametri.');
     }
 
     // Pollinations.AI restituisce direttamente l'immagine
     const imageBlob = await response.blob();
     const imageUrl = URL.createObjectURL(imageBlob);
 
-    return {
+    const result = {
       imageUrl,
       blob: imageBlob, // Mantieni il blob per il download
       prompt: prompt,
@@ -143,6 +311,24 @@ export async function generateImage(prompt, options = {}, abortController = null
       seed: seed || null,
       provider: 'Pollinations.AI'
     };
+
+    // Salva nella cache
+    requestCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+
+    // Pulisci la cache vecchia (mantieni solo gli ultimi 50 elementi)
+    if (requestCache.size > 50) {
+      const entries = Array.from(requestCache.entries());
+      entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+      requestCache.clear();
+      entries.slice(0, 50).forEach(([key, value]) => {
+        requestCache.set(key, value);
+      });
+    }
+
+    return result;
   } catch (error) {
     clearTimeout(timeoutId);
     
@@ -172,11 +358,8 @@ export async function generateMultipleImages(prompt, count = 1, options = {}, ab
 
   for (let i = 0; i < count; i++) {
     try {
-      // Aggiungi delay tra le richieste per rispettare i rate limits
-      // Pollinations.AI ha un rate limit di 1 richiesta ogni 15s per utenti anonimi
-      if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 16000)); // 16 secondi per sicurezza
-      }
+      // Il rate limit è già gestito automaticamente da generateImage
+      // Non serve aggiungere delay manuale qui, waitForRateLimit lo gestisce
 
       const result = await generateImage(prompt, {
         ...options,

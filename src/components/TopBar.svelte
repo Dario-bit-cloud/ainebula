@@ -24,12 +24,28 @@
   let modelSelectorButton;
   let modelDropdown;
   let dropdownPosition = { top: 0, left: 0 };
+  let isThirdPartySubmenuOpen = false;
+  let thirdPartySubmenuPosition = { top: 0, left: 0 };
+  let thirdPartySubmenuRef;
+  let clickHandled = false;
   
-  function toggleModelDropdown() {
+  function toggleModelDropdown(event) {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    clickHandled = true;
     isModelDropdownOpen = !isModelDropdownOpen;
     if (isModelDropdownOpen && modelSelectorButton) {
-      updateDropdownPosition();
+      // Usa setTimeout per assicurarsi che il DOM sia aggiornato
+      setTimeout(() => {
+        updateDropdownPosition();
+      }, 0);
     }
+    // Reset dopo un breve delay
+    setTimeout(() => {
+      clickHandled = false;
+    }, 100);
   }
   
   function updateDropdownPosition() {
@@ -69,15 +85,46 @@
   }
   
   // Mostra sempre tutti i modelli, ma disabilita quelli premium senza abbonamento
-  // Raggruppa i modelli per gruppo
+  // Raggruppa i modelli per gruppo, escludendo "AI di terze parti" dal dropdown principale
   $: groupedModels = $availableModels.reduce((acc, model) => {
     const group = model.group || 'Altri';
+    // Escludi "AI di terze parti" dal dropdown principale
+    if (group === 'AI di terze parti') {
+      return acc;
+    }
     if (!acc[group]) {
       acc[group] = [];
     }
     acc[group].push(model);
     return acc;
   }, {});
+  
+  // Modelli di terze parti separati
+  $: thirdPartyModels = $availableModels.filter(m => m.group === 'AI di terze parti');
+  
+  // Funzione per gestire il click sulla sezione "AI di terze parti"
+  function toggleThirdPartySubmenu(event) {
+    if (event && event.currentTarget) {
+      updateThirdPartySubmenuPosition(event);
+    }
+    isThirdPartySubmenuOpen = !isThirdPartySubmenuOpen;
+  }
+  
+  function updateThirdPartySubmenuPosition(event) {
+    if (modelDropdown && event && event.currentTarget) {
+      const dropdownRect = modelDropdown.getBoundingClientRect();
+      const groupRect = event.currentTarget.getBoundingClientRect();
+      thirdPartySubmenuPosition = {
+        top: groupRect.top,
+        left: dropdownRect.right + 8
+      };
+    }
+  }
+  
+  // Chiudi il submenu quando si chiude il dropdown principale
+  $: if (!isModelDropdownOpen) {
+    isThirdPartySubmenuOpen = false;
+  }
   
   function toggleSettings() {
     isSettingsOpen.update(open => !open);
@@ -97,9 +144,23 @@
   
   // Chiudi dropdown quando si clicca fuori
   function handleClickOutside(event) {
-    if (!event.target.closest('.model-selector-wrapper') && !event.target.closest('.legacy-submenu')) {
-      isModelDropdownOpen = false;
+    // Ignora se il click è stato gestito dal toggle
+    if (clickHandled) {
+      return;
     }
+    
+    // Non chiudere se si clicca sul bottone del modello o sul dropdown
+    if (event.target.closest('.model-selector') || 
+        event.target.closest('.model-selector-wrapper') || 
+        event.target.closest('.model-dropdown') ||
+        event.target.closest('.third-party-submenu') ||
+        event.target.closest('.legacy-submenu')) {
+      return;
+    }
+    
+    // Chiudi il dropdown
+    isModelDropdownOpen = false;
+    isThirdPartySubmenuOpen = false;
   }
   
   // Aggiorna posizione quando la finestra viene ridimensionata o scrollata
@@ -143,10 +204,11 @@
       <button 
         class="model-selector" 
         bind:this={modelSelectorButton} 
-        on:click={toggleModelDropdown}
+        on:click|stopPropagation={toggleModelDropdown}
         aria-label="Seleziona modello AI"
         aria-expanded={isModelDropdownOpen}
         aria-haspopup="listbox"
+        type="button"
       >
         <span class="model-name">
           {#if $availableModels.find(m => m.id === $selectedModel)}
@@ -161,7 +223,7 @@
               </span>
             {/if}
           {:else}
-            Nebula AI 1.5
+            Flash Thinking
           {/if}
         </span>
         <svg class="dropdown-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -176,9 +238,14 @@
           role="listbox"
           aria-label="Lista modelli AI disponibili"
         >
-          {#each Object.entries(groupedModels) as [groupName, models]}
-            <div class="model-group-header">{groupName}</div>
-            {#each models as model}
+          {#if Object.keys(groupedModels).length === 0 && thirdPartyModels.length === 0}
+            <div class="model-option" style="padding: 12px; text-align: center; color: var(--md-sys-color-on-surface-variant);">
+              Nessun modello disponibile
+            </div>
+          {:else}
+            {#each Object.entries(groupedModels) as [groupName, models]}
+              <div class="model-group-header">{groupName}</div>
+              {#each models as model}
               <button 
                 class="model-option" 
                 class:selected={model.id === $selectedModel}
@@ -246,17 +313,81 @@
                   {#if model.description}
                     <div class="model-description">{model.description}</div>
                   {/if}
-                  {#if model.contextLength}
-                    <div class="model-context">Context: {Math.floor(model.contextLength / 1000)}K tokens</div>
-                  {/if}
                 </div>
                 {#if model.id === $selectedModel}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
+                  <div class="selected-indicator">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
                 {/if}
               </button>
+              {/each}
             {/each}
+            <!-- Sezione AI di terze parti con click -->
+            {#if thirdPartyModels.length > 0}
+            <div 
+              class="model-group-header third-party-header"
+              class:active={isThirdPartySubmenuOpen}
+              on:click={(e) => toggleThirdPartySubmenu(e)}
+            >
+              AI di terze parti
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 8px; transition: transform 0.2s;">
+                <polyline points="9 18 15 12 9 6" style="transform: {isThirdPartySubmenuOpen ? 'rotate(90deg)' : 'rotate(0deg)'};"/>
+              </svg>
+            </div>
+          {/if}
+          {/if}
+        </div>
+      {/if}
+      <!-- Tendina AI di terze parti -->
+      {#if isThirdPartySubmenuOpen && thirdPartyModels.length > 0}
+        <div 
+          class="third-party-submenu" 
+          bind:this={thirdPartySubmenuRef}
+          style="top: {thirdPartySubmenuPosition.top}px; left: {thirdPartySubmenuPosition.left}px;"
+        >
+          {#each thirdPartyModels as model}
+            <button 
+              class="model-option" 
+              class:selected={model.id === $selectedModel}
+              on:click={() => selectModel(model.id)}
+              role="option"
+              aria-selected={model.id === $selectedModel}
+            >
+              <div class="model-info">
+                <div class="model-name">
+                  {model.name}
+                  {#if model.vision}
+                    <span class="feature-badge vision-badge" title="Vision - Supporta analisi immagini">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      Vision
+                    </span>
+                  {/if}
+                  {#if model.reasoning}
+                    <span class="feature-badge reasoning-badge" title="Reasoning - Supporta ragionamento avanzato">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                      </svg>
+                      Reasoning
+                    </span>
+                  {/if}
+                </div>
+                {#if model.description}
+                  <div class="model-description">{model.description}</div>
+                {/if}
+              </div>
+              {#if model.id === $selectedModel}
+                <div class="selected-indicator">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+              {/if}
+            </button>
           {/each}
         </div>
       {/if}
@@ -366,16 +497,20 @@
   @media (max-width: 768px) {
     .top-bar {
       padding: 10px 12px;
-      height: 52px;
+      padding-top: calc(10px + env(safe-area-inset-top));
+      height: calc(52px + env(safe-area-inset-top));
+      min-height: 52px;
     }
 
     .menu-toggle {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 8px;
-      min-width: 40px;
-      min-height: 40px;
+      padding: 10px;
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
+      border-radius: 12px;
     }
 
     .logo-icon {
@@ -383,67 +518,95 @@
     }
 
     .left-section {
-      gap: 8px;
+      gap: 10px;
     }
 
     .model-selector {
-      padding: 6px 8px;
+      padding: 8px 12px;
+      min-height: 44px;
+      border-radius: 16px;
     }
 
     .model-name {
-      font-size: 13px;
-      max-width: 150px;
+      font-size: 14px;
+      max-width: 160px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-weight: 500;
     }
 
     .right-section {
-      gap: 8px;
+      gap: 6px;
     }
 
     .icon-button {
-      padding: 8px;
+      padding: 10px;
       min-width: 44px;
       min-height: 44px;
       touch-action: manipulation;
-    }
-    
-    .menu-toggle {
-      min-width: 44px;
-      min-height: 44px;
-      touch-action: manipulation;
+      border-radius: 12px;
     }
   }
 
   @media (max-width: 480px) {
     .top-bar {
       padding: 8px 10px;
-      height: 50px;
+      padding-top: calc(8px + env(safe-area-inset-top));
+      height: calc(50px + env(safe-area-inset-top));
+      min-height: 50px;
+    }
+
+    .model-selector {
+      padding: 6px 10px;
+      min-height: 40px;
     }
 
     .model-name {
-      max-width: 120px;
-      font-size: 12px;
+      max-width: 130px;
+      font-size: 13px;
+    }
+    
+    .icon-button {
+      padding: 8px;
+      min-width: 40px;
+      min-height: 40px;
+    }
+    
+    .menu-toggle {
+      padding: 8px;
+      min-width: 40px;
+      min-height: 40px;
     }
   }
 
   .model-selector-wrapper {
     position: relative;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1001 !important;
+    pointer-events: auto !important;
   }
 
   .model-selector {
-    display: flex;
+    display: flex !important;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     cursor: pointer;
-    padding: 8px 12px;
-    border-radius: var(--md-sys-shape-corner-medium);
-    transition: all var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+    padding: 10px 16px;
+    border-radius: var(--md-sys-shape-corner-large);
+    transition: all var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized);
     background: var(--md-sys-color-surface-container);
     border: 1px solid var(--md-sys-color-outline-variant);
     color: var(--md-sys-color-on-surface);
     box-shadow: var(--md-sys-elevation-level1);
+    font-weight: 500;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1001 !important;
+    pointer-events: auto !important;
   }
 
   @media (max-width: 768px) {
@@ -465,6 +628,12 @@
   .model-selector:hover {
     background-color: var(--md-sys-color-surface-container-high);
     box-shadow: var(--md-sys-elevation-level2);
+    transform: translateY(-1px);
+  }
+  
+  .model-selector:active {
+    transform: translateY(0);
+    box-shadow: var(--md-sys-elevation-level1);
   }
 
   .model-name {
@@ -475,20 +644,31 @@
   }
 
   .dropdown-icon {
-    color: var(--text-secondary);
+    color: var(--md-sys-color-on-surface-variant);
+    transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  }
+  
+  .model-selector[aria-expanded="true"] .dropdown-icon {
+    transform: rotate(180deg);
   }
 
   .model-dropdown {
-    position: fixed;
-    min-width: 280px;
+    position: fixed !important;
+    min-width: 240px;
     max-width: 90vw;
-    background-color: var(--md-sys-color-surface-container-high);
-    border: 1px solid var(--md-sys-color-outline-variant);
+    background-color: var(--md-sys-color-surface-container-highest) !important;
+    border: 1px solid var(--md-sys-color-outline-variant) !important;
     border-radius: var(--md-sys-shape-corner-medium);
-    box-shadow: var(--md-sys-elevation-level3);
-    overflow: visible;
-    z-index: 10000;
-    animation: dropdownSlideDown var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+    box-shadow: var(--md-sys-elevation-level4) !important;
+    overflow: hidden;
+    z-index: 10001 !important;
+    animation: dropdownSlideDown var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
+    backdrop-filter: blur(20px);
+    padding: 4px 0;
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: block !important;
+    pointer-events: auto !important;
   }
 
   @media (max-width: 768px) {
@@ -502,14 +682,63 @@
   }
   
   .model-group-header {
-    padding: 12px 16px 8px;
-    font-size: 12px;
+    padding: 8px 12px 6px;
+    font-size: 10px;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--md-sys-color-on-surface-variant);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 4px;
+    letter-spacing: 0.8px;
+    margin: 4px 0 2px;
+    position: relative;
+    font-family: var(--md-sys-typescale-label-small-font);
+  }
+  
+  .model-group-header:not(:first-child)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 12px;
+    right: 12px;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--md-sys-color-outline-variant) 20%,
+      var(--md-sys-color-outline-variant) 80%,
+      transparent
+    );
+  }
+  
+  .model-group-header.third-party-header {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+    border-radius: var(--md-sys-shape-corner-small);
+    margin: 4px 8px 2px;
+    padding: 8px 12px;
+    background: var(--md-sys-color-surface-container);
+  }
+  
+  .model-group-header.third-party-header:hover {
+    background-color: var(--md-sys-color-surface-container-high);
+  }
+  
+  .model-group-header.third-party-header.active {
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+  
+  .model-group-header.third-party-header svg {
+    transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+    color: var(--md-sys-color-primary);
+    width: 10px;
+    height: 10px;
+  }
+  
+  .model-group-header.third-party-header.active svg {
+    color: var(--md-sys-color-on-primary-container);
   }
   
   .legacy-submenu {
@@ -524,14 +753,28 @@
     animation: dropdownSlideRight 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
+  .third-party-submenu {
+    position: fixed;
+    min-width: 240px;
+    background-color: var(--md-sys-color-surface-container-highest);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-medium);
+    box-shadow: var(--md-sys-elevation-level5);
+    overflow: hidden;
+    z-index: 10001;
+    animation: dropdownSlideRight var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
+    backdrop-filter: blur(20px);
+    padding: 4px 0;
+  }
+  
   @keyframes dropdownSlideRight {
     from {
       opacity: 0;
-      transform: translateX(-10px);
+      transform: translateX(-12px) scale(0.96);
     }
     to {
       opacity: 1;
-      transform: translateX(0);
+      transform: translateX(0) scale(1);
     }
   }
   
@@ -546,7 +789,7 @@
   @keyframes dropdownSlideDown {
     from {
       opacity: 0;
-      transform: translateY(-10px) scale(0.95);
+      transform: translateY(-8px) scale(0.97);
     }
     to {
       opacity: 1;
@@ -559,21 +802,76 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 8px 12px;
     background: none;
     border: none;
     text-align: left;
     cursor: pointer;
-    transition: background-color 0.2s;
-    color: var(--text-primary);
+    transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+    color: var(--md-sys-color-on-surface);
+    margin: 1px 4px;
+    border-radius: var(--md-sys-shape-corner-small);
+    position: relative;
+  }
+  
+  .model-option::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 0;
+    background: var(--md-sys-color-primary);
+    border-radius: 0 1px 1px 0;
+    transition: height var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
   }
 
   .model-option:hover {
-    background-color: var(--hover-bg);
+    background-color: var(--md-sys-color-surface-container-high);
+  }
+  
+  .model-option:hover::before {
+    height: 50%;
   }
 
   .model-option.selected {
-    background-color: var(--bg-tertiary);
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+  }
+  
+  .model-option.selected::before {
+    height: 70%;
+    background: var(--md-sys-color-primary);
+  }
+  
+  .selected-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    animation: checkmarkAppear var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized);
+    flex-shrink: 0;
+  }
+  
+  .selected-indicator svg {
+    width: 12px;
+    height: 12px;
+  }
+  
+  @keyframes checkmarkAppear {
+    from {
+      opacity: 0;
+      transform: scale(0.5) rotate(-90deg);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+    }
   }
 
   .model-option.premium {
@@ -581,37 +879,62 @@
   }
 
   .model-option.disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
+    position: relative;
+  }
+  
+  .model-option.disabled::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--md-sys-color-surface-container);
+    opacity: 0.3;
+    border-radius: var(--md-sys-shape-corner-medium);
+    pointer-events: none;
   }
 
   .model-option.disabled:hover {
     background-color: transparent;
+    transform: none;
+  }
+  
+  .model-option.disabled:hover::before {
+    height: 0;
   }
 
   .model-info {
     flex: 1;
+    min-width: 0;
   }
 
   .model-info .model-name {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
+    font-family: var(--md-sys-typescale-body-medium-font);
     margin-bottom: 2px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    flex-wrap: wrap;
+    line-height: 1.3;
   }
 
   .premium-badge {
     display: inline-flex;
     align-items: center;
     padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
+    border-radius: var(--md-sys-shape-corner-extra-small);
+    font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    line-height: 1;
+    line-height: 1.1;
+    box-shadow: var(--md-sys-elevation-level1);
+    transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
   }
 
   .premium-badge.premium {
@@ -632,38 +955,45 @@
   .web-search-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 700;
+    gap: 3px;
+    padding: 2px 5px;
+    border-radius: var(--md-sys-shape-corner-extra-small);
+    font-size: 9px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1;
-    margin-left: 6px;
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
+    letter-spacing: 0.4px;
+    line-height: 1.1;
+    margin-left: 4px;
+    background: linear-gradient(135deg, rgba(79, 172, 254, 0.15) 0%, rgba(0, 242, 254, 0.15) 100%);
+    border: 1px solid rgba(79, 172, 254, 0.3);
+    color: #60a5fa;
   }
   
   .web-search-badge svg {
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
   }
   
   .limited-time-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 10px;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: var(--md-sys-shape-corner-extra-small);
+    font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.3px;
-    line-height: 1;
-    margin-left: 6px;
-    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-    color: #8b4513;
+    line-height: 1.1;
+    margin-left: 4px;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: #fbbf24;
     animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  .limited-time-badge svg {
+    width: 9px;
+    height: 9px;
   }
   
   .limited-time-badge svg {
@@ -701,16 +1031,30 @@
   .feature-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 700;
+    gap: 3px;
+    padding: 2px 5px;
+    border-radius: var(--md-sys-shape-corner-extra-small);
+    font-size: 9px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1;
-    margin-left: 6px;
-    color: white;
+    letter-spacing: 0.4px;
+    line-height: 1.1;
+    background: var(--md-sys-color-surface-container);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+    margin-left: 4px;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+  
+  .feature-badge svg {
+    width: 9px;
+    height: 9px;
+  }
+  
+  .model-option.selected .feature-badge {
+    background: var(--md-sys-color-primary-container);
+    border-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary-container);
   }
   
   .feature-badge svg {
@@ -719,15 +1063,21 @@
   }
   
   .vision-badge {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    border-color: rgba(102, 126, 234, 0.3);
+    color: #a78bfa;
   }
   
   .reasoning-badge {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.15) 0%, rgba(245, 87, 108, 0.15) 100%);
+    border-color: rgba(240, 147, 251, 0.3);
+    color: #f472b6;
   }
   
   .function-badge {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(135deg, rgba(79, 172, 254, 0.15) 0%, rgba(0, 242, 254, 0.15) 100%);
+    border-color: rgba(79, 172, 254, 0.3);
+    color: #60a5fa;
   }
   
   .model-context {
@@ -758,8 +1108,19 @@
   }
 
   .model-description {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 400;
+    font-family: var(--md-sys-typescale-body-medium-font);
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.4;
+    margin-top: 2px;
+    letter-spacing: 0;
+    opacity: 0.8;
+  }
+  
+  .model-option.selected .model-description {
+    color: var(--md-sys-color-on-primary-container);
+    opacity: 0.85;
   }
 
   .center-section {

@@ -1,8 +1,84 @@
 // Servizio di crittografia end-to-end per i messaggi delle chat
 // Usa Web Crypto API per crittografare i messaggi lato client
+// SICUREZZA: La chiave NON viene mai memorizzata in localStorage, solo in memoria temporanea
+
+// Cache temporanea della password in memoria (non in localStorage)
+// La password viene rimossa automaticamente dopo 5 minuti di inattività
+const passwordCache = new Map();
+const CACHE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minuti
+
+// Timeout per rimuovere la password dalla cache
+const passwordTimeouts = new Map();
+
+/**
+ * Memorizza temporaneamente la password in memoria (solo per questa sessione)
+ * @param {string} userId - ID dell'utente
+ * @param {string} password - Password dell'utente
+ */
+export function cachePassword(userId, password) {
+  // Rimuovi il timeout precedente se esiste
+  if (passwordTimeouts.has(userId)) {
+    clearTimeout(passwordTimeouts.get(userId));
+  }
+  
+  // Memorizza la password in cache
+  passwordCache.set(userId, password);
+  
+  // Rimuovi la password dalla cache dopo il timeout
+  const timeoutId = setTimeout(() => {
+    passwordCache.delete(userId);
+    passwordTimeouts.delete(userId);
+    console.log(`🔒 [ENCRYPTION] Password rimossa dalla cache per utente ${userId}`);
+  }, CACHE_TIMEOUT_MS);
+  
+  passwordTimeouts.set(userId, timeoutId);
+  console.log(`✅ [ENCRYPTION] Password memorizzata in cache per utente ${userId}`);
+}
+
+/**
+ * Ottiene la password dalla cache se disponibile
+ * @param {string} userId - ID dell'utente
+ * @returns {string|null} - Password o null se non disponibile
+ */
+export function getCachedPassword(userId) {
+  return passwordCache.get(userId) || null;
+}
+
+/**
+ * Rimuove la password dalla cache
+ * @param {string} userId - ID dell'utente
+ */
+export function clearCachedPassword(userId) {
+  passwordCache.delete(userId);
+  if (passwordTimeouts.has(userId)) {
+    clearTimeout(passwordTimeouts.get(userId));
+    passwordTimeouts.delete(userId);
+  }
+  console.log(`🔒 [ENCRYPTION] Password rimossa dalla cache per utente ${userId}`);
+}
+
+/**
+ * Richiede la password all'utente se non è in cache
+ * Questa funzione dovrebbe essere chiamata quando serve la password per decrittografare
+ * @param {string} userId - ID dell'utente
+ * @returns {Promise<string>} - Password dell'utente
+ * @throws {Error} - Se la password non è disponibile
+ */
+export async function requestPasswordIfNeeded(userId) {
+  // Se la password è già in cache, usala
+  const cachedPassword = getCachedPassword(userId);
+  if (cachedPassword) {
+    return cachedPassword;
+  }
+  
+  // Altrimenti, lancia un errore che dovrebbe essere gestito dall'UI
+  // L'UI dovrebbe mostrare un modal per richiedere la password
+  throw new Error('PASSWORD_REQUIRED');
+}
 
 /**
  * Deriva una chiave di crittografia dalla password dell'utente
+ * NON memorizza la chiave, la deriva sempre dalla password
  * @param {string} password - Password dell'utente
  * @param {string} userId - ID dell'utente (per salt unico)
  * @returns {Promise<CryptoKey>} - Chiave di crittografia
@@ -47,52 +123,102 @@ export async function deriveEncryptionKey(password, userId) {
 }
 
 /**
- * Genera una chiave di crittografia e la memorizza in modo sicuro
- * Questa funzione crea una chiave basata sulla password dell'utente
- * @param {string} password - Password dell'utente
+ * Deriva una chiave specifica per una chat dalla chiave master
+ * Questo permette di isolare le chat crittograficamente
+ * @param {CryptoKey} masterKey - Chiave master derivata dalla password
+ * @param {string} chatId - ID della chat
+ * @returns {Promise<CryptoKey>} - Chiave specifica per la chat
+ */
+export async function deriveChatKey(masterKey, chatId) {
+  try {
+    const encoder = new TextEncoder();
+    const chatIdBytes = encoder.encode(`chat-${chatId}`);
+    
+    // Esporta la chiave master come raw bytes
+    const masterKeyBytes = await crypto.subtle.exportKey('raw', masterKey);
+    
+    // Importa come materiale chiave per PBKDF2
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      masterKeyBytes,
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    
+    // Deriva una chiave specifica per questa chat
+    const chatKey = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: chatIdBytes,
+        iterations: 1, // Solo 1 iterazione per derivazione rapida (la sicurezza è già garantita dalla chiave master)
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      {
+        name: 'AES-GCM',
+        length: 256
+      },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    
+    return chatKey;
+  } catch (error) {
+    console.error('❌ [ENCRYPTION] Errore derivazione chiave chat:', error);
+    throw new Error('Errore nella derivazione della chiave per la chat');
+  }
+}
+
+/**
+ * Ottiene la chiave di crittografia per l'utente corrente
+ * Deriva sempre la chiave dalla password (non memorizza la chiave)
+ * @param {string} userId - ID dell'utente
+ * @param {string} password - Password dell'utente (opzionale, se non fornita cerca in cache)
+ * @returns {Promise<CryptoKey|null>} - Chiave di crittografia o null se non disponibile
+ */
+export async function getEncryptionKeyForUser(userId, password = null) {
+  try {
+    // Se la password non è fornita, prova a recuperarla dalla cache
+    if (!password) {
+      password = getCachedPassword(userId);
+      if (!password) {
+        console.warn('⚠️ [ENCRYPTION] Password non disponibile per utente', userId);
+        return null;
+      }
+    }
+    
+    // Deriva sempre la chiave dalla password (non memorizzarla)
+    const key = await deriveEncryptionKey(password, userId);
+    return key;
+  } catch (error) {
+    console.error('❌ [ENCRYPTION] Errore recupero chiave:', error);
+    return null;
+  }
+}
+
+/**
+ * Inizializza la crittografia per un utente dopo il login
+ * Memorizza la password in cache (non la chiave)
+ * @param {string} password - Password dell'utente (non memorizzata permanentemente)
  * @param {string} userId - ID dell'utente
  * @returns {Promise<CryptoKey>} - Chiave di crittografia
  */
-export async function getOrCreateEncryptionKey(password, userId) {
-  // Controlla se esiste già una chiave memorizzata
-  const storageKey = `encryption_key_${userId}`;
-  const storedKeyData = localStorage.getItem(storageKey);
+export async function initializeEncryption(password, userId) {
+  // Memorizza la password in cache (non la chiave)
+  cachePassword(userId, password);
   
-  if (storedKeyData) {
-    try {
-      // Prova a importare la chiave memorizzata
-      const keyData = JSON.parse(storedKeyData);
-      const key = await crypto.subtle.importKey(
-        'jwk',
-        keyData,
-        {
-          name: 'AES-GCM',
-          length: 256
-        },
-        false,
-        ['encrypt', 'decrypt']
-      );
-      return key;
-    } catch (error) {
-      console.warn('⚠️ [ENCRYPTION] Chiave memorizzata non valida, ne creo una nuova');
-      // Se la chiave memorizzata non è valida, ne crea una nuova
-    }
-  }
-  
-  // Deriva una nuova chiave dalla password
-  const key = await deriveEncryptionKey(password, userId);
-  
-  // Memorizza la chiave in formato JWK (solo per questa sessione)
-  // NOTA: In produzione, potresti voler memorizzare solo un hash della password
-  // e derivare la chiave ogni volta. Per ora, memorizziamo la chiave per comodità.
-  try {
-    const keyData = await crypto.subtle.exportKey('jwk', key);
-    localStorage.setItem(storageKey, JSON.stringify(keyData));
-  } catch (error) {
-    console.warn('⚠️ [ENCRYPTION] Impossibile memorizzare la chiave:', error);
-  }
-  
-  return key;
+  // Deriva e restituisce la chiave
+  return await deriveEncryptionKey(password, userId);
+}
+
+/**
+ * Rimuove la password dalla cache (logout)
+ * @param {string} userId - ID dell'utente
+ */
+export function clearEncryptionKey(userId) {
+  clearCachedPassword(userId);
+  console.log('🔒 [ENCRYPTION] Password rimossa dalla cache');
 }
 
 /**
@@ -186,87 +312,162 @@ export async function decryptMessage(encryptedMessage, key) {
 }
 
 /**
- * Crittografa un array di messaggi
+ * Crittografa un array di messaggi (parallelizzato per performance)
  * @param {Array} messages - Array di messaggi da crittografare
  * @param {CryptoKey} key - Chiave di crittografia
  * @returns {Promise<Array>} - Array di messaggi crittografati
  */
 export async function encryptMessages(messages, key) {
-  const encryptedMessages = [];
-  
-  for (const message of messages) {
+  // Parallelizza la crittografia per migliorare le performance
+  const encryptionPromises = messages.map(async (message) => {
     if (message.content && typeof message.content === 'string') {
       try {
         const encryptedContent = await encryptMessage(message.content, key);
-        encryptedMessages.push({
+        return {
           ...message,
           content: encryptedContent
-        });
+        };
       } catch (error) {
         console.error('❌ [ENCRYPTION] Errore crittografia messaggio:', error);
         // In caso di errore, mantieni il messaggio originale
-        encryptedMessages.push(message);
+        return message;
       }
     } else {
-      encryptedMessages.push(message);
+      return message;
     }
-  }
+  });
   
-  return encryptedMessages;
+  // Esegui tutte le crittografie in parallelo
+  return await Promise.all(encryptionPromises);
 }
 
 /**
- * Decrittografa un array di messaggi
+ * Decrittografa un array di messaggi (parallelizzato per performance)
  * @param {Array} messages - Array di messaggi crittografati
  * @param {CryptoKey} key - Chiave di crittografia
  * @returns {Promise<Array>} - Array di messaggi decrittografati
  */
 export async function decryptMessages(messages, key) {
-  const decryptedMessages = [];
-  
-  for (const message of messages) {
+  // Parallelizza la decrittografia per migliorare le performance
+  const decryptionPromises = messages.map(async (message) => {
     if (message.content && typeof message.content === 'string') {
       try {
         const decryptedContent = await decryptMessage(message.content, key);
-        decryptedMessages.push({
+        return {
           ...message,
           content: decryptedContent
-        });
+        };
       } catch (error) {
         console.error('❌ [ENCRYPTION] Errore decrittografia messaggio:', error);
         // In caso di errore, mantieni il messaggio originale
-        decryptedMessages.push(message);
+        return message;
       }
     } else {
-      decryptedMessages.push(message);
+      return message;
     }
-  }
+  });
   
-  return decryptedMessages;
+  // Esegui tutte le decrittografie in parallelo
+  return await Promise.all(decryptionPromises);
 }
 
 /**
- * Ottiene la chiave di crittografia per l'utente corrente
- * Questa funzione cerca di ottenere la chiave dalla password memorizzata
- * o dalla sessione corrente
- * @param {string} userId - ID dell'utente
- * @returns {Promise<CryptoKey|null>} - Chiave di crittografia o null se non disponibile
+ * Crittografa anche i metadati della chat (titolo, ecc.)
+ * @param {Object} chat - Oggetto chat con titolo e messaggi
+ * @param {CryptoKey} key - Chiave di crittografia
+ * @returns {Promise<Object>} - Chat con metadati crittografati
  */
-export async function getEncryptionKeyForUser(userId) {
-  try {
-    const storageKey = `encryption_key_${userId}`;
-    const storedKeyData = localStorage.getItem(storageKey);
-    
-    if (!storedKeyData) {
-      // Chiave non trovata - comportamento normale per nuovi utenti o utenti che non hanno ancora generato una chiave
-      // I messaggi verranno salvati in chiaro finché l'utente non genera una chiave
-      return null;
+export async function encryptChatMetadata(chat, key) {
+  const encryptedChat = { ...chat };
+  
+  // Crittografa il titolo se presente
+  if (chat.title && typeof chat.title === 'string' && !chat.title.startsWith('encrypted:')) {
+    try {
+      encryptedChat.title = await encryptMessage(chat.title, key);
+    } catch (error) {
+      console.error('❌ [ENCRYPTION] Errore crittografia titolo:', error);
+      // In caso di errore, mantieni il titolo originale
     }
+  }
+  
+  // Crittografa i messaggi se presenti
+  if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+    encryptedChat.messages = await encryptMessages(chat.messages, key);
+  }
+  
+  return encryptedChat;
+}
+
+/**
+ * Decrittografa anche i metadati della chat (titolo, ecc.)
+ * @param {Object} chat - Oggetto chat con metadati crittografati
+ * @param {CryptoKey} key - Chiave di crittografia
+ * @returns {Promise<Object>} - Chat con metadati decrittografati
+ */
+export async function decryptChatMetadata(chat, key) {
+  const decryptedChat = { ...chat };
+  
+  // Decrittografa il titolo se presente
+  if (chat.title && typeof chat.title === 'string' && chat.title.startsWith('encrypted:')) {
+    try {
+      decryptedChat.title = await decryptMessage(chat.title, key);
+    } catch (error) {
+      console.error('❌ [ENCRYPTION] Errore decrittografia titolo:', error);
+      // In caso di errore, mantieni il titolo originale
+    }
+  }
+  
+  // Decrittografa i messaggi se presenti
+  if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+    decryptedChat.messages = await decryptMessages(chat.messages, key);
+  }
+  
+  return decryptedChat;
+}
+
+/**
+ * Crea una chiave di recupero per i messaggi vecchi dopo il cambio password
+ * Questa funzione permette di mantenere l'accesso ai messaggi crittografati con la vecchia password
+ * @param {string} oldPassword - Vecchia password
+ * @param {string} newPassword - Nuova password
+ * @param {string} userId - ID dell'utente
+ * @returns {Promise<Object>} - Chiave di recupero crittografata con la nuova password
+ */
+export async function createRecoveryKey(oldPassword, newPassword, userId) {
+  try {
+    // Deriva la vecchia chiave
+    const oldKey = await deriveEncryptionKey(oldPassword, userId);
     
-    const keyData = JSON.parse(storedKeyData);
-    const key = await crypto.subtle.importKey(
-      'jwk',
-      keyData,
+    // Deriva la nuova chiave
+    const newKey = await deriveEncryptionKey(newPassword, userId);
+    
+    // Esporta la vecchia chiave come raw bytes
+    const oldKeyBytes = await crypto.subtle.exportKey('raw', oldKey);
+    
+    // Converti in base64 per memorizzazione
+    const oldKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(oldKeyBytes)));
+    
+    // Crittografa la vecchia chiave con la nuova password
+    // Usa un salt specifico per la chiave di recupero
+    const encoder = new TextEncoder();
+    const recoverySalt = encoder.encode(`recovery-key-${userId}`);
+    
+    const recoveryKeyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(newPassword),
+      'PBKDF2',
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+    
+    const recoveryKey = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: recoverySalt,
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      recoveryKeyMaterial,
       {
         name: 'AES-GCM',
         length: 256
@@ -275,37 +476,118 @@ export async function getEncryptionKeyForUser(userId) {
       ['encrypt', 'decrypt']
     );
     
-    return key;
+    // Crittografa la vecchia chiave con la chiave di recupero
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encryptedOldKey = await crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv
+      },
+      recoveryKey,
+      encoder.encode(oldKeyBase64)
+    );
+    
+    // Combina IV e dati crittografati
+    const combined = new Uint8Array(iv.length + encryptedOldKey.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(encryptedOldKey), iv.length);
+    
+    const recoveryKeyBase64 = btoa(String.fromCharCode(...combined));
+    
+    return {
+      encryptedOldKey: `recovery:${recoveryKeyBase64}`,
+      userId: userId
+    };
   } catch (error) {
-    console.error('❌ [ENCRYPTION] Errore recupero chiave:', error);
-    return null;
+    console.error('❌ [ENCRYPTION] Errore creazione chiave di recupero:', error);
+    throw new Error('Errore nella creazione della chiave di recupero');
   }
 }
 
 /**
- * Inizializza la crittografia per un utente dopo il login
- * Questa funzione dovrebbe essere chiamata dopo un login riuscito
- * @param {string} password - Password dell'utente (non memorizzata)
+ * Decrittografa la vecchia chiave usando la chiave di recupero
+ * @param {string} encryptedRecoveryKey - Chiave di recupero crittografata
+ * @param {string} newPassword - Nuova password
  * @param {string} userId - ID dell'utente
- * @returns {Promise<CryptoKey>} - Chiave di crittografia
+ * @returns {Promise<CryptoKey>} - Vecchia chiave di crittografia
  */
-export async function initializeEncryption(password, userId) {
-  return await getOrCreateEncryptionKey(password, userId);
+export async function decryptRecoveryKey(encryptedRecoveryKey, newPassword, userId) {
+  try {
+    if (!encryptedRecoveryKey.startsWith('recovery:')) {
+      throw new Error('Formato chiave di recupero non valido');
+    }
+    
+    // Deriva la chiave di recupero dalla nuova password
+    const encoder = new TextEncoder();
+    const recoverySalt = encoder.encode(`recovery-key-${userId}`);
+    
+    const recoveryKeyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(newPassword),
+      'PBKDF2',
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+    
+    const recoveryKey = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: recoverySalt,
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      recoveryKeyMaterial,
+      {
+        name: 'AES-GCM',
+        length: 256
+      },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    
+    // Decrittografa la vecchia chiave
+    const base64 = encryptedRecoveryKey.substring(9);
+    const binaryString = atob(base64);
+    const combined = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      combined[i] = binaryString.charCodeAt(i);
+    }
+    
+    const iv = combined.slice(0, 12);
+    const encryptedData = combined.slice(12);
+    
+    const decryptedOldKeyBase64 = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv
+      },
+      recoveryKey,
+      encryptedData
+    );
+    
+    // Converti da base64 a raw bytes
+    const oldKeyBase64 = new TextDecoder().decode(decryptedOldKeyBase64);
+    const oldKeyBinary = atob(oldKeyBase64);
+    const oldKeyBytes = new Uint8Array(oldKeyBinary.length);
+    for (let i = 0; i < oldKeyBinary.length; i++) {
+      oldKeyBytes[i] = oldKeyBinary.charCodeAt(i);
+    }
+    
+    // Importa la vecchia chiave
+    const oldKey = await crypto.subtle.importKey(
+      'raw',
+      oldKeyBytes,
+      {
+        name: 'AES-GCM',
+        length: 256
+      },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    
+    return oldKey;
+  } catch (error) {
+    console.error('❌ [ENCRYPTION] Errore decrittografia chiave di recupero:', error);
+    throw new Error('Errore nella decrittografia della chiave di recupero');
+  }
 }
-
-/**
- * Rimuove la chiave di crittografia dalla memoria locale (logout)
- * @param {string} userId - ID dell'utente
- */
-export function clearEncryptionKey(userId) {
-  const storageKey = `encryption_key_${userId}`;
-  localStorage.removeItem(storageKey);
-  console.log('🔒 [ENCRYPTION] Chiave di crittografia rimossa');
-}
-
-
-
-
-
-
-

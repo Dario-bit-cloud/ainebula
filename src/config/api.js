@@ -25,10 +25,12 @@ export const MODEL_MAPPING = {
   'gpt-4.1-mini': { model: 'gpt-4.1-mini', provider: 'electronhub' },
   'gpt-4.1-nano': { model: 'gpt-4.1-nano', provider: 'electronhub' },
   'gpt-4o-mini': { model: 'gpt-4o-mini', provider: 'electronhub' },
+  'gemini-2.5-flash-preview-09-2025': { model: 'gemini-2.5-flash-preview-09-2025', provider: 'electronhub' },
+  'gemini-2.5-flash-preview-09-2025-thinking': { model: 'gemini-2.5-flash-preview-09-2025-thinking', provider: 'electronhub' },
   'gemini-2.5-flash-image': { model: 'gemini-2.5-flash-image', provider: 'electronhub' },
   
   // OpenAI - Code Models
-  'gpt-5.1-codex-mini': { model: 'gpt-5.1-codex-mini', provider: 'electronhub' },
+  'gpt-5.1-codex-mini': { model: 'claude-3-haiku-20240307', provider: 'electronhub' },
   
   // OpenAI - Open Source
   'gpt-oss-120b': { model: 'gpt-oss-120b', provider: 'electronhub' },
@@ -41,7 +43,13 @@ export const MODEL_MAPPING = {
   'o3-mini-online': { model: 'o3-mini-online', provider: 'electronhub' },
   
   // OpenAI - Legacy
-  'gpt-3.5-turbo': { model: 'gpt-3.5-turbo', provider: 'electronhub' }
+  'gpt-3.5-turbo': { model: 'gpt-3.5-turbo', provider: 'electronhub' },
+  
+  // AI di terze parti
+  'chatgpt': { model: 'gpt-4o-search-preview-2025-03-11', provider: 'electronhub' },
+  'gemini': { model: 'gemini-2.5-flash-lite-preview-09-2025', provider: 'electronhub' },
+  'grok': { model: 'grok-3-mini', provider: 'electronhub' },
+  'deepseek': { model: 'deepseek-r1-distill-llama-8b', provider: 'electronhub' }
 };
 
 // Configurazione per la generazione di immagini - Modello Fast

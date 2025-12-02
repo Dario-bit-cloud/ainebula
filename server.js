@@ -82,7 +82,8 @@ app.use(compression({
   threshold: 1024 // Comprimi solo se la risposta è > 1KB
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Aumenta il limite per le immagini
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser()); // Middleware per leggere i cookie
 
 // Middleware per verificare l'autenticazione
@@ -1121,14 +1122,22 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
       // Elimina i messaggi esistenti per questa chat
       await sql`DELETE FROM messages WHERE chat_id = ${id}`;
       
-      // Inserisci i nuovi messaggi
-      for (const message of messages) {
-        if (!message.hidden) { // Salva solo i messaggi non nascosti
-          await sql`
+      // Filtra solo i messaggi non nascosti
+      const visibleMessages = messages.filter(msg => !msg.hidden);
+      
+      // Batch insert: inserisci tutti i messaggi in batch (molto più veloce del loop sequenziale)
+      if (visibleMessages.length > 0) {
+        // Inserisci in batch usando Promise.all per parallelizzare
+        // Questo è più veloce di un loop sequenziale ma mantiene la compatibilità
+        const insertPromises = visibleMessages.map(msg => 
+          sql`
             INSERT INTO messages (chat_id, type, content, hidden, timestamp)
-            VALUES (${id}, ${message.type}, ${message.content}, ${message.hidden || false}, ${message.timestamp || new Date().toISOString()})
-          `;
-        }
+            VALUES (${id}, ${msg.type}, ${msg.content}, ${msg.hidden || false}, ${msg.timestamp || new Date().toISOString()})
+          `
+        );
+        
+        // Esegui tutti gli insert in parallelo
+        await Promise.all(insertPromises);
       }
     }
     
@@ -2690,6 +2699,117 @@ setInterval(cleanupExpiredSharedLinks, 24 * 60 * 60 * 1000);
 
 // ==================== FINE JOB PULIZIA AUTOMATICA ====================
 
+// ==================== ENDPOINT UPLOAD IMMAGINI TEMPORANEE ====================
+
+// Store in-memory per immagini temporanee (per image-to-image)
+const tempImageStore = new Map();
+const IMAGE_TTL = 60 * 60 * 1000; // 1 ora
+
+// Endpoint per caricare un'immagine temporanea
+app.post('/api/image/upload', async (req, res) => {
+  try {
+    const { imageData } = req.body; // Base64 data URL
+    
+    if (!imageData || !imageData.startsWith('data:image/')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Formato immagine non valido. Fornire un data URL valido.'
+      });
+    }
+
+    // Genera un ID univoco per l'immagine
+    const imageId = randomBytes(16).toString('hex');
+    
+    // Estrai il tipo MIME e i dati base64
+    const matches = imageData.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+    if (!matches) {
+      return res.status(400).json({
+        success: false,
+        message: 'Formato data URL non valido'
+      });
+    }
+
+    const mimeType = matches[1];
+    const base64Data = matches[2];
+    
+    // Salva l'immagine nello store temporaneo
+    tempImageStore.set(imageId, {
+      mimeType,
+      base64Data,
+      timestamp: Date.now()
+    });
+
+    // Pulisci immagini vecchie (più di 1 ora)
+    const now = Date.now();
+    for (const [id, data] of tempImageStore.entries()) {
+      if (now - data.timestamp > IMAGE_TTL) {
+        tempImageStore.delete(id);
+      }
+    }
+
+    // Genera l'URL pubblico
+    const baseUrl = req.protocol + '://' + req.get('host');
+    const imageUrl = `${baseUrl}/api/image/${imageId}`;
+
+    res.json({
+      success: true,
+      imageUrl,
+      imageId
+    });
+  } catch (error) {
+    console.error('Errore upload immagine:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il caricamento dell\'immagine',
+      error: error.message
+    });
+  }
+});
+
+// Endpoint per servire l'immagine temporanea
+app.get('/api/image/:imageId', (req, res) => {
+  try {
+    const { imageId } = req.params;
+    const imageData = tempImageStore.get(imageId);
+
+    if (!imageData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Immagine non trovata o scaduta'
+      });
+    }
+
+    // Controlla se l'immagine è scaduta
+    const now = Date.now();
+    if (now - imageData.timestamp > IMAGE_TTL) {
+      tempImageStore.delete(imageId);
+      return res.status(404).json({
+        success: false,
+        message: 'Immagine scaduta'
+      });
+    }
+
+    // Converti base64 in buffer
+    const imageBuffer = Buffer.from(imageData.base64Data, 'base64');
+    
+    // Imposta gli header appropriati
+    res.setHeader('Content-Type', `image/${imageData.mimeType}`);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache per 1 ora
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error('Errore servizio immagine:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il recupero dell\'immagine',
+      error: error.message
+    });
+  }
+});
+
+// ==================== FINE ENDPOINT UPLOAD IMMAGINI ====================
+
 app.listen(PORT, () => {
   if (isDevelopment) {
     log('\n' + '='.repeat(60));
@@ -2721,6 +2841,8 @@ app.listen(PORT, () => {
     log(`   POST /api/user/subscription - Crea/aggiorna abbonamento`);
     log(`   DELETE /api/user/subscription/:id - Cancella abbonamento`);
     log(`   GET  /api/user/payments - Ottieni storico pagamenti`);
+    log(`   POST /api/image/upload - Carica immagine temporanea`);
+    log(`   GET  /api/image/:imageId - Ottieni immagine temporanea`);
     log('\n' + '='.repeat(60));
     log('✅ Server pronto a ricevere richieste\n');
   } else {

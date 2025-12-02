@@ -30,7 +30,7 @@ export const tokenInfo = derived(
       const allowsPremiumFeatures = selectedModelData?.allowsPremiumFeatures || false;
       const hasPremium = (isPremiumModel && hasActiveSubscription()) || (allowsPremiumFeatures && isGeminiFlash);
       const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel || isGeminiFlash;
-      const isNebula15 = $selectedModel === 'gpt-4o-mini';
+      const isNebula15 = $selectedModel === 'gemini-2.5-flash-preview-09-2025-thinking';
       const isRegistered = $isAuthenticatedStore;
       
       let maxTokens;
@@ -70,7 +70,7 @@ export const tokenInfo = derived(
       const allowsPremiumFeatures = selectedModelData?.allowsPremiumFeatures || false;
       const hasPremium = (isPremiumModel && hasActiveSubscription()) || (allowsPremiumFeatures && isGeminiFlash);
       const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel || isGeminiFlash;
-      const isNebula15 = $selectedModel === 'gpt-4o-mini';
+      const isNebula15 = $selectedModel === 'gemini-2.5-flash-preview-09-2025-thinking';
       const isRegistered = $isAuthenticatedStore;
       
       let maxTokens;

@@ -4,9 +4,21 @@ import { writable } from 'svelte/store';
 export const availableModels = writable([
   // ========== NEBULA - GRATUITI ==========
   {
-    id: 'gpt-4o-mini',
-    name: 'Nebula 4o-mini',
-    description: 'Modello versatile e avanzato. Supporta testo e immagini, ideale per la maggior parte delle conversazioni quotidiane.',
+    id: 'gemini-2.5-flash-preview-09-2025',
+    name: 'Flash',
+    description: 'Perfetto per conversazioni quotidiane. Supporta testo e immagini.',
+    group: 'Nebula AI',
+    premium: false,
+    webSearch: false,
+    vision: true,
+    functionCall: true,
+    reasoning: false,
+    contextLength: 128000
+  },
+  {
+    id: 'gemini-2.5-flash-preview-09-2025-thinking',
+    name: 'Flash Thinking',
+    description: 'Flash con modalità thinking abilitata. Mostra il ragionamento interno.',
     group: 'Nebula AI',
     premium: false,
     webSearch: false,
@@ -17,8 +29,8 @@ export const availableModels = writable([
   },
   {
     id: 'gemini-2.5-flash-image',
-    name: 'Nebula Gemini 2.5 Flash Image',
-    description: 'Modello reasoning ottimizzato per STEM, matematica e coding. Eccelle in problem solving complessi e analisi approfondite.',
+    name: 'Imagenerator',
+    description: 'Ideale per matematica, scienze e programmazione. Risolve problemi complessi.',
     group: 'Nebula AI',
     premium: false,
     allowsPremiumFeatures: true,
@@ -31,8 +43,8 @@ export const availableModels = writable([
   },
   {
     id: 'gpt-5.1-codex-mini',
-    name: 'Nebula Codex Mini',
-    description: 'Modello specializzato per coding e software engineering. Eccelle in programmazione, debugging e sviluppo software. 400K token context window.',
+    name: 'Codex',
+    description: 'Specializzato per programmazione e sviluppo software.',
     group: 'Nebula AI',
     premium: false,
     webSearch: false,
@@ -43,8 +55,8 @@ export const availableModels = writable([
   },
   {
     id: 'gpt-4o-search-preview-2025-03-11',
-    name: 'Nebula 4o Search',
-    description: 'Modello specializzato per ricerca web in tempo reale. Addestrato per comprendere ed eseguire query di ricerca web, ideale per informazioni aggiornate.',
+    name: 'Surfer',
+    description: 'Cerca informazioni aggiornate su internet in tempo reale.',
     group: 'Nebula AI',
     premium: false,
     webSearch: true,
@@ -57,8 +69,8 @@ export const availableModels = writable([
   // ========== NEBULA - PREMIUM ==========
   {
     id: 'gpt-4.1',
-    name: 'Nebula 4.1',
-    description: 'Flagship model per istruzioni avanzate, software engineering e ragionamento a lungo contesto. 1M token context window.',
+    name: '4.1',
+    description: 'Il modello più avanzato per compiti complessi e conversazioni lunghe.',
     group: 'Nebula Premium',
     premium: true,
     requiredPlan: 'pro',
@@ -70,8 +82,8 @@ export const availableModels = writable([
   },
   {
     id: 'o3',
-    name: 'Nebula o3',
-    description: 'Il modello reasoning più potente. Eccelle in matematica, scienza, coding e ragionamento visivo. Massima precisione e capacità analitiche.',
+    name: 'o3',
+    description: 'Il modello più potente per matematica, scienze e ragionamento complesso.',
     group: 'Nebula Premium',
     premium: true,
     requiredPlan: 'max',
@@ -80,10 +92,60 @@ export const availableModels = writable([
     functionCall: true,
     reasoning: true,
     contextLength: 200000
+  },
+  
+  // ========== AI DI TERZE PARTI ==========
+  {
+    id: 'chatgpt',
+    name: 'ChatGPT',
+    description: 'Modello AI di OpenAI per conversazioni e assistenza.',
+    group: 'AI di terze parti',
+    premium: false,
+    webSearch: false,
+    vision: false,
+    functionCall: false,
+    reasoning: false,
+    contextLength: 128000
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    description: 'Modello AI di Google per compiti complessi.',
+    group: 'AI di terze parti',
+    premium: false,
+    webSearch: false,
+    vision: true,
+    functionCall: false,
+    reasoning: false,
+    contextLength: 128000
+  },
+  {
+    id: 'grok',
+    name: 'Grok',
+    description: 'Modello AI di xAI per conversazioni avanzate.',
+    group: 'AI di terze parti',
+    premium: false,
+    webSearch: false,
+    vision: false,
+    functionCall: false,
+    reasoning: false,
+    contextLength: 128000
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    description: 'Modello AI per coding e ragionamento.',
+    group: 'AI di terze parti',
+    premium: false,
+    webSearch: false,
+    vision: false,
+    functionCall: false,
+    reasoning: true,
+    contextLength: 128000
   }
 ]);
 
-export const selectedModel = writable('gpt-4o-mini');
+export const selectedModel = writable('gemini-2.5-flash-preview-09-2025');
 
 export function setModel(modelId) {
   selectedModel.set(modelId);
