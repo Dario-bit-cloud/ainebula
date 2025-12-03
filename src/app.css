@@ -2,6 +2,10 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  /* Disabilita il menu contestuale del browser */
+  -webkit-touch-callout: none;
+  -webkit-user-select: text; /* Permetti selezione testo ma disabilita menu */
+  user-select: text;
 }
 
 /* Nascondi tutte le scrollbar ma mantieni la funzionalità di scroll */
@@ -232,9 +236,14 @@ button, a, input, select, textarea {
 
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  /* Faster transitions on mobile */
+  /* Faster transitions on mobile - ancora più veloci */
   button, a, input, select, textarea {
-    transition: all var(--transition-fast);
+    transition: all 100ms ease-out; /* Più veloce di var(--transition-fast) */
+  }
+  
+  /* Disabilita animazioni complesse su mobile */
+  * {
+    animation-duration: 0.2s !important; /* Limita durata animazioni */
   }
   
   /* Optimize touch scrolling */
@@ -243,10 +252,10 @@ button, a, input, select, textarea {
     overflow-scrolling: touch;
   }
   
-  /* Touch target sizes - minimo 44x44px per accessibilità */
+  /* Touch target sizes - ottimizzato per mobile (40px invece di 44px per più spazio) */
   button, a, input[type="button"], input[type="submit"], .clickable {
-    min-height: 44px;
-    min-width: 44px;
+    min-height: 40px;
+    min-width: 40px;
     touch-action: manipulation; /* Riduce delay tap su mobile */
   }
   
@@ -291,12 +300,14 @@ button, a, input, select, textarea {
     filter: none !important; /* Rimuovi filtri pesanti su mobile */
   }
   
-  /* Backdrop filter solo se supportato e performante */
-  @supports (backdrop-filter: blur(10px)) {
-    .ios-device * {
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
+  /* DISABILITATO backdrop-filter su mobile - troppo pesante per performance */
+  /* Usa solo background-color solido per modals */
+  .modal-backdrop,
+  [class*="modal-backdrop"],
+  [class*="modal-overlay"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(0, 0, 0, 0.75) !important; /* Più opaco per compensare */
   }
   
   /* Miglioramenti viewport e layout */
@@ -333,10 +344,10 @@ button, a, input, select, textarea {
     font-size: 14px;
   }
   
-  /* Touch targets ancora più grandi su schermi piccoli */
+  /* Touch targets ottimizzati su schermi piccoli (40px invece di 48px) */
   button, a, input[type="button"], input[type="submit"], .clickable {
-    min-height: 48px;
-    min-width: 48px;
+    min-height: 40px;
+    min-width: 40px;
   }
 }
 
@@ -350,18 +361,18 @@ button, a, input, select, textarea {
 
 /* Ottimizzazioni generali modals su mobile */
 @media (max-width: 768px) {
-  /* Modal backdrop ottimizzato */
+  /* Modal backdrop ottimizzato - NO BLUR per performance mobile */
   .modal-backdrop,
   [class*="modal-backdrop"],
   [class*="modal-overlay"] {
     padding: 0;
     align-items: flex-end;
-    background-color: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background-color: rgba(0, 0, 0, 0.75) !important; /* Più opaco senza blur */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
   
-  /* Modal content fullscreen su mobile */
+  /* Modal content fullscreen su mobile - ottimizzato */
   .modal-content,
   [class*="modal-content"],
   [class*="modal"] {
@@ -369,54 +380,57 @@ button, a, input, select, textarea {
     width: 100% !important;
     max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
     height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
-    border-radius: 20px 20px 0 0 !important;
+    border-radius: 16px 16px 0 0 !important; /* Ridotto da 20px a 16px */
     margin: 0 !important;
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.4) !important; /* Ombra più semplice */
   }
   
-  /* Modal header con safe area */
+  /* Modal header con safe area - padding ridotto */
   .modal-header,
   [class*="modal-header"] {
-    padding-top: calc(16px + env(safe-area-inset-top)) !important;
+    padding-top: calc(12px + env(safe-area-inset-top)) !important; /* Ridotto da 16px */
     padding-left: env(safe-area-inset-left) !important;
     padding-right: env(safe-area-inset-right) !important;
+    padding-bottom: 12px !important; /* Aggiunto padding bottom */
   }
   
-  /* Modal body con safe area */
+  /* Modal body con safe area - padding ridotto */
   .modal-body,
   [class*="modal-body"] {
-    padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important; /* Ridotto da 20px */
     padding-left: env(safe-area-inset-left) !important;
     padding-right: env(safe-area-inset-right) !important;
+    padding-top: 12px !important; /* Aggiunto padding top */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
   
-  /* Close button ottimizzato */
+  /* Close button ottimizzato - dimensioni ridotte */
   .close-button,
   [class*="close-button"],
   [class*="modal-close"] {
-    min-width: 44px !important;
-    min-height: 44px !important;
+    min-width: 40px !important; /* Ridotto da 44px */
+    min-height: 40px !important; /* Ridotto da 44px */
     touch-action: manipulation;
-    border-radius: 12px;
+    border-radius: 10px; /* Ridotto da 12px */
   }
   
-  /* Input fields nei modals */
+  /* Input fields nei modals - dimensioni ottimizzate */
   .modal-content input,
   .modal-content textarea,
   .modal-content select {
     font-size: 16px !important; /* Previene zoom su iOS */
-    min-height: 48px !important;
-    padding: 14px 16px !important;
+    min-height: 44px !important; /* Ridotto da 48px */
+    padding: 12px 14px !important; /* Ridotto da 14px 16px */
   }
   
-  /* Buttons nei modals */
+  /* Buttons nei modals - dimensioni ottimizzate */
   .modal-content button:not(.close-button) {
-    min-height: 48px !important;
+    min-height: 44px !important; /* Ridotto da 48px */
     touch-action: manipulation;
     font-size: 15px !important;
+    padding: 10px 16px !important; /* Aggiunto padding esplicito */
   }
 }
 

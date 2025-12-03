@@ -352,4 +352,67 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  @media (max-width: 768px) {
+    .modal-backdrop {
+      padding: 0;
+      align-items: flex-end;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .modal-content {
+      max-width: 100% !important;
+      width: 100% !important;
+      max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+      height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+      border-radius: 20px 20px 0 0 !important;
+      margin: 0 !important;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3) !important;
+      animation: modalSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .modal-header {
+      padding: calc(16px + env(safe-area-inset-top)) env(safe-area-inset-left) 16px env(safe-area-inset-right) !important;
+    }
+
+    .modal-body {
+      padding: 16px env(safe-area-inset-left) calc(16px + env(safe-area-inset-bottom)) env(safe-area-inset-right) !important;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    .modal-footer {
+      padding: 16px env(safe-area-inset-left) calc(16px + env(safe-area-inset-bottom)) env(safe-area-inset-right) !important;
+      flex-direction: column-reverse;
+      gap: 10px;
+    }
+
+    .cancel-button,
+    .create-button {
+      width: 100%;
+      min-height: 48px !important;
+      font-size: 15px !important;
+      touch-action: manipulation;
+    }
+
+    input, textarea {
+      font-size: 16px !important;
+      min-height: 48px !important;
+      padding: 14px 16px !important;
+    }
+  }
 </style>

@@ -52,6 +52,11 @@
   let showMobileActionsMenu = false;
   let mobileActionsRef;
   
+  // Lazy loading messaggi per performance mobile
+  let visibleMessageIndices = new Set();
+  let intersectionObserver = null;
+  const MESSAGE_VIEWPORT_MARGIN = 5; // Carica 5 messaggi prima e dopo la viewport
+  
   // Verifica se il modello selezionato supporta web search
   $: currentModel = $availableModels.find(m => m.id === $selectedModel);
   $: hasWebSearch = currentModel?.webSearch || false;
@@ -135,6 +140,20 @@
   // Filtra i messaggi nascosti per la visualizzazione
   $: visibleMessages = messages.filter(msg => !msg.hidden);
   
+  // Su mobile, mostra solo i messaggi visibili per performance (lazy loading)
+  // Su desktop o con pochi messaggi, mostra tutto
+  $: optimizedVisibleMessages = (() => {
+    if (!$isMobile || visibleMessages.length <= 20) {
+      return visibleMessages;
+    }
+    // Su mobile con molti messaggi, mostra solo quelli visibili + ultimi 5
+    const lastMessagesCount = 5;
+    const lastMessagesStart = Math.max(0, visibleMessages.length - lastMessagesCount);
+    return visibleMessages.filter((msg, idx) => 
+      visibleMessageIndices.has(idx) || idx >= lastMessagesStart
+    );
+  })();
+  
   // Usa derived store per token info (ottimizzato)
   $: {
     const info = $tokenInfo;
@@ -173,6 +192,16 @@
   afterUpdate(() => {
     if (messagesContainer) {
       initCodeCopyButtons(messagesContainer);
+      
+      // Su mobile, aggiorna Intersection Observer per lazy loading
+      if ($isMobile && visibleMessages.length > 20 && intersectionObserver) {
+        const messageElements = messagesContainer.querySelectorAll('[data-message-index]');
+        messageElements.forEach(el => {
+          // Rimuovi osservazioni precedenti e riosserva
+          intersectionObserver.unobserve(el);
+          intersectionObserver.observe(el);
+        });
+      }
     }
   });
 
@@ -298,8 +327,74 @@
         if (messagesContainer) {
           scrollToBottom();
         }
+        // Su mobile, inizializza lazy loading
+        if ($isMobile && messagesContainer) {
+          initializeLazyLoading();
+        }
       }
     });
+    
+    // Inizializza lazy loading su mobile
+    function initializeLazyLoading() {
+      if (!$isMobile || !messagesContainer) return;
+      
+      // Reset visible indices - mostra sempre gli ultimi messaggi
+      const totalMessages = visibleMessages.length;
+      visibleMessageIndices = new Set();
+      
+      // Mostra sempre gli ultimi 10 messaggi
+      for (let i = Math.max(0, totalMessages - 10); i < totalMessages; i++) {
+        visibleMessageIndices.add(i);
+      }
+      
+      // Crea Intersection Observer per lazy loading
+      if (intersectionObserver) {
+        intersectionObserver.disconnect();
+      }
+      
+      intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const index = parseInt(entry.target.dataset.messageIndex);
+              if (!isNaN(index)) {
+                visibleMessageIndices.add(index);
+                // Carica anche i messaggi vicini
+                for (let i = Math.max(0, index - MESSAGE_VIEWPORT_MARGIN); 
+                     i <= Math.min(totalMessages - 1, index + MESSAGE_VIEWPORT_MARGIN); 
+                     i++) {
+                  visibleMessageIndices.add(i);
+                }
+                // Trigger reactivity
+                visibleMessageIndices = new Set(visibleMessageIndices);
+              }
+            }
+          });
+        },
+        {
+          root: messagesContainer,
+          rootMargin: '200px', // Carica messaggi 200px prima/dopo la viewport
+          threshold: 0.1
+        }
+      );
+      
+      // Osserva i messaggi già renderizzati
+      tick().then(() => {
+        if (messagesContainer) {
+          const messageElements = messagesContainer.querySelectorAll('[data-message-index]');
+          messageElements.forEach(el => intersectionObserver.observe(el));
+        }
+      });
+    }
+    
+    // Inizializza lazy loading se siamo su mobile
+    if ($isMobile) {
+      tick().then(() => {
+        if (messagesContainer) {
+          initializeLazyLoading();
+        }
+      });
+    }
     
     // Monitor scroll per mostrare/nascondere pulsante scroll to top
     // Usa afterUpdate per assicurarsi che messagesContainer sia disponibile
@@ -398,6 +493,11 @@
           window.removeEventListener('resize', keyboardHandlers.handleViewportResize);
         }
       }
+      // Cleanup Intersection Observer
+      if (intersectionObserver) {
+        intersectionObserver.disconnect();
+        intersectionObserver = null;
+      }
       if (unsubscribe) unsubscribe();
     };
   });
@@ -418,9 +518,11 @@
   }
   
   // Throttled scroll per performance durante streaming
+  // Su mobile, throttle più aggressivo per migliori performance
+  const scrollThrottleDelay = get(isMobile) ? 200 : 100;
   const throttledScrollToBottom = throttle(() => {
     scrollToBottom(false);
-  }, 100); // Max una volta ogni 100ms
+  }, scrollThrottleDelay);
   
   // Batch DOM updates durante streaming per migliorare le performance
   let pendingUpdate = null;
@@ -576,11 +678,17 @@
       addMessage(chatId, userMessage);
       const messageText = inputValue.trim();
       
+      // Reset input immediatamente per feedback visivo veloce
       inputValue = '';
       attachedImages = [];
       
-      await tick();
-      scrollToBottom();
+      // Non aspettare tick su mobile - più veloce
+      if (get(isMobile)) {
+        scrollToBottom();
+      } else {
+        await tick();
+        scrollToBottom();
+      }
       
       isGenerating.set(true);
       
@@ -640,7 +748,10 @@
           // Aggiorna il messaggio in tempo reale SENZA normalizzazione (più veloce)
           // skipSave = true per evitare salvataggi durante lo streaming
           updateMessage(chatId, messageIndex, { content: fullResponse }, true);
-          await tick();
+          // Su mobile, riduci tick per performance
+          if (!get(isMobile)) {
+            await tick();
+          }
           throttledScrollToBottom(); // Scroll throttled per performance
         }
         
@@ -1708,12 +1819,13 @@
       </div>
     {/if}
     
-    {#each visibleMessages as message, index (message.id || index)}
+    {#each optimizedVisibleMessages as message, index (message.id || index)}
       <div 
         class="message" 
         class:user-message={message.type === 'user'} 
         class:ai-message={message.type === 'ai'}
         class:highlighted={highlightedMessageIndex === index && searchQuery}
+        data-message-index={index}
       >
         {#if message.images && message.images.length > 0}
           <div class="message-images">
@@ -1753,7 +1865,7 @@
           on:edit={() => handleEditMessage(index)}
           on:regenerate={() => {
             // Trova il messaggio utente precedente nell'array messages completo
-            const currentMessage = visibleMessages[index];
+            const currentMessage = optimizedVisibleMessages[index];
             const messageId = currentMessage?.id;
             if (messageId) {
               const messageIndexInFull = messages.findIndex(m => m.id === messageId);
@@ -1770,7 +1882,7 @@
           }}
           on:moreDetailed={() => {
             // Trova il messaggio utente precedente nell'array messages completo
-            const currentMessage = visibleMessages[index];
+            const currentMessage = optimizedVisibleMessages[index];
             const messageId = currentMessage?.id;
             if (messageId) {
               const messageIndexInFull = messages.findIndex(m => m.id === messageId);
@@ -1787,7 +1899,7 @@
           }}
           on:moreSimple={() => {
             // Trova il messaggio utente precedente nell'array messages completo
-            const currentMessage = visibleMessages[index];
+            const currentMessage = optimizedVisibleMessages[index];
             const messageId = currentMessage?.id;
             if (messageId) {
               const messageIndexInFull = messages.findIndex(m => m.id === messageId);
@@ -2524,6 +2636,13 @@
     min-height: 0;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+  }
+  
+  @media (max-width: 768px) {
+    .messages-container {
+      padding: 16px 12px; /* Ridotto drasticamente da 40px */
+      gap: 16px; /* Ridotto da 24px */
+    }
   }
   
   .message.highlighted {
@@ -4074,11 +4193,11 @@
     position: relative;
   }
   
-  .mobile-menu-button {
-    min-width: 44px;
-    min-height: 44px;
-    touch-action: manipulation;
-  }
+    .mobile-menu-button {
+      min-width: 40px; /* Ridotto da 44px */
+      min-height: 40px; /* Ridotto da 44px */
+      touch-action: manipulation;
+    }
   
   .mobile-actions-menu {
     position: absolute;
@@ -4101,7 +4220,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
+    padding: 10px 14px; /* Ridotto da 12px 16px */
     background: none;
     border: none;
     color: var(--text-primary);
@@ -4109,7 +4228,7 @@
     border-radius: 8px;
     font-size: 14px;
     transition: all 0.2s;
-    min-height: 48px;
+    min-height: 40px; /* Ridotto da 48px */
     touch-action: manipulation;
     text-align: left;
     width: 100%;
@@ -4157,10 +4276,10 @@
     }
     
     .chat-icon-button {
-      width: 44px;
-      height: 44px;
-      min-width: 44px;
-      min-height: 44px;
+      width: 40px; /* Ridotto da 44px */
+      height: 40px; /* Ridotto da 44px */
+      min-width: 40px; /* Ridotto da 44px */
+      min-height: 40px; /* Ridotto da 44px */
       touch-action: manipulation;
     }
     
@@ -4201,11 +4320,11 @@
     
     .send-button,
     .stop-button {
-      width: 44px;
-      height: 44px;
-      min-width: 44px;
-      min-height: 44px;
-      padding: 10px;
+      width: 40px; /* Ridotto da 44px */
+      height: 40px; /* Ridotto da 44px */
+      min-width: 40px; /* Ridotto da 44px */
+      min-height: 40px; /* Ridotto da 44px */
+      padding: 8px; /* Ridotto da 10px */
       touch-action: manipulation;
     }
     
@@ -4827,65 +4946,238 @@
   /* Stili per i blocchi di codice con pulsante copia */
   .message-content :global(.code-block-wrapper) {
     position: relative;
-    margin: 12px 0;
-    border-radius: 8px;
+    margin: 16px 0;
+    border-radius: 12px;
     overflow: hidden;
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: #1e1e1e; /* Colore di sfondo simile a VS Code Dark */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+  }
+  
+  .message-content :global(.code-block-wrapper:hover) {
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
   
   .message-content :global(.code-block-wrapper pre) {
     margin: 0;
     border-radius: 0;
+    padding: 16px;
+    overflow-x: auto;
+    background: transparent !important;
+  }
+  
+  .message-content :global(.code-block-wrapper code) {
+    font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    background: transparent !important;
+  }
+  
+  /* Assicura che i colori di highlight.js siano visibili e non sovrascritti */
+  .message-content :global(.code-block-wrapper pre code.hljs) {
+    background: transparent !important;
+    padding: 0;
+    display: block;
+    overflow-x: auto;
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs) {
+    background: transparent !important;
+    color: #d4d4d4 !important; /* Colore di base testo VS Code Dark */
+  }
+  
+  /* Colori VS Code Dark per syntax highlighting - più fedeli e visibili */
+  .message-content :global(.code-block-wrapper .hljs-keyword),
+  .message-content :global(.code-block-wrapper .hljs-selector-tag),
+  .message-content :global(.code-block-wrapper .hljs-built_in),
+  .message-content :global(.code-block-wrapper .hljs-name),
+  .message-content :global(.code-block-wrapper .hljs-tag),
+  .message-content :global(.code-block-wrapper .hljs-selector-id),
+  .message-content :global(.code-block-wrapper .hljs-selector-class) {
+    color: #569cd6 !important; /* Blu per keyword */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-string),
+  .message-content :global(.code-block-wrapper .hljs-title),
+  .message-content :global(.code-block-wrapper .hljs-section),
+  .message-content :global(.code-block-wrapper .hljs-attribute),
+  .message-content :global(.code-block-wrapper .hljs-literal),
+  .message-content :global(.code-block-wrapper .hljs-template-tag),
+  .message-content :global(.code-block-wrapper .hljs-template-variable),
+  .message-content :global(.code-block-wrapper .hljs-type),
+  .message-content :global(.code-block-wrapper .hljs-addition),
+  .message-content :global(.code-block-wrapper .hljs-regexp),
+  .message-content :global(.code-block-wrapper .hljs-link) {
+    color: #ce9178 !important; /* Arancione per stringhe */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-comment),
+  .message-content :global(.code-block-wrapper .hljs-quote),
+  .message-content :global(.code-block-wrapper .hljs-deletion),
+  .message-content :global(.code-block-wrapper .hljs-meta) {
+    color: #6a9955 !important; /* Verde per commenti */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-number),
+  .message-content :global(.code-block-wrapper .hljs-symbol) {
+    color: #b5cea8 !important; /* Verde chiaro per numeri */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-function),
+  .message-content :global(.code-block-wrapper .hljs-title.function_),
+  .message-content :global(.code-block-wrapper .hljs-title.class_),
+  .message-content :global(.code-block-wrapper .hljs-class .hljs-title) {
+    color: #dcdcaa !important; /* Giallo per funzioni */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-variable),
+  .message-content :global(.code-block-wrapper .hljs-params),
+  .message-content :global(.code-block-wrapper .hljs-attr) {
+    color: #9cdcfe !important; /* Azzurro chiaro per variabili */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-property) {
+    color: #92c5f7 !important; /* Azzurro per proprietà */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-operator),
+  .message-content :global(.code-block-wrapper .hljs-punctuation) {
+    color: #d4d4d4 !important; /* Grigio per operatori */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-constant) {
+    color: #4fc1ff !important; /* Azzurro per costanti */
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-doctag),
+  .message-content :global(.code-block-wrapper .hljs-strong) {
+    color: #569cd6 !important; /* Blu per doctag */
+    font-weight: bold;
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-emphasis) {
+    font-style: italic;
+  }
+  
+  .message-content :global(.code-block-wrapper .hljs-strong) {
+    font-weight: bold;
+  }
+  
+  /* Supporto per tema chiaro - Colori VS Code Light */
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs) {
+    color: #1e1e1e; /* Colore di base testo VS Code Light */
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-keyword),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-selector-tag),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-built_in),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-name),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-tag) {
+    color: #0000ff; /* Blu per keyword */
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-string),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-title),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-section),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-attribute),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-literal),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-template-tag),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-template-variable),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-type),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-addition) {
+    color: #a31515; /* Rosso scuro per stringhe */
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-comment),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-quote),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-deletion),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-meta) {
+    color: #008000; /* Verde per commenti */
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-number),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-symbol) {
+    color: #098658; /* Verde per numeri */
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-function),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-title.function_) {
+    color: #795e26; /* Marrone per funzioni */
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-variable),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-params) {
+    color: #001080; /* Blu scuro per variabili */
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-property),
+  body[data-theme="light"] .message-content :global(.code-block-wrapper .hljs-attr) {
+    color: #0451a5; /* Blu per proprietà */
+  }
+  
+  /* Header del blocco di codice */
+  .message-content :global(.code-block-header) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 36px;
+  }
+  
+  .message-content :global(.code-block-language) {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   
   .message-content :global(.code-copy-button) {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
-    background-color: rgba(0, 0, 0, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 6px 12px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.9);
     cursor: pointer;
     font-size: 12px;
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    z-index: 10;
-    opacity: 0;
-    pointer-events: none;
-  }
-  
-  .message-content :global(.code-block-wrapper:hover .code-copy-button) {
-    opacity: 1;
-    pointer-events: all;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   
   .message-content :global(.code-copy-button:hover) {
-    background-color: rgba(0, 0, 0, 0.8);
-    border-color: rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
     color: rgba(255, 255, 255, 1);
     transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
   
   .message-content :global(.code-copy-button:active) {
     transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   }
   
   .message-content :global(.code-copy-button.copied) {
-    background-color: rgba(76, 175, 80, 0.3);
-    border-color: rgba(76, 175, 80, 0.6);
+    background-color: rgba(76, 175, 80, 0.2);
+    border-color: rgba(76, 175, 80, 0.5);
     color: #4caf50;
-    opacity: 1;
   }
   
   .message-content :global(.code-copy-button svg) {
     width: 14px;
     height: 14px;
-    stroke-width: 2;
+    stroke-width: 2.5;
     flex-shrink: 0;
   }
   
@@ -4893,6 +5185,43 @@
     font-size: 12px;
     font-weight: 500;
     white-space: nowrap;
+  }
+  
+  /* Supporto per tema chiaro */
+  body[data-theme="light"] .message-content :global(.code-block-wrapper) {
+    background-color: #ffffff; /* Colore di sfondo simile a VS Code Light */
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-wrapper:hover) {
+    border-color: rgba(0, 0, 0, 0.15);
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-header) {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-bottom-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-block-language) {
+    color: rgba(0, 0, 0, 0.5);
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-copy-button) {
+    background-color: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: rgba(0, 0, 0, 0.8);
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-copy-button:hover) {
+    background-color: rgba(0, 0, 0, 0.12);
+    border-color: rgba(0, 0, 0, 0.18);
+    color: rgba(0, 0, 0, 1);
+  }
+  
+  body[data-theme="light"] .message-content :global(.code-copy-button.copied) {
+    background-color: rgba(76, 175, 80, 0.15);
+    border-color: rgba(76, 175, 80, 0.4);
+    color: #2e7d32;
   }
   
   .message-content :global(blockquote) {

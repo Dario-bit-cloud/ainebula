@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
+// Usa il tema GitHub Dark come base, poi sovrascriveremo con colori VS Code personalizzati
 import 'highlight.js/styles/github-dark.css';
 
 // Configura marked per usare highlight.js per il codice
@@ -25,12 +26,50 @@ export function normalizeTextSpacing(text) {
   return text.replace(/[ \t]+$/gm, '');
 }
 
+// Rileva se il contenuto contiene HTML non escapato che dovrebbe essere mostrato come codice
+function detectUnescapedHTML(content) {
+  if (!content) return false;
+  
+  // Verifica che non sia già dentro un blocco di codice markdown
+  const hasCodeBlock = /```[\s\S]*?```/.test(content) || /`[^`]+`/.test(content);
+  if (hasCodeBlock) return false;
+  
+  // Tag HTML comuni che indicano codice HTML completo
+  const htmlTags = [
+    /<html[\s>]/i,
+    /<head[\s>]/i,
+    /<body[\s>]/i,
+    /<!DOCTYPE/i,
+    /<html>/i,
+    /<\/html>/i
+  ];
+  
+  // Verifica se contiene tag HTML strutturali
+  const hasHTMLTags = htmlTags.some(tag => tag.test(content));
+  
+  // Verifica se contiene tag HTML multipli (probabilmente codice HTML completo)
+  const htmlTagCount = (content.match(/<[a-z][\s>]/gi) || []).length;
+  
+  // Wrappa se ha tag HTML strutturali o almeno 2 tag HTML (per evitare falsi positivi con singoli tag)
+  return hasHTMLTags || htmlTagCount >= 2;
+}
+
 // Renderizza markdown in HTML sicuro
-export function renderMarkdown(markdown) {
+export function renderMarkdown(markdown, options = {}) {
   if (!markdown) return '';
   try {
+    let processedMarkdown = markdown;
+    
+    // Verifica se contiene HTML non escapato (per tutti i modelli)
+    const hasUnescapedHTML = detectUnescapedHTML(markdown);
+    
+    // Se rileva HTML non escapato, wrappa in un blocco di codice
+    if (hasUnescapedHTML) {
+      processedMarkdown = `\`\`\`html\n${markdown}\n\`\`\``;
+    }
+    
     // Normalizza il testo prima di renderizzarlo
-    const normalizedMarkdown = normalizeTextSpacing(markdown);
+    const normalizedMarkdown = normalizeTextSpacing(processedMarkdown);
     let html = marked.parse(normalizedMarkdown);
     
     // Rimuovi paragrafi vuoti o con solo spazi
@@ -43,9 +82,9 @@ export function renderMarkdown(markdown) {
       return normalized ? `${openTag}${normalized}${closeTag}` : '';
     });
     
-    // Aggiungi pulsanti di copia ai blocchi di codice
-    // Regex migliorata per catturare pre><code con qualsiasi attributo
-    html = html.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/g, (match, codeContent) => {
+    // Aggiungi pulsanti di copia e header ai blocchi di codice
+    // Regex migliorata per catturare pre><code con qualsiasi attributo e linguaggio
+    html = html.replace(/<pre[^>]*><code[^>]*(?:class="[^"]*language-(\w+)[^"]*")?[^>]*>([\s\S]*?)<\/code><\/pre>/g, (match, language, codeContent) => {
       // Escape base del codice per l'attributo data (il testo verrà estratto dal DOM al click)
       // Usiamo un placeholder che verrà sostituito quando necessario
       const escapedCode = codeContent
@@ -55,14 +94,21 @@ export function renderMarkdown(markdown) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
       
+      // Determina il nome del linguaggio da mostrare
+      const langName = language || 'code';
+      const langDisplay = langName.charAt(0).toUpperCase() + langName.slice(1);
+      
       return `<div class="code-block-wrapper">
-        <button class="code-copy-button" data-code="${escapedCode}" title="Copia codice">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="copy-text">Copia</span>
-        </button>
+        <div class="code-block-header">
+          <span class="code-block-language">${langDisplay}</span>
+          <button class="code-copy-button" data-code="${escapedCode}" title="Copia codice">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span class="copy-text">Copia</span>
+          </button>
+        </div>
         ${match}
       </div>`;
     });

@@ -17,6 +17,7 @@
   import { showSuccess as showToastSuccess, showError, showWarning, showInfo } from './services/toastService.js';
   import { isMobileDevice } from './utils/platform.js';
   import { hasPWAInstallPromptBeenShown, markPWAInstallPromptAsShown, isPWAInstalled } from './utils/mobile.js';
+  // Il menu contestuale è gestito in main.js, non serve importare qui
   
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
@@ -28,6 +29,9 @@
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AlertDialog from './components/AlertDialog.svelte';
   import PromptDialog from './components/PromptDialog.svelte';
+  // Context menu (always loaded)
+  import ContextMenu from './components/ContextMenu.svelte';
+  import { showContextMenu, closeContextMenu } from './services/contextMenuService.js';
   
   // Carica modals solo quando necessario
   async function loadSettingsModal() {
@@ -387,6 +391,7 @@
   // Inizializza autenticazione e tema
   onMount(async () => {
     window.addEventListener('keydown', handleKeyboardShortcuts);
+    // Il menu contestuale è già gestito in main.js
     initAuth();
     // Precarica SettingsModal dato che è un componente importante
     loadSettingsModal();
@@ -591,6 +596,9 @@
   
   <!-- Toast notifications -->
   <svelte:component this={ToastContainer} />
+  
+  <!-- Context menu -->
+  <ContextMenu />
 </div>
 
 <style>

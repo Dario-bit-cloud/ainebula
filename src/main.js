@@ -12,6 +12,7 @@ import {
   handleVirtualKeyboard 
 } from './utils/mobile.js';
 import { initTheme } from './utils/theme.js';
+import { showContextMenu } from './services/contextMenuService.js';
 
 // Inizializza il tema PRIMA che l'app venga montata per evitare flash
 // Questo gestisce anche la sincronizzazione in tempo reale con le preferenze di sistema
@@ -65,6 +66,104 @@ if (typeof window !== 'undefined') {
     // Ricarica per applicare tutti gli stili
     window.location.reload();
   };
+  
+  // Gestione menu contestuale per desktop e mobile
+  let longPressTimer = null;
+  let longPressTarget = null;
+  let touchStartPosition = null;
+  const LONG_PRESS_DURATION = 500; // 500ms per long press
+  const MAX_MOVE_DISTANCE = 10; // Massimo movimento consentito durante long press (in px)
+
+  // Gestisce il menu contestuale del browser (desktop)
+  function handleContextMenu(event) {
+    const target = event.target;
+    
+    // Escludi alcuni elementi dal menu contestuale personalizzato
+    if (
+      (target.tagName === 'INPUT' && target.type === 'password') ||
+      target.closest('[data-no-context-menu]') ||
+      target.closest('iframe')
+    ) {
+      return; // Lascia che il browser gestisca il menu contestuale
+    }
+    
+    // Previeni SEMPRE il menu contestuale del browser
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Mostra il menu contestuale personalizzato
+    showContextMenu(event.clientX, event.clientY, target);
+  }
+
+  // Gestisce il long press su mobile
+  function handleTouchStart(event) {
+    const target = event.target;
+    
+    // Escludi alcuni elementi
+    if (
+      (target.tagName === 'INPUT' && target.type === 'password') ||
+      target.closest('[data-no-context-menu]') ||
+      target.closest('iframe')
+    ) {
+      return;
+    }
+
+    const touch = event.touches[0];
+    touchStartPosition = { x: touch.clientX, y: touch.clientY };
+    longPressTarget = target;
+
+    // Avvia il timer per il long press
+    longPressTimer = setTimeout(() => {
+      // Verifica che il touch sia ancora attivo e nella stessa posizione
+      if (longPressTarget && touchStartPosition) {
+        // Previeni il menu contestuale del browser
+        event.preventDefault();
+        
+        // Mostra il menu contestuale personalizzato
+        showContextMenu(touchStartPosition.x, touchStartPosition.y, longPressTarget);
+        
+        // Aggiungi feedback visivo (vibrazione se supportata)
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+      }
+    }, LONG_PRESS_DURATION);
+  }
+
+  function handleTouchMove(event) {
+    // Se l'utente muove il dito troppo, annulla il long press
+    if (touchStartPosition && longPressTimer) {
+      const touch = event.touches[0];
+      const deltaX = Math.abs(touch.clientX - touchStartPosition.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPosition.y);
+      
+      if (deltaX > MAX_MOVE_DISTANCE || deltaY > MAX_MOVE_DISTANCE) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        longPressTarget = null;
+        touchStartPosition = null;
+      }
+    }
+  }
+
+  function handleTouchEnd(event) {
+    // Annulla il long press se l'utente rilascia prima del tempo
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    longPressTarget = null;
+    touchStartPosition = null;
+  }
+
+  // Aggiungi listener per desktop
+  document.addEventListener('contextmenu', handleContextMenu, { capture: true, passive: false });
+  
+  // Aggiungi listener per mobile (long press)
+  document.addEventListener('touchstart', handleTouchStart, { passive: false });
+  document.addEventListener('touchmove', handleTouchMove, { passive: true });
+  document.addEventListener('touchend', handleTouchEnd, { passive: true });
+  document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 }
 
 const app = mount(App, {

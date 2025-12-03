@@ -10,6 +10,7 @@ import {
   decryptRecoveryKey
 } from './encryptionService.js';
 import { getCurrentUser } from './authService.js';
+import { log, logWarn, logError } from '../utils/logger.js';
 
 // Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
@@ -36,7 +37,79 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
-console.log('🔧 [CHAT SERVICE] API Base URL configurato:', API_BASE_URL);
+log('🔧 [CHAT SERVICE] API Base URL configurato:', API_BASE_URL);
+
+/**
+ * Decrittografa le chat in batch usando requestIdleCallback per non bloccare l'UI
+ * Decrittografa solo i metadati (titolo), non i messaggi (lazy loading)
+ */
+async function batchDecryptChats(chats, encryptionKey, userId) {
+  // Su mobile, usa setTimeout per batchizzare meglio
+  const useIdleCallback = typeof requestIdleCallback !== 'undefined' && !/mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  
+  const decryptedChats = [];
+  const batchSize = 3; // Decrittografa 3 chat alla volta per non bloccare
+  
+  for (let i = 0; i < chats.length; i += batchSize) {
+    const batch = chats.slice(i, i + batchSize);
+    
+    // Decrittografa il batch
+    const batchPromises = batch.map(async (chat) => {
+      // Controlla se ci sono dati crittografati (solo titolo, non messaggi)
+      const hasEncryptedTitle = chat.title && typeof chat.title === 'string' && chat.title.startsWith('encrypted:');
+      
+      if (hasEncryptedTitle) {
+        try {
+          // Decrittografa solo il titolo, non i messaggi
+          const { decryptChatMetadata } = await import('./encryptionService.js');
+          const decrypted = await decryptChatMetadata(chat, encryptionKey);
+          // Mantieni i messaggi crittografati per decrittografia lazy
+          return {
+            ...decrypted,
+            messages: chat.messages // Mantieni messaggi crittografati
+          };
+        } catch (error) {
+          logWarn(`⚠️ [CHAT SERVICE] Decrittografia titolo fallita per chat ${chat.id}, provo con chiave di recupero`);
+          try {
+            const recoveryKeys = JSON.parse(localStorage.getItem('recovery_keys') || '{}');
+            const recoveryKey = recoveryKeys[userId];
+            if (recoveryKey) {
+              const { getCachedPassword, decryptRecoveryKey, decryptChatMetadata } = await import('./encryptionService.js');
+              const currentPassword = getCachedPassword(userId);
+              if (currentPassword) {
+                const oldKey = await decryptRecoveryKey(recoveryKey, currentPassword, userId);
+                const decrypted = await decryptChatMetadata(chat, oldKey);
+                return {
+                  ...decrypted,
+                  messages: chat.messages
+                };
+              }
+            }
+          } catch (recoveryError) {
+            logError('❌ [CHAT SERVICE] Errore decrittografia con chiave di recupero:', recoveryError);
+          }
+          return chat;
+        }
+      }
+      return chat;
+    });
+    
+    const batchResults = await Promise.all(batchPromises);
+    decryptedChats.push(...batchResults);
+    
+    // Su mobile, usa setTimeout per dare respiro al browser
+    if (!useIdleCallback && i + batchSize < chats.length) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    } else if (useIdleCallback) {
+      // Su desktop, usa requestIdleCallback se disponibile
+      await new Promise(resolve => {
+        requestIdleCallback(() => resolve(), { timeout: 100 });
+      });
+    }
+  }
+  
+  return decryptedChats;
+}
 
 /**
  * Ottiene tutte le chat dell'utente dal database e le decrittografa
@@ -44,7 +117,7 @@ console.log('🔧 [CHAT SERVICE] API Base URL configurato:', API_BASE_URL);
 export async function getChatsFromDatabase() {
   const url = API_BASE_URL;
   
-  console.log('💬 [CHAT SERVICE] Caricamento chat dal database:', {
+  log('💬 [CHAT SERVICE] Caricamento chat dal database:', {
     url,
     timestamp: new Date().toISOString()
   });
@@ -53,11 +126,11 @@ export async function getChatsFromDatabase() {
     const token = localStorage.getItem('auth_token');
     
     if (!token) {
-      console.warn('⚠️ [CHAT SERVICE] Nessun token trovato');
+      logWarn('⚠️ [CHAT SERVICE] Nessun token trovato');
       return { success: false, message: 'Non autenticato' };
     }
     
-    console.log('📤 [CHAT SERVICE] Invio richiesta GET:', { url });
+    log('📤 [CHAT SERVICE] Invio richiesta GET:', { url });
     
     const response = await fetch(url, {
       method: 'GET',
@@ -69,11 +142,10 @@ export async function getChatsFromDatabase() {
       }
     });
     
-    console.log('📥 [CHAT SERVICE] Risposta ricevuta:', {
+    log('📥 [CHAT SERVICE] Risposta ricevuta:', {
       status: response.status,
       statusText: response.statusText,
-      ok: response.ok,
-      headers: Object.fromEntries(response.headers.entries())
+      ok: response.ok
     });
     
     if (!response.ok) {
@@ -93,17 +165,17 @@ export async function getChatsFromDatabase() {
       // Prova prima a leggere come JSON direttamente
       try {
         data = await response.json();
-        console.log('✅ [CHAT SERVICE] Chat caricate (JSON diretto):', {
+        log('✅ [CHAT SERVICE] Chat caricate (JSON diretto):', {
           success: data.success,
           count: data.chats?.length || 0
         });
       } catch (jsonError) {
         // Se fallisce, prova a leggere come testo e poi parsare
-        console.log('⚠️ [CHAT SERVICE] Tentativo lettura come testo...');
+        logWarn('⚠️ [CHAT SERVICE] Tentativo lettura come testo...');
         responseText = await response.text();
-        console.log('📄 [CHAT SERVICE] Body risposta (raw):', responseText.substring(0, 200));
+        log('📄 [CHAT SERVICE] Body risposta (raw):', responseText.substring(0, 200));
         data = JSON.parse(responseText);
-        console.log('✅ [CHAT SERVICE] Chat caricate (parsing testo):', {
+        log('✅ [CHAT SERVICE] Chat caricate (parsing testo):', {
           success: data.success,
           count: data.chats?.length || 0
         });
@@ -114,7 +186,7 @@ export async function getChatsFromDatabase() {
       try {
         const clonedResponse = response.clone();
         responseText = await clonedResponse.text();
-        console.log('📄 [CHAT SERVICE] Body risposta (clonata):', responseText.substring(0, 200));
+        log('📄 [CHAT SERVICE] Body risposta (clonata):', responseText.substring(0, 200));
         data = JSON.parse(responseText);
       } catch (cloneError) {
         console.error('❌ [CHAT SERVICE] Errore anche con clone:', cloneError);
@@ -127,70 +199,37 @@ export async function getChatsFromDatabase() {
       }
     }
     
-    // Decrittografa i messaggi quando vengono caricati dal database
+    // Decrittografia LAZY e BATCHIZZATA per performance mobile
+    // Non decrittografare tutte le chat subito, ma solo quando necessario
     if (data && data.success && data.chats && Array.isArray(data.chats)) {
       const user = getCurrentUser();
       if (user && user.id) {
         // Ottieni la password dalla cache
-        console.log(`🔍 [CHAT SERVICE] Ricerca password per utente ${user.id}...`);
+        log(`🔍 [CHAT SERVICE] Ricerca password per utente ${user.id}...`);
         const password = getCachedPassword(user.id);
         if (password) {
-          console.log(`✅ [CHAT SERVICE] Password trovata per utente ${user.id}`);
+          log(`✅ [CHAT SERVICE] Password trovata per utente ${user.id}`);
           const encryptionKey = await getEncryptionKeyForUser(user.id, password);
           if (encryptionKey) {
-            console.log('🔓 [CHAT SERVICE] Decrittografia messaggi e metadati delle chat...');
+            log('🔓 [CHAT SERVICE] Decrittografia lazy e batchizzata delle chat...');
             try {
-              // Decrittografa tutti i messaggi e metadati di tutte le chat
-              const decryptedChats = await Promise.all(
-                data.chats.map(async (chat) => {
-                  // Controlla se ci sono dati crittografati (messaggi o titolo)
-                  const hasEncryptedData = 
-                    (chat.messages && Array.isArray(chat.messages) && chat.messages.some(msg => 
-                      msg.content && typeof msg.content === 'string' && msg.content.startsWith('encrypted:')
-                    )) ||
-                    (chat.title && typeof chat.title === 'string' && chat.title.startsWith('encrypted:'));
-                  
-                  if (hasEncryptedData) {
-                    try {
-                      // Prova prima con la chiave corrente
-                      return await decryptChatMetadata(chat, encryptionKey);
-                    } catch (error) {
-                      // Se fallisce, prova con la chiave di recupero (per messaggi vecchi)
-                      console.log(`⚠️ [CHAT SERVICE] Decrittografia fallita, provo con chiave di recupero per chat ${chat.id}`);
-                      try {
-                        const recoveryKeys = JSON.parse(localStorage.getItem('recovery_keys') || '{}');
-                        const recoveryKey = recoveryKeys[user.id];
-                        if (recoveryKey) {
-                          const currentPassword = getCachedPassword(user.id);
-                          if (currentPassword) {
-                            const oldKey = await decryptRecoveryKey(recoveryKey, currentPassword, user.id);
-                            return await decryptChatMetadata(chat, oldKey);
-                          }
-                        }
-                      } catch (recoveryError) {
-                        console.error('❌ [CHAT SERVICE] Errore decrittografia con chiave di recupero:', recoveryError);
-                      }
-                      // Se anche la chiave di recupero fallisce, restituisci la chat originale
-                      return chat;
-                    }
-                  }
-                  return chat;
-                })
-              );
+              // Decrittografa solo i titoli e metadati (non i messaggi) per performance
+              // I messaggi verranno decrittografati lazy quando la chat viene aperta
+              const decryptedChats = await batchDecryptChats(data.chats, encryptionKey, user.id);
               
               // Sostituisci le chat con quelle decrittografate
               data.chats = decryptedChats;
-              console.log(`✅ [CHAT SERVICE] Decrittografate ${data.chats.length} chat`);
+              log(`✅ [CHAT SERVICE] Decrittografati metadati di ${data.chats.length} chat`);
             } catch (error) {
-              console.error('❌ [CHAT SERVICE] Errore durante decrittografia messaggi:', error);
+              logError('❌ [CHAT SERVICE] Errore durante decrittografia messaggi:', error);
               // In caso di errore, mantieni le chat originali (potrebbero essere in chiaro)
             }
           } else {
-            console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
+            log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, messaggi potrebbero essere in chiaro');
           }
         } else {
-          console.log(`⚠️ [CHAT SERVICE] Password non in cache per utente ${user.id}, messaggi rimangono crittografati`);
-          console.log(`💡 [CHAT SERVICE] Suggerimento: fai logout e login per ripristinare la password in cache`);
+          logWarn(`⚠️ [CHAT SERVICE] Password non in cache per utente ${user.id}, messaggi rimangono crittografati`);
+          log('💡 [CHAT SERVICE] Suggerimento: fai logout e login per ripristinare la password in cache');
         }
       }
     }
@@ -220,7 +259,7 @@ export async function getChatsFromDatabase() {
 export async function saveChatToDatabase(chat) {
   const url = API_BASE_URL;
   
-  console.log('💾 [CHAT SERVICE] Salvataggio chat:', {
+  log('💾 [CHAT SERVICE] Salvataggio chat:', {
     url,
     chatId: chat.id,
     title: chat.title,
@@ -232,7 +271,7 @@ export async function saveChatToDatabase(chat) {
     const token = localStorage.getItem('auth_token');
     
     if (!token) {
-      console.warn('⚠️ [CHAT SERVICE] Nessun token trovato per salvare chat');
+      logWarn('⚠️ [CHAT SERVICE] Nessun token trovato per salvare chat');
       return { success: false, message: 'Non autenticato' };
     }
     
@@ -242,13 +281,13 @@ export async function saveChatToDatabase(chat) {
     // Crittografa i messaggi e i metadati se la crittografia è disponibile
     const user = getCurrentUser();
     if (user && user.id) {
-      console.log(`🔍 [CHAT SERVICE] Ricerca password per crittografia, utente ${user.id}...`);
+      log(`🔍 [CHAT SERVICE] Ricerca password per crittografia, utente ${user.id}...`);
       const password = getCachedPassword(user.id);
       if (password) {
-        console.log(`✅ [CHAT SERVICE] Password trovata per crittografia, utente ${user.id}`);
+        log(`✅ [CHAT SERVICE] Password trovata per crittografia, utente ${user.id}`);
         const encryptionKey = await getEncryptionKeyForUser(user.id, password);
         if (encryptionKey) {
-          console.log('🔒 [CHAT SERVICE] Crittografia messaggi e metadati prima del salvataggio...');
+          log('🔒 [CHAT SERVICE] Crittografia messaggi e metadati prima del salvataggio...');
           try {
             // Crittografa sia i metadati (titolo) che i messaggi
             const chatToEncrypt = {
@@ -264,23 +303,23 @@ export async function saveChatToDatabase(chat) {
               chat.title = encryptedChat.title;
             }
             
-            console.log(`✅ [CHAT SERVICE] Crittografati messaggi e metadati della chat`);
+            log(`✅ [CHAT SERVICE] Crittografati messaggi e metadati della chat`);
           } catch (error) {
-            console.error('❌ [CHAT SERVICE] Errore crittografia messaggi:', error);
+            logError('❌ [CHAT SERVICE] Errore crittografia messaggi:', error);
             // Continua comunque con il salvataggio (per retrocompatibilità)
           }
         } else {
-          console.log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, salvataggio in chiaro');
+          log('ℹ️ [CHAT SERVICE] Chiave di crittografia non disponibile, salvataggio in chiaro');
         }
       } else {
-        console.log(`⚠️ [CHAT SERVICE] Password non in cache per utente ${user.id}, salvataggio in chiaro`);
-        console.log(`💡 [CHAT SERVICE] Suggerimento: fai logout e login per ripristinare la password in cache`);
+        logWarn(`⚠️ [CHAT SERVICE] Password non in cache per utente ${user.id}, salvataggio in chiaro`);
+        log('💡 [CHAT SERVICE] Suggerimento: fai logout e login per ripristinare la password in cache');
       }
     }
     
     // Non salvare chat temporanee nel database
     if (chat.isTemporary) {
-      console.log('ℹ️ [CHAT SERVICE] Chat temporanea, non salvata nel database');
+      log('ℹ️ [CHAT SERVICE] Chat temporanea, non salvata nel database');
       return { success: true, message: 'Chat temporanea non salvata nel database' };
     }
     
@@ -292,7 +331,7 @@ export async function saveChatToDatabase(chat) {
       isTemporary: false
     };
     
-    console.log('📤 [CHAT SERVICE] Invio richiesta POST:', {
+    log('📤 [CHAT SERVICE] Invio richiesta POST:', {
       url,
       chatId: chat.id,
       messagesCount: requestBody.messages.length
@@ -307,7 +346,7 @@ export async function saveChatToDatabase(chat) {
       body: JSON.stringify(requestBody)
     });
     
-    console.log('📥 [CHAT SERVICE] Risposta salvataggio:', {
+    log('📥 [CHAT SERVICE] Risposta salvataggio:', {
       status: response.status,
       statusText: response.statusText,
       ok: response.ok
@@ -319,12 +358,12 @@ export async function saveChatToDatabase(chat) {
     try {
       data = JSON.parse(responseText);
       if (data.success) {
-        console.log('✅ [CHAT SERVICE] Chat salvata con successo:', chat.id);
+        log('✅ [CHAT SERVICE] Chat salvata con successo:', chat.id);
       } else {
-        console.warn('⚠️ [CHAT SERVICE] Salvataggio fallito:', data);
+        logWarn('⚠️ [CHAT SERVICE] Salvataggio fallito:', data);
       }
     } catch (parseError) {
-      console.error('❌ [CHAT SERVICE] Errore parsing risposta:', parseError);
+      logError('❌ [CHAT SERVICE] Errore parsing risposta:', parseError);
       return {
         success: false,
         message: 'Errore nel formato della risposta del server',
@@ -357,7 +396,7 @@ export async function saveChatToDatabase(chat) {
  * Elimina una chat dal database
  */
 export async function deleteChatFromDatabase(chatId) {
-  console.log('🗑️ [CHAT SERVICE] Eliminazione chat dal database:', {
+  log('🗑️ [CHAT SERVICE] Eliminazione chat dal database:', {
     chatId,
     timestamp: new Date().toISOString()
   });
@@ -366,7 +405,7 @@ export async function deleteChatFromDatabase(chatId) {
     const token = localStorage.getItem('auth_token');
     
     if (!token) {
-      console.warn('⚠️ [CHAT SERVICE] Nessun token trovato per eliminare chat');
+      logWarn('⚠️ [CHAT SERVICE] Nessun token trovato per eliminare chat');
       return { success: false, message: 'Non autenticato' };
     }
     
@@ -378,7 +417,7 @@ export async function deleteChatFromDatabase(chatId) {
       }
     });
     
-    console.log('📥 [CHAT SERVICE] Risposta eliminazione:', {
+    log('📥 [CHAT SERVICE] Risposta eliminazione:', {
       status: response.status,
       statusText: response.statusText,
       ok: response.ok
@@ -405,14 +444,14 @@ export async function deleteChatFromDatabase(chatId) {
     const data = await response.json();
     
     if (data.success) {
-      console.log('✅ [CHAT SERVICE] Chat eliminata con successo:', chatId);
+      log('✅ [CHAT SERVICE] Chat eliminata con successo:', chatId);
     } else {
-      console.warn('⚠️ [CHAT SERVICE] Eliminazione fallita:', data);
+      logWarn('⚠️ [CHAT SERVICE] Eliminazione fallita:', data);
     }
     
     return data;
   } catch (error) {
-    console.error('❌ [CHAT SERVICE] Errore durante eliminazione chat:', {
+    logError('❌ [CHAT SERVICE] Errore durante eliminazione chat:', {
       name: error.name,
       message: error.message,
       chatId,
