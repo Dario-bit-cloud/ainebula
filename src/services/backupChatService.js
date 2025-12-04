@@ -1,11 +1,35 @@
 import { log, logWarn, logError } from '../utils/logger.js';
-import { API_BASE_URL } from '../config/api.js';
+
+// Funzione helper per ottenere l'URL base dell'API
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    
+    // Se siamo su localhost, usa localhost:3001
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001/api/chat';
+    }
+    
+    // In produzione, controlla se c'è una variabile d'ambiente per il backend
+    const backendUrl = import.meta.env.VITE_API_BASE_URL;
+    
+    if (backendUrl) {
+      return `${backendUrl}/api/chat`;
+    }
+    
+    // Altrimenti, per Vercel, usa URL relativo
+    return '/api/chat';
+  }
+  return 'http://localhost:3001/api/chat';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Salva un backup completo di tutte le chat nel database
  */
 export async function saveChatsBackup(chats) {
-  const url = `${API_BASE_URL}/api/chat/backup`;
+  const url = `${API_BASE_URL}/backup`;
   
   log('💾 [BACKUP SERVICE] Salvataggio backup chat:', {
     url,
@@ -94,7 +118,7 @@ export async function saveChatsBackup(chats) {
  * Carica l'ultimo backup delle chat dal database
  */
 export async function loadChatsBackup() {
-  const url = `${API_BASE_URL}/api/chat/backup`;
+  const url = `${API_BASE_URL}/backup`;
   
   log('📥 [BACKUP SERVICE] Caricamento backup chat:', {
     url,
