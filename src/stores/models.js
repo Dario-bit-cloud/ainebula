@@ -125,7 +125,7 @@ export const availableModels = writable([
   }
 ]);
 
-export const selectedModel = writable('gemini-2.5-flash-image');
+export const selectedModel = writable('gemini-2.5-flash-preview-09-2025');
 
 export function setModel(modelId) {
   selectedModel.set(modelId);

@@ -122,7 +122,7 @@ async function createTables() {
         ai_top_p DECIMAL(3,2) DEFAULT 1.0,
         ai_frequency_penalty DECIMAL(3,2) DEFAULT 0.0,
         ai_presence_penalty DECIMAL(3,2) DEFAULT 0.0,
-        default_model VARCHAR(100) DEFAULT 'nebula-1.0',
+        default_model VARCHAR(100) DEFAULT 'gemini-2.5-flash-preview-09-2025',
         notifications_enabled BOOLEAN DEFAULT TRUE,
         email_notifications BOOLEAN DEFAULT FALSE,
         auto_save_chats BOOLEAN DEFAULT TRUE,
