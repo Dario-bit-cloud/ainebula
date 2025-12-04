@@ -1193,20 +1193,22 @@
 
   .image-card {
     border: 2px solid var(--border-color, #d4d4d4);
-    border-radius: 12px;
+    border-radius: 16px;
     overflow: hidden;
     background: var(--bg-primary, #ffffff);
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
   .image-card:hover {
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.2);
+    transform: translateY(-4px);
+    border-color: var(--accent-blue, #3b82f6);
   }
 
   .image-wrapper {
     width: 100%;
-    background: var(--bg-secondary, #f5f5f5);
+    background: linear-gradient(135deg, var(--bg-secondary, #f5f5f5) 0%, var(--bg-tertiary, #e5e5e5) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1221,7 +1223,8 @@
     display: block;
     max-height: 400px;
     object-fit: contain;
-    transition: transform 0.3s;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
   }
 
   .image-overlay {
@@ -1230,12 +1233,13 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.6) 100%);
+    backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .image-card:hover .image-overlay {
@@ -1243,25 +1247,36 @@
   }
 
   .image-card:hover .image-wrapper img {
-    transform: scale(1.05);
+    transform: scale(1.08);
   }
 
   .btn-overlay {
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
-    border-radius: 8px;
-    padding: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    padding: 12px 16px;
     cursor: pointer;
     color: #171717;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    gap: 8px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-weight: 600;
+    font-size: 14px;
   }
 
   .btn-overlay:hover {
     background: white;
-    transform: scale(1.1);
+    transform: scale(1.05) translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .btn-overlay:active {
+    transform: scale(0.98) translateY(0);
   }
 
   .image-info {

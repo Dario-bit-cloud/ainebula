@@ -1767,7 +1767,18 @@
         {#if message.images && message.images.length > 0}
           <div class="message-images">
             {#each message.images as image}
-              <img src={image.url} alt={image.name} class="message-image" on:click={() => window.open(image.url, '_blank')} />
+              <div class="message-image-wrapper">
+                <img src={image.url} alt={image.name} class="message-image" on:click={() => window.open(image.url, '_blank')} />
+                <div class="message-image-overlay">
+                  <div class="message-image-zoom-hint">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="11" cy="11" r="8"/>
+                      <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <span>Clicca per ingrandire</span>
+                  </div>
+                </div>
+              </div>
             {/each}
           </div>
         {/if}
@@ -3069,9 +3080,13 @@
       min-height: 40px;
     }
 
+    .message-image-wrapper {
+      max-width: 100%;
+      max-height: 180px;
+    }
+
     .message-image {
       max-height: 180px;
-      border-radius: 10px;
     }
     
     .image-preview {
@@ -3186,36 +3201,98 @@
   .message-images {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .message-image-wrapper {
+    position: relative;
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: imageFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .message-image {
+    width: 100%;
+    height: 100%;
     max-width: 200px;
     max-height: 200px;
-    border-radius: 8px;
     object-fit: cover;
-    cursor: pointer;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, box-shadow 0.3s ease;
-    border: 1px solid var(--border-color);
-    animation: imageFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: block;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   @keyframes imageFadeIn {
     from {
       opacity: 0;
-      transform: scale(0.95);
+      transform: scale(0.95) translateY(4px);
     }
     to {
       opacity: 1;
-      transform: scale(1);
+      transform: scale(1) translateY(0);
     }
   }
 
-  .message-image:hover {
+  .message-image-wrapper:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(59, 130, 246, 0.2);
+    border-color: var(--accent-blue);
+  }
+
+  .message-image-wrapper:hover .message-image {
     transform: scale(1.05);
+  }
+
+  .message-image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.4) 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 12px;
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+
+  .message-image-wrapper:hover .message-image-overlay {
+    opacity: 1;
+  }
+
+  .message-image-zoom-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    padding: 6px 12px;
+    border-radius: 20px;
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    transform: translateY(4px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .message-image-wrapper:hover .message-image-zoom-hint {
+    transform: translateY(0);
+  }
+
+  .message-image-zoom-hint svg {
+    flex-shrink: 0;
     opacity: 0.9;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 
   .user-message .message-images {
@@ -3325,22 +3402,25 @@
     position: relative;
     width: 100px;
     height: 100px;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
     background-color: var(--bg-tertiary);
     animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
   .image-preview.selected {
     border-color: var(--accent-blue);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 4px 16px rgba(59, 130, 246, 0.15);
+    transform: scale(1.02);
   }
 
   .image-preview:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.2);
+    border-color: var(--accent-blue);
   }
 
   .image-overlay {
@@ -3349,13 +3429,14 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.6) 100%);
+    backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .image-preview:hover .image-overlay {
@@ -3364,40 +3445,58 @@
 
   .image-edit {
     position: absolute;
-    top: 4px;
-    left: 4px;
-    background: rgba(0, 0, 0, 0.7);
+    top: 6px;
+    left: 6px;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     color: white;
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 2;
   }
 
   .image-edit:hover {
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(59, 130, 246, 0.9);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  }
+
+  .image-edit:active {
+    transform: scale(0.95);
   }
 
   .image-style-badge {
     position: absolute;
-    bottom: 4px;
-    left: 4px;
-    right: 4px;
-    background: rgba(0, 0, 0, 0.8);
+    bottom: 6px;
+    left: 6px;
+    right: 6px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
     color: white;
-    padding: 4px 6px;
-    border-radius: 4px;
+    padding: 5px 8px;
+    border-radius: 6px;
     font-size: 10px;
-    font-weight: 500;
+    font-weight: 600;
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+  }
+
+  .image-preview:hover .image-style-badge {
+    background: rgba(59, 130, 246, 0.9);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   .input-container {
@@ -3441,11 +3540,12 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
   }
 
   .image-preview:hover img {
-    transform: scale(1.1);
+    transform: scale(1.08);
   }
 
   .image-actions-bar {
@@ -3565,13 +3665,14 @@
 
   .image-remove {
     position: absolute;
-    top: 4px;
-    right: 4px;
-    background-color: rgba(0, 0, 0, 0.7);
+    top: 6px;
+    right: 6px;
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
     border: none;
     border-radius: 50%;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     color: white;
     cursor: pointer;
     display: flex;
@@ -3581,6 +3682,8 @@
     padding: 0;
     opacity: 0;
     transform: scale(0.8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 2;
   }
 
   .image-preview:hover .image-remove {
@@ -3589,8 +3692,13 @@
   }
 
   .image-remove:hover {
-    background-color: rgba(239, 68, 68, 0.9);
-    transform: scale(1.1) rotate(90deg);
+    background-color: rgba(239, 68, 68, 0.95);
+    transform: scale(1.15) rotate(90deg);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  }
+
+  .image-remove:active {
+    transform: scale(1) rotate(90deg);
   }
 
   .image-remove svg {
@@ -4950,3 +5058,4 @@
 
 
 </style>
+
