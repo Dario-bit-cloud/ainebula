@@ -38,7 +38,12 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
-log('🔧 [CHAT SERVICE] API Base URL configurato:', API_BASE_URL);
+// Log solo quando necessario (non a livello di modulo per evitare problemi di bundling)
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    log('🔧 [CHAT SERVICE] API Base URL configurato:', API_BASE_URL);
+  }, 0);
+}
 
 /**
  * Decrittografa le chat in batch usando requestIdleCallback per non bloccare l'UI

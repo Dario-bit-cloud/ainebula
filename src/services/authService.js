@@ -32,7 +32,12 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
-console.log('🔧 [AUTH SERVICE] API Base URL configurato:', API_BASE_URL);
+// Log solo quando necessario (non a livello di modulo per evitare problemi di bundling)
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    console.log('🔧 [AUTH SERVICE] API Base URL configurato:', API_BASE_URL);
+  }, 0);
+}
 
 /**
  * Verifica la sessione corrente
