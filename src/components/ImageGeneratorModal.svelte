@@ -234,7 +234,6 @@
         </div>
         <div>
           <h2>Generatore Immagini AI</h2>
-          <p class="header-subtitle">Crea immagini straordinarie con l'intelligenza artificiale</p>
         </div>
       </div>
       <button class="close-btn" on:click={closeModal} title="Chiudi">
