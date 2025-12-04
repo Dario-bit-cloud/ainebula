@@ -3,6 +3,7 @@
   import { isPremiumModalOpen } from '../stores/app.js';
   import { isMobile } from '../stores/app.js';
   import { showAlert } from '../services/dialogService.js';
+  import { isAuthenticatedStore } from '../stores/auth.js';
   
   // Supabase Auth - billing gestito dal database
   let isLoading = false;
