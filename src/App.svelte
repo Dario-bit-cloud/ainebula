@@ -392,8 +392,22 @@
     window.addEventListener('keydown', handleKeyboardShortcuts);
     // Il menu contestuale è già gestito in main.js
     initAuth();
-    // Precarica SettingsModal dato che è un componente importante
-    loadSettingsModal();
+    // Precarica modals comuni in background per migliorare la velocità
+    // Usa requestIdleCallback se disponibile, altrimenti setTimeout
+    const preloadModals = () => {
+      loadSettingsModal();
+      // Precarica altri modals comuni dopo un breve delay
+      setTimeout(() => {
+        loadShortcutsModal();
+        loadAISettingsModal();
+      }, 1000);
+    };
+    
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(preloadModals, { timeout: 2000 });
+    } else {
+      setTimeout(preloadModals, 500);
+    }
     
     // Esponi toast service globalmente per compatibilità
     window.showToastSuccess = showToastSuccess;

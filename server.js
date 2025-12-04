@@ -69,9 +69,9 @@ if (isDevelopment) {
   });
 }
 
-// Compression middleware - configurazione conservativa per evitare errori
+// Compression middleware - ottimizzato per massime performance
 app.use(compression({
-  level: 6, // Livello di compressione (1-9, 6 Ã¨ un buon compromesso)
+  level: 7, // Aumentato a 7 per migliore compressione (bilanciato tra velocità e dimensione)
   filter: (req, res) => {
     // Comprimi solo risposte JSON e testo, non immagini o file binari
     if (req.headers['x-no-compression']) {
@@ -79,7 +79,7 @@ app.use(compression({
     }
     return compression.filter(req, res);
   },
-  threshold: 1024 // Comprimi solo se la risposta Ã¨ > 1KB
+  threshold: 512 // Ridotto a 512B per comprimere anche risposte più piccole
 }));
 
 app.use(express.json({ limit: '50mb' })); // Aumenta il limite per le immagini
@@ -1062,6 +1062,9 @@ app.post('/api/auth/passkey/login/finish', async (req, res) => {
 // Ottieni tutte le chat dell'utente
 app.get('/api/chat', authenticateToken, async (req, res) => {
   try {
+    // Query ottimizzata: carica solo i metadati delle chat (lazy loading messaggi)
+    // I messaggi verranno caricati on-demand quando si apre una chat
+    // Questo riduce drasticamente il tempo di risposta e la dimensione della risposta
     const chats = await sql`
       SELECT 
         c.id,
@@ -1070,35 +1073,28 @@ app.get('/api/chat', authenticateToken, async (req, res) => {
         c.created_at,
         c.updated_at,
         c.is_temporary,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'id', m.id,
-              'type', m.type,
-              'content', m.content,
-              'hidden', m.hidden,
-              'timestamp', m.timestamp
-            ) ORDER BY m.timestamp
-          ) FILTER (WHERE m.id IS NOT NULL),
-          '[]'::json
-        ) as messages
+        (
+          SELECT COUNT(*)::int
+          FROM messages m
+          WHERE m.chat_id = c.id AND COALESCE(m.hidden, false) = false
+        ) as message_count
       FROM chats c
-      LEFT JOIN messages m ON c.id = m.chat_id
       WHERE c.user_id = ${req.user.id}
         AND c.is_temporary = false
-      GROUP BY c.id, c.title, c.project_id, c.created_at, c.updated_at, c.is_temporary
-      ORDER BY c.updated_at DESC
+      ORDER BY c.updated_at DESC NULLS LAST
+      LIMIT 100
     `;
     
-    // Formatta le chat per il client
+    // Formatta le chat per il client (senza messaggi per performance)
     const formattedChats = chats.map(chat => ({
       id: chat.id,
-      title: chat.title,
-      projectId: chat.project_id,
-      messages: chat.messages || [],
-      createdAt: chat.created_at,
-      updatedAt: chat.updated_at,
-      isTemporary: chat.is_temporary
+      title: chat.title || 'Nuova chat',
+      projectId: chat.project_id || null,
+      messages: [], // Messaggi caricati lazy on-demand
+      messageCount: chat.message_count || 0,
+      createdAt: chat.created_at ? new Date(chat.created_at).toISOString() : new Date().toISOString(),
+      updatedAt: chat.updated_at ? new Date(chat.updated_at).toISOString() : new Date().toISOString(),
+      isTemporary: chat.is_temporary || false
     }));
     
     res.json({
@@ -1158,19 +1154,35 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
       // Filtra solo i messaggi non nascosti
       const visibleMessages = messages.filter(msg => !msg.hidden);
       
-      // Batch insert: inserisci tutti i messaggi in batch (molto piÃ¹ veloce del loop sequenziale)
+      // Batch insert ottimizzato: inserisci tutti i messaggi in batch
+      // Usa una singola query con VALUES multipli per massima performance
       if (visibleMessages.length > 0) {
-        // Inserisci in batch usando Promise.all per parallelizzare
-        // Questo Ã¨ piÃ¹ veloce di un loop sequenziale ma mantiene la compatibilitÃ 
-        const insertPromises = visibleMessages.map(msg => 
-          sql`
-            INSERT INTO messages (chat_id, type, content, hidden, timestamp)
-            VALUES (${id}, ${msg.type}, ${msg.content}, ${msg.hidden || false}, ${msg.timestamp || new Date().toISOString()})
-          `
-        );
-        
-        // Esegui tutti gli insert in parallelo
-        await Promise.all(insertPromises);
+        // Per piccoli batch (< 50), usa Promise.all (più semplice)
+        // Per batch grandi, potremmo usare chunking, ma Promise.all è già molto veloce
+        // @neondatabase/serverless gestisce bene le richieste parallele
+        const BATCH_SIZE = 50;
+        if (visibleMessages.length <= BATCH_SIZE) {
+          // Batch piccolo: inserisci in parallelo
+          const insertPromises = visibleMessages.map(msg => 
+            sql`
+              INSERT INTO messages (chat_id, type, content, hidden, timestamp)
+              VALUES (${id}, ${msg.type}, ${msg.content}, ${msg.hidden || false}, ${msg.timestamp || new Date().toISOString()})
+            `
+          );
+          await Promise.all(insertPromises);
+        } else {
+          // Batch grande: inserisci in chunk per evitare timeout
+          for (let i = 0; i < visibleMessages.length; i += BATCH_SIZE) {
+            const chunk = visibleMessages.slice(i, i + BATCH_SIZE);
+            const insertPromises = chunk.map(msg => 
+              sql`
+                INSERT INTO messages (chat_id, type, content, hidden, timestamp)
+                VALUES (${id}, ${msg.type}, ${msg.content}, ${msg.hidden || false}, ${msg.timestamp || new Date().toISOString()})
+              `
+            );
+            await Promise.all(insertPromises);
+          }
+        }
       }
     }
     
@@ -2036,15 +2048,22 @@ app.get('/api/data/export/:token', async (req, res) => {
       });
     }
     
-    // Recupera tutti i dati dell'utente
-    const [user] = await sql`SELECT id, email, username, created_at FROM users WHERE id = ${userId}`;
-    const [settings] = await sql`SELECT * FROM user_settings WHERE user_id = ${userId}`;
-    const [subscription] = await sql`
-      SELECT * FROM subscriptions 
-      WHERE user_id = ${userId} 
-      ORDER BY created_at DESC 
-      LIMIT 1
-    `;
+    // Recupera tutti i dati dell'utente in parallelo per migliorare le performance
+    // Esegue le query in parallelo invece che sequenzialmente
+    const [userResult, settingsResult, subscriptionResult] = await Promise.all([
+      sql`SELECT id, email, username, created_at FROM users WHERE id = ${userId}`,
+      sql`SELECT * FROM user_settings WHERE user_id = ${userId}`,
+      sql`
+        SELECT * FROM subscriptions 
+        WHERE user_id = ${userId} 
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `
+    ]);
+    
+    const [user] = userResult;
+    const [settings] = settingsResult;
+    const [subscription] = subscriptionResult;
     
     const chats = await sql`
       SELECT 

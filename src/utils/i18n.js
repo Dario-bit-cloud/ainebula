@@ -22,7 +22,7 @@ export const translations = {
     // Sidebar
     'newChat': 'Nuova chat',
     'searchChats': 'Cerca chat',
-    'library': 'Libreria',
+    'history': 'Cronologia',
     'projects': 'Progetti',
     'noChatsYet': 'Nessuna chat ancora',
     'createNewChat': 'Crea una nuova chat per iniziare',
@@ -243,7 +243,7 @@ export const translations = {
     // Sidebar
     'newChat': 'New chat',
     'searchChats': 'Search chats',
-    'library': 'Library',
+    'history': 'History',
     'projects': 'Projects',
     'noChatsYet': 'No chats yet',
     'createNewChat': 'Create a new chat to get started',

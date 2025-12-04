@@ -170,6 +170,7 @@ export const AVAILABLE_MODELS = [
   { value: 'flux', label: 'Flux (Default - High Quality)' },
   { value: 'turbo', label: 'Turbo (Fast)' },
   { value: 'stable-diffusion', label: 'Stable Diffusion' },
+  { value: 'sdxl-lightning', label: 'SDXL Lightning (Ultra Fast)' },
   { value: 'kontext', label: 'Kontext (Image-to-Image)' }
 ];
 

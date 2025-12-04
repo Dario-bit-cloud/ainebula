@@ -1,13 +1,37 @@
 // Servizio per interagire con il database tramite API
 
-const API_BASE_URL = 'http://localhost:3001/api/db';
+// Determina l'URL base dell'API in base all'ambiente
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    
+    // Se siamo su localhost, usa localhost:3001
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001/api/db';
+    }
+    
+    // In produzione, controlla se c'è una variabile d'ambiente per il backend
+    const backendUrl = import.meta.env.VITE_API_BASE_URL;
+    
+    if (backendUrl) {
+      return `${backendUrl}/api/db`;
+    }
+    
+    // Altrimenti, per Vercel, usa URL relativo
+    return '/api/db';
+  }
+  return 'http://localhost:3001/api/db';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Testa la connessione al database
  */
 export async function testDatabaseConnection() {
   try {
-    const response = await fetch(`${API_BASE_URL}/test`);
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/test`);
     const data = await response.json();
     return data;
   } catch (error) {
@@ -24,7 +48,8 @@ export async function testDatabaseConnection() {
  */
 export async function getDatabaseInfo() {
   try {
-    const response = await fetch(`${API_BASE_URL}/info`);
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/info`);
     const data = await response.json();
     return data;
   } catch (error) {
@@ -41,7 +66,8 @@ export async function getDatabaseInfo() {
  */
 export async function executeQuery(query) {
   try {
-    const response = await fetch(`${API_BASE_URL}/query`, {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

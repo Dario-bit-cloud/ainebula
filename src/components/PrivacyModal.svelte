@@ -42,10 +42,13 @@
           <section class="privacy-section">
             <h2 class="section-title">1. Introduzione</h2>
             <p class="section-text">
-              Nebula AI rispetta la tua privacy e si impegna a proteggere i tuoi dati personali. Questa Informativa sulla Privacy spiega come raccogliamo, utilizziamo, condividiamo e proteggiamo le tue informazioni personali quando utilizzi il nostro servizio.
+              Nebula AI rispetta la tua privacy e si impegna a proteggere la tua privacy nel modo più assoluto. <strong>Nebula AI non raccoglie, non memorizza e non tratta dati personali degli utenti.</strong>
             </p>
             <p class="section-text">
-              Questa informativa è conforme al Regolamento Generale sulla Protezione dei Dati (GDPR) dell'Unione Europea e alle leggi italiane sulla protezione dei dati personali.
+              Questa informativa è conforme al Regolamento Generale sulla Protezione dei Dati (GDPR) dell'Unione Europea e alle leggi italiane sulla protezione dei dati personali (D.Lgs. 196/2003 come modificato dal D.Lgs. 101/2018).
+            </p>
+            <p class="section-text small-note">
+              <strong>Nota importante:</strong> Per fornire le funzionalità di intelligenza artificiale, Nebula AI utilizza API di terze parti (come OpenAI, Anthropic, Google, ecc.). Queste API potrebbero raccogliere dati tecnici durante l'elaborazione delle richieste. Tuttavia, Nebula AI implementa un sistema di filtraggio e anonimizzazione avanzato che rimuove tutti gli identificatori personali prima di inviare le richieste alle API di terze parti, garantendo che anche gli utenti registrati risultino completamente anonimi durante l'elaborazione delle chat.
             </p>
           </section>
           
@@ -60,70 +63,135 @@
           </section>
           
           <section class="privacy-section">
-            <h2 class="section-title">3. Dati Personali Raccolti</h2>
+            <h2 class="section-title">3. Raccolta e Trattamento dei Dati</h2>
             <p class="section-text">
-              <strong>3.1 Dati Forniti Direttamente dall'Utente:</strong>
+              <strong>Nebula AI non raccoglie dati personali.</strong> Il nostro servizio è progettato con un'architettura privacy-first che minimizza la raccolta di informazioni personali.
+            </p>
+            
+            <p class="section-text">
+              <strong>3.1 Dati di Autenticazione (Solo per Utenti Registrati):</strong>
+            </p>
+            <p class="section-text">
+              Per gli utenti che scelgono di registrarsi, raccogliamo esclusivamente:
             </p>
             <ul class="section-list">
-              <li>Informazioni di registrazione (username, email, password crittografata)</li>
-              <li>Informazioni di profilo e preferenze</li>
-              <li>Contenuti utente (messaggi, chat, file caricati)</li>
-              <li>Informazioni di pagamento (per piani a pagamento)</li>
+              <li>Username (pseudonimo, non necessariamente identificativo)</li>
+              <li>Indirizzo email (utilizzato solo per autenticazione e comunicazioni essenziali)</li>
+              <li>Password (crittografata con hash irreversibile, non accessibile nemmeno da Nebula AI)</li>
             </ul>
+            
             <p class="section-text">
-              <strong>3.2 Dati Raccolti Automaticamente:</strong>
+              <strong>3.2 Chat e Contenuti - Crittografia End-to-End:</strong>
+            </p>
+            <p class="section-text">
+              Le tue chat e conversazioni sono archiviate su Nebula AI con crittografia end-to-end. Questo significa che:
             </p>
             <ul class="section-list">
-              <li>Dati tecnici (indirizzo IP, tipo di browser, sistema operativo)</li>
-              <li>Dati di utilizzo (pagine visitate, funzionalità utilizzate)</li>
-              <li>Dati di sessione (token di autenticazione, timestamp)</li>
-              <li>Dati di dispositivo</li>
+              <li>Le chat sono crittografate prima di essere salvate nel database</li>
+              <li>Solo tu possiedi la chiave di decrittazione (derivata dalla tua password)</li>
+              <li><strong>Nebula AI non può vedere, leggere o accedere al contenuto delle tue chat</strong></li>
+              <li>Le chat vengono salvate esclusivamente per permetterti di mantenere la tua cronologia personale</li>
+              <li>Anche in caso di richieste legali, Nebula AI non può fornire il contenuto delle chat perché non è in grado di decrittarle</li>
             </ul>
+            
             <p class="section-text">
-              <strong>3.3 Dati da Terze Parti:</strong>
+              <strong>3.3 Dati Tecnici Minimi:</strong>
             </p>
             <p class="section-text">
-              Potremmo ricevere informazioni da fornitori di autenticazione, pagamento o servizi AI.
+              Per garantire il funzionamento del servizio, vengono registrati solo dati tecnici essenziali e anonimi:
+            </p>
+            <ul class="section-list">
+              <li>Token di autenticazione (per mantenere la sessione attiva)</li>
+              <li>Timestamp delle attività (per funzionalità di sincronizzazione)</li>
+              <li>Dati aggregati e anonimi per statistiche di utilizzo (senza identificatori personali)</li>
+            </ul>
+            
+            <p class="section-text small-note">
+              <strong>Nota sulle API di Terze Parti:</strong> Quando invii una richiesta tramite Nebula AI, il sistema rimuove automaticamente tutti gli identificatori personali (username, email, ID utente) prima di inviare la richiesta alle API di terze parti. Le richieste vengono anonimizzate e non contengono informazioni che possano identificarti, anche se sei un utente registrato. Nebula AI funge da intermediario che protegge la tua identità.
             </p>
           </section>
           
           <section class="privacy-section">
             <h2 class="section-title">4. Base Giuridica del Trattamento</h2>
             <p class="section-text">
-              Trattiamo i tuoi dati personali sulla base di:
+              Poiché Nebula AI non raccoglie dati personali oltre a quelli strettamente necessari per l'autenticazione, la base giuridica del trattamento è limitata a:
             </p>
             <ul class="section-list">
-              <li><strong>Consenso:</strong> Quando hai fornito il consenso esplicito</li>
-              <li><strong>Esecuzione del Contratto:</strong> Per fornire il Servizio</li>
-              <li><strong>Interesse Legittimo:</strong> Per migliorare il Servizio e garantire la sicurezza</li>
-              <li><strong>Obbligo Legale:</strong> Per adempiere a obblighi legali</li>
+              <li><strong>Esecuzione del Contratto:</strong> Per fornire il Servizio e permetterti di accedere alle funzionalità</li>
+              <li><strong>Consenso Esplicito:</strong> Per qualsiasi trattamento opzionale (es. newsletter, comunicazioni promozionali)</li>
+              <li><strong>Obbligo Legale:</strong> Solo quando strettamente richiesto dalla legge (es. richieste delle autorità competenti per dati di autenticazione)</li>
             </ul>
+            <p class="section-text">
+              <strong>Importante:</strong> Nebula AI non utilizza "interesse legittimo" come base giuridica per il trattamento di dati personali, in quanto non raccoglie dati per finalità di marketing, profilazione o analisi comportamentale.
+            </p>
           </section>
           
           <section class="privacy-section">
             <h2 class="section-title">5. Finalità del Trattamento</h2>
             <p class="section-text">
-              Utilizziamo i tuoi dati personali per:
+              I dati minimi raccolti da Nebula AI sono utilizzati esclusivamente per:
             </p>
             <ul class="section-list">
-              <li>Fornire e gestire il Servizio</li>
-              <li>Migliorare funzionalità e prestazioni</li>
-              <li>Comunicare con te riguardo al Servizio</li>
-              <li>Proteggere il Servizio da accessi non autorizzati</li>
-              <li>Adempiere a obblighi legali</li>
+              <li><strong>Autenticazione e Accesso:</strong> Permetterti di accedere al tuo account e mantenere la sessione attiva</li>
+              <li><strong>Archiviazione Sicura delle Chat:</strong> Conservare le tue chat in forma crittografata per la tua cronologia personale (senza possibilità di accesso da parte di Nebula AI)</li>
+              <li><strong>Sicurezza del Servizio:</strong> Proteggere il servizio da accessi non autorizzati e abusi</li>
+              <li><strong>Comunicazioni Essenziali:</strong> Inviare notifiche tecniche essenziali relative al servizio (es. modifiche ai termini, problemi di sicurezza)</li>
+            </ul>
+            <p class="section-text">
+              <strong>Nebula AI non utilizza i tuoi dati per:</strong>
+            </p>
+            <ul class="section-list">
+              <li>Profilazione o analisi comportamentale</li>
+              <li>Marketing diretto o pubblicità mirata</li>
+              <li>Vendita o condivisione con terze parti per scopi commerciali</li>
+              <li>Training di modelli AI con i tuoi contenuti</li>
             </ul>
           </section>
           
           <section class="privacy-section">
             <h2 class="section-title">6. Condivisione dei Dati</h2>
             <p class="section-text">
-              <strong>Non vendiamo i tuoi dati personali.</strong> Condividiamo i tuoi dati solo nelle seguenti circostanze:
+              <strong>Nebula AI non vende, non affitta e non condivide i tuoi dati personali con terze parti per scopi commerciali.</strong>
+            </p>
+            <p class="section-text">
+              <strong>6.1 Fornitori di Servizi Tecnici:</strong>
+            </p>
+            <p class="section-text">
+              Nebula AI utilizza fornitori di servizi tecnici per l'infrastruttura (hosting, database). Questi fornitori:
             </p>
             <ul class="section-list">
-              <li><strong>Fornitori di Servizi:</strong> Con fornitori che ci assistono nell'erogazione del Servizio (hosting, servizi AI, pagamenti), tutti vincolati da accordi di riservatezza</li>
-              <li><strong>Obblighi Legali:</strong> Se richiesto dalla legge o da autorità competenti</li>
-              <li><strong>Trasferimenti Aziendali:</strong> In caso di fusione o acquisizione</li>
-              <li><strong>Con il Tuo Consenso:</strong> Quando hai fornito il consenso esplicito</li>
+              <li>Hanno accesso solo ai dati tecnici necessari per il funzionamento del servizio</li>
+              <li>Non hanno accesso al contenuto delle chat (crittografate end-to-end)</li>
+              <li>Sono vincolati da accordi di riservatezza e conformità GDPR</li>
+              <li>Non possono utilizzare i dati per altri scopi</li>
+            </ul>
+            
+            <p class="section-text">
+              <strong>6.2 API di Servizi AI (Terze Parti):</strong>
+            </p>
+            <p class="section-text">
+              Quando utilizzi le funzionalità AI, Nebula AI invia richieste anonimizzate alle API di terze parti (OpenAI, Anthropic, Google, ecc.):
+            </p>
+            <ul class="section-list">
+              <li>Le richieste vengono anonimizzate prima dell'invio (rimozione di identificatori personali)</li>
+              <li>Nebula AI funge da intermediario che protegge la tua identità</li>
+              <li>Le API di terze parti non ricevono informazioni che possano identificarti</li>
+              <li>Le politiche sulla privacy delle API di terze parti si applicano ai dati anonimizzati che ricevono</li>
+            </ul>
+            <p class="section-text small-note">
+              <strong>Nota:</strong> Ti consigliamo di consultare le informative sulla privacy dei fornitori di API AI che utilizzi tramite Nebula AI per comprendere come trattano i dati anonimizzati che ricevono.
+            </p>
+            
+            <p class="section-text">
+              <strong>6.3 Obblighi Legali:</strong>
+            </p>
+            <p class="section-text">
+              Nebula AI può divulgare dati solo se richiesto dalla legge o da autorità competenti. Tuttavia:
+            </p>
+            <ul class="section-list">
+              <li>Le chat crittografate end-to-end non possono essere decrittate da Nebula AI</li>
+              <li>In caso di richiesta legale, Nebula AI può fornire solo dati di autenticazione (username, email) e metadati tecnici</li>
+              <li>Il contenuto delle chat rimane inaccessibile anche a Nebula AI</li>
             </ul>
           </section>
           
@@ -137,34 +205,42 @@
           <section class="privacy-section">
             <h2 class="section-title">8. Conservazione dei Dati</h2>
             <p class="section-text">
-              Conserviamo i tuoi dati solo per il tempo necessario:
+              Nebula AI conserva i dati solo per il tempo strettamente necessario:
             </p>
             <ul class="section-list">
-              <li><strong>Dati dell'Account:</strong> Fino a quando il tuo account è attivo o fino a cancellazione</li>
-              <li><strong>Dati delle Chat:</strong> Fino a quando non elimini le chat o il tuo account</li>
-              <li><strong>Dati di Sessione:</strong> Massimo 7 giorni dopo la scadenza</li>
-              <li><strong>Dati di Log:</strong> Massimo 12 mesi</li>
+              <li><strong>Dati di Autenticazione:</strong> Fino a quando il tuo account è attivo o fino a quando richiedi la cancellazione. Dopo la cancellazione, i dati vengono eliminati entro 30 giorni.</li>
+              <li><strong>Chat Crittografate:</strong> Fino a quando non elimini manualmente le chat o il tuo account. Le chat vengono conservate esclusivamente per permetterti di mantenere la tua cronologia personale. Puoi eliminarle in qualsiasi momento.</li>
+              <li><strong>Dati di Sessione:</strong> Massimo 7 giorni dopo la scadenza della sessione</li>
+              <li><strong>Dati di Log Tecnici:</strong> Massimo 90 giorni, solo per finalità di sicurezza e troubleshooting</li>
+              <li><strong>Dati Aggregati e Anonimi:</strong> Conservati indefinitamente ma senza possibilità di identificazione personale</li>
             </ul>
             <p class="section-text">
-              Dopo il periodo di conservazione, i dati vengono eliminati in modo sicuro o anonimizzati.
+              Dopo il periodo di conservazione, i dati vengono eliminati in modo sicuro utilizzando metodi di cancellazione definitiva che rendono impossibile il recupero. Le chat crittografate vengono eliminate insieme alle chiavi di crittografia associate.
+            </p>
+            <p class="section-text">
+              <strong>Diritto alla Cancellazione:</strong> Puoi richiedere la cancellazione completa del tuo account e di tutti i dati associati in qualsiasi momento. La cancellazione è definitiva e irreversibile.
             </p>
           </section>
           
           <section class="privacy-section">
             <h2 class="section-title">9. Sicurezza dei Dati</h2>
             <p class="section-text">
-              Implementiamo misure tecniche e organizzative appropriate per proteggere i tuoi dati:
+              Nebula AI implementa misure di sicurezza avanzate per proteggere i tuoi dati:
             </p>
             <ul class="section-list">
-              <li>Crittografia end-to-end per i messaggi (quando abilitata)</li>
-              <li>Crittografia in transito (HTTPS/TLS)</li>
-              <li>Crittografia a riposo nel database</li>
-              <li>Controlli di accesso limitati</li>
-              <li>Autenticazione forte (passkeys, 2FA)</li>
-              <li>Monitoraggio continuo della sicurezza</li>
+              <li><strong>Crittografia End-to-End Obbligatoria:</strong> Tutte le chat sono crittografate end-to-end utilizzando algoritmi crittografici moderni (AES-256). La crittografia avviene lato client prima dell'invio al server.</li>
+              <li><strong>Zero-Knowledge Architecture:</strong> Nebula AI non può accedere, leggere o decrittare il contenuto delle tue chat. Solo tu possiedi la chiave di decrittazione.</li>
+              <li><strong>Crittografia in Transito:</strong> Tutte le comunicazioni utilizzano protocolli sicuri (HTTPS/TLS 1.3) con certificati SSL validati</li>
+              <li><strong>Crittografia a Riposo:</strong> I dati nel database sono crittografati a riposo con crittografia a livello di database</li>
+              <li><strong>Derivazione delle Chiavi:</strong> Le chiavi di crittografia sono derivate dalla tua password utilizzando algoritmi PBKDF2 o Argon2, rendendo impossibile il recupero senza la password</li>
+              <li><strong>Autenticazione Forte:</strong> Supporto per passkeys (WebAuthn), autenticazione a due fattori (2FA) e password forti</li>
+              <li><strong>Controlli di Accesso:</strong> Accesso limitato ai dati solo al personale autorizzato, con logging di tutte le attività</li>
+              <li><strong>Monitoraggio della Sicurezza:</strong> Monitoraggio continuo per rilevare e prevenire violazioni, intrusioni e accessi non autorizzati</li>
+              <li><strong>Backup Sicuri:</strong> Backup regolari crittografati con chiavi separate</li>
+              <li><strong>Valutazioni Periodiche:</strong> Audit di sicurezza regolari e valutazioni della conformità</li>
             </ul>
             <p class="section-text">
-              Nonostante queste misure, nessun sistema è completamente sicuro. Ti incoraggiamo a utilizzare password forti.
+              <strong>Limitazione di Responsabilità:</strong> Nonostante implementiamo le migliori pratiche di sicurezza, nessun sistema è completamente sicuro. Ti incoraggiamo a utilizzare password forti e uniche, abilitare l'autenticazione a due fattori e mantenere riservate le tue credenziali. Nebula AI non può essere ritenuta responsabile per violazioni di sicurezza causate da negligenza dell'utente o da attacchi informatici sofisticati.
             </p>
           </section>
           
@@ -378,6 +454,18 @@
     line-height: 1.7;
     color: var(--text-secondary);
     margin: 0 0 12px 0;
+  }
+
+  .small-note {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+    font-style: italic;
+    padding: 12px;
+    background-color: var(--bg-tertiary, rgba(255, 255, 255, 0.03));
+    border-left: 3px solid var(--accent-blue);
+    border-radius: 4px;
+    margin-top: 8px;
   }
 
   .section-list {

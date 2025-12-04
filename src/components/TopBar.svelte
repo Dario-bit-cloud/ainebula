@@ -58,6 +58,7 @@
         // Apri il modal premium
         isPremiumModalOpen.set(true);
         isModelDropdownOpen = false;
+        isThirdPartySubmenuOpen = false;
         return;
       }
     }
@@ -73,6 +74,7 @@
     }
     
     isModelDropdownOpen = false;
+    isThirdPartySubmenuOpen = false;
   }
   
   // Mostra sempre tutti i modelli, ma disabilita quelli premium senza abbonamento
@@ -95,10 +97,18 @@
   
   // Funzione per gestire il click sulla sezione "AI di terze parti"
   function toggleThirdPartySubmenu(event) {
-    if (event && event.currentTarget) {
-      updateThirdPartySubmenuPosition(event);
+    if (event) {
+      event.stopPropagation();
     }
-    isThirdPartySubmenuOpen = !isThirdPartySubmenuOpen;
+    // Su mobile, non aprire il submenu laterale ma usa il popup
+    if ($isMobile) {
+      isThirdPartySubmenuOpen = !isThirdPartySubmenuOpen;
+    } else {
+      if (event && event.currentTarget) {
+        updateThirdPartySubmenuPosition(event);
+      }
+      isThirdPartySubmenuOpen = !isThirdPartySubmenuOpen;
+    }
   }
   
   function updateThirdPartySubmenuPosition(event) {
@@ -112,9 +122,25 @@
     }
   }
   
+  function closeThirdPartyPopup() {
+    isThirdPartySubmenuOpen = false;
+  }
+  
+  function handleThirdPartyBackdropClick(event) {
+    if (event.target === event.currentTarget) {
+      closeThirdPartyPopup();
+    }
+  }
+  
   // Chiudi il submenu quando si chiude il dropdown principale
   $: if (!isModelDropdownOpen) {
-    isThirdPartySubmenuOpen = false;
+    // Su mobile chiudi anche il popup
+    if ($isMobile) {
+      isThirdPartySubmenuOpen = false;
+    } else {
+      // Su desktop chiudi solo il submenu laterale
+      isThirdPartySubmenuOpen = false;
+    }
   }
   
   function toggleSettings() {
@@ -140,18 +166,30 @@
       return;
     }
     
+    // Su mobile, se il popup è aperto, non chiudere con click esterno (gestito dal backdrop)
+    if ($isMobile && isThirdPartySubmenuOpen) {
+      if (event.target.closest('.third-party-popup-backdrop') && 
+          !event.target.closest('.third-party-popup')) {
+        return; // Il backdrop gestirà la chiusura
+      }
+    }
+    
     // Non chiudere se si clicca sul bottone del modello o sul dropdown
     if (event.target.closest('.model-selector') || 
         event.target.closest('.model-selector-wrapper') || 
         event.target.closest('.model-dropdown') ||
         event.target.closest('.third-party-submenu') ||
+        event.target.closest('.third-party-popup') ||
         event.target.closest('.legacy-submenu')) {
       return;
     }
     
     // Chiudi il dropdown
     isModelDropdownOpen = false;
-    isThirdPartySubmenuOpen = false;
+    // Su desktop chiudi anche il submenu, su mobile il popup si chiude tramite backdrop
+    if (!$isMobile) {
+      isThirdPartySubmenuOpen = false;
+    }
   }
   
   // Aggiorna posizione quando la finestra viene ridimensionata o scrollata
@@ -282,8 +320,8 @@
           {/if}
         </div>
       {/if}
-      <!-- Tendina AI di terze parti -->
-      {#if isThirdPartySubmenuOpen && thirdPartyModels.length > 0}
+      <!-- Tendina AI di terze parti - Desktop -->
+      {#if isThirdPartySubmenuOpen && thirdPartyModels.length > 0 && !$isMobile}
         <div 
           class="third-party-submenu" 
           bind:this={thirdPartySubmenuRef}
@@ -317,6 +355,71 @@
               {/if}
             </button>
           {/each}
+        </div>
+      {/if}
+      
+      <!-- Popup AI di terze parti - Mobile -->
+      {#if isThirdPartySubmenuOpen && thirdPartyModels.length > 0 && $isMobile}
+        <div 
+          class="third-party-popup-backdrop" 
+          on:click={handleThirdPartyBackdropClick}
+          on:keydown={(e) => e.key === 'Escape' && closeThirdPartyPopup()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Seleziona AI di terze parti"
+        >
+          <div 
+            class="third-party-popup" 
+            bind:this={thirdPartySubmenuRef}
+            on:click|stopPropagation
+          >
+            <div class="third-party-popup-header">
+              <h3>AI di terze parti</h3>
+              <button 
+                class="close-popup-button" 
+                on:click={closeThirdPartyPopup}
+                aria-label="Chiudi"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div class="third-party-popup-content">
+              {#each thirdPartyModels as model}
+                <button 
+                  class="model-option" 
+                  class:selected={model.id === $selectedModel}
+                  on:click={() => {
+                    selectModel(model.id);
+                    closeThirdPartyPopup();
+                  }}
+                  role="option"
+                  aria-selected={model.id === $selectedModel}
+                >
+                  <div class="model-info">
+                    <div class="model-name">
+                      {#if model.logo}
+                        <img src={model.logo} alt="{model.name} logo" class="model-logo" />
+                      {/if}
+                      {model.name}
+                    </div>
+                    {#if model.description}
+                      <div class="model-description">{model.description}</div>
+                    {/if}
+                  </div>
+                  {#if model.id === $selectedModel}
+                    <div class="selected-indicator">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </div>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
         </div>
       {/if}
     </div>
@@ -697,6 +800,144 @@
     animation: dropdownSlideRight var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
     backdrop-filter: blur(20px);
     padding: 4px 0;
+  }
+  
+  /* Popup Mobile per AI di terze parti */
+  .third-party-popup-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10002;
+    padding: 20px;
+    animation: backdropFadeIn var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
+  }
+  
+  @keyframes backdropFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  .third-party-popup {
+    background-color: var(--md-sys-color-surface-container-highest);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-extra-large);
+    box-shadow: var(--md-sys-elevation-level5);
+    width: 100%;
+    max-width: 400px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: popupSlideUp var(--md-sys-motion-duration-medium4) var(--md-sys-motion-easing-emphasized);
+    z-index: 10003;
+  }
+  
+  @media (max-width: 480px) {
+    .third-party-popup-backdrop {
+      padding: 16px;
+    }
+    
+    .third-party-popup {
+      max-width: 100%;
+      border-radius: var(--md-sys-shape-corner-large);
+    }
+    
+    .third-party-popup-header {
+      padding: 16px 20px 12px;
+    }
+    
+    .third-party-popup-header h3 {
+      font-size: var(--md-sys-typescale-title-medium-size);
+    }
+  }
+  
+  @keyframes popupSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  
+  .third-party-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  }
+  
+  .third-party-popup-header h3 {
+    font-size: var(--md-sys-typescale-title-large-size);
+    font-weight: var(--md-sys-typescale-title-large-weight);
+    font-family: var(--md-sys-typescale-title-large-font);
+    color: var(--md-sys-color-on-surface);
+    margin: 0;
+  }
+  
+  .close-popup-button {
+    background: none;
+    border: none;
+    color: var(--md-sys-color-on-surface-variant);
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--md-sys-shape-corner-small);
+    transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+    min-width: 40px;
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+  
+  .close-popup-button:hover {
+    background-color: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface);
+  }
+  
+  .close-popup-button:active {
+    transform: scale(0.95);
+  }
+  
+  .third-party-popup-content {
+    padding: 8px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    max-height: calc(80vh - 80px);
+  }
+  
+  .third-party-popup-content .model-option {
+    margin: 2px 4px;
+    padding: 12px 16px;
+    min-height: 56px;
+    border-radius: var(--md-sys-shape-corner-medium);
+  }
+  
+  .third-party-popup-content .model-info .model-name {
+    font-size: var(--md-sys-typescale-body-large-size);
+    font-weight: var(--md-sys-typescale-body-large-weight);
+  }
+  
+  .third-party-popup-content .model-description {
+    font-size: var(--md-sys-typescale-body-medium-size);
+    margin-top: 4px;
   }
   
   @keyframes dropdownSlideRight {

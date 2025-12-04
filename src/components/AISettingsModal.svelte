@@ -107,7 +107,7 @@
             <input
               type="range"
               min="100"
-              max="4000"
+              max="300000"
               step="100"
               bind:value={localSettings.maxTokens}
             />

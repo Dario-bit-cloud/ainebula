@@ -12,6 +12,10 @@ Il Servizio è fornito da [Nome Azienda] (di seguito "noi", "nostro", "ci", "Neb
 
 Nebula AI è una piattaforma di assistenza all'intelligenza artificiale che fornisce strumenti di chat, generazione di contenuti, analisi e altre funzionalità basate su intelligenza artificiale. Il Servizio consente agli utenti di interagire con modelli di intelligenza artificiale per vari scopi, inclusi ma non limitati a: assistenza nella scrittura, analisi di dati, generazione di contenuti, ricerca e supporto decisionale.
 
+**Architettura Privacy-First:** Nebula AI è progettato con un'architettura privacy-first. Le tue chat sono crittografate end-to-end, il che significa che solo tu puoi accedere al contenuto. Nebula AI non può vedere, leggere o decrittare le tue conversazioni, anche per finalità di manutenzione o richieste legali.
+
+> **Nota sulle API di Terze Parti:** Per fornire le funzionalità AI, Nebula AI utilizza API di terze parti (OpenAI, Anthropic, Google, ecc.). Queste API potrebbero raccogliere dati tecnici durante l'elaborazione. Tuttavia, Nebula AI implementa un sistema di anonimizzazione che rimuove tutti gli identificatori personali prima di inviare le richieste, garantendo che anche gli utenti registrati risultino completamente anonimi.
+
 Il Servizio è fornito "così com'è" e può essere modificato, sospeso o interrotto in qualsiasi momento senza preavviso.
 
 ## 3. ETA' MINIMA E CAPACITÀ GIURIDICA
@@ -32,19 +36,32 @@ Per utilizzare alcune funzionalità del Servizio, potrebbe essere necessario cre
 - Mantenere la sicurezza della tua password e di tutte le attività che si verificano sotto il tuo account
 - Notificarci immediatamente di qualsiasi uso non autorizzato del tuo account
 
-### 4.2 Responsabilità dell'Account
+### 4.2 Dati Minimi Raccolti
+Nebula AI raccoglie solo i dati minimi necessari per l'autenticazione: username (pseudonimo), email e password (crittografata). Nebula AI non raccoglie dati personali aggiuntivi e non utilizza i tuoi dati per profilazione, marketing o analisi comportamentale.
+
+### 4.3 Crittografia delle Chat
+Le tue chat sono crittografate end-to-end utilizzando una chiave derivata dalla tua password. Questo significa che:
+- Solo tu possiedi la chiave per decrittare le tue chat
+- Nebula AI non può accedere al contenuto delle tue conversazioni
+- Se perdi la password, non sarà possibile recuperare le chat crittografate
+- Le chat vengono salvate esclusivamente per permetterti di mantenere la tua cronologia personale
+
+### 4.4 Responsabilità dell'Account
 Sei l'unico responsabile di:
 - Tutte le attività che si verificano sotto il tuo account
-- La sicurezza del tuo account e delle tue credenziali
+- La sicurezza del tuo account e delle tue credenziali (inclusa la gestione sicura della password)
 - Mantenere la riservatezza delle tue credenziali di accesso
 - Tutti i contenuti che pubblichi o condividi attraverso il Servizio
+- Comprendere che la perdita della password comporta la perdita permanente di accesso alle chat crittografate
 
-### 4.3 Sospensione e Cancellazione
+### 4.5 Sospensione e Cancellazione
 Ci riserviamo il diritto di sospendere o cancellare il tuo account in qualsiasi momento, con o senza preavviso, per qualsiasi motivo, incluso ma non limitato a:
 - Violazione di questi Termini
 - Uso fraudolento o illegale del Servizio
 - Inattività prolungata
 - Richiesta dell'utente
+
+Alla cancellazione, tutti i dati associati (incluse le chat crittografate) verranno eliminati definitivamente e non potranno essere recuperati.
 
 ## 5. USO ACCETTABILE
 
@@ -98,6 +115,26 @@ Tuttavia, riconosci che altri utenti potrebbero generare contenuti simili o iden
 
 Il trattamento dei tuoi dati personali è disciplinato dalla nostra Informativa sulla Privacy, che forma parte integrante di questi Termini. Utilizzando il Servizio, accetti anche la nostra Informativa sulla Privacy.
 
+### 7.1 Principi Fondamentali
+
+- **Nessuna Raccolta di Dati Personali:** Nebula AI non raccoglie, non memorizza e non tratta dati personali oltre a quelli strettamente necessari per l'autenticazione (username, email, password crittografata).
+
+- **Crittografia End-to-End:** Tutte le chat sono crittografate end-to-end. Nebula AI non può vedere, leggere o accedere al contenuto delle tue conversazioni, anche in caso di richieste legali.
+
+- **Anonimizzazione per API Terze Parti:** Quando utilizzi le funzionalità AI, Nebula AI rimuove automaticamente tutti gli identificatori personali prima di inviare le richieste alle API di terze parti, garantendo la tua anonimità.
+
+- **Nessun Uso Commerciale:** Nebula AI non vende, non affitta e non condivide i tuoi dati con terze parti per scopi commerciali.
+
+### 7.2 Responsabilità dell'Utente
+
+Sei responsabile di:
+- Mantenere la sicurezza della tua password (chiave di crittografia)
+- Non condividere le tue credenziali con terze parti
+- Comprendere che se perdi la password, non sarà possibile recuperare le chat crittografate
+- Rispettare la privacy degli altri utenti e non tentare di accedere ai loro account o contenuti
+
+> **Nota Legale:** In caso di richieste legali da parte di autorità competenti, Nebula AI può fornire solo dati di autenticazione (username, email) e metadati tecnici. Il contenuto delle chat crittografate rimane inaccessibile anche a Nebula AI e non può essere fornito, in quanto tecnicamente impossibile da decrittare senza la tua password.
+
 ## 8. ABBONAMENTI E PAGAMENTI
 
 ### 8.1 Piani di Abbonamento
@@ -128,9 +165,15 @@ NELLA MASSIMA MISURA CONSENTITA DALLA LEGGE APPLICABILE, NEBULA AI E I SUOI FORN
 - Errori, bug o interruzioni nel Servizio
 - Contenuti generati dall'AI imprecisi, incompleti o inappropriati
 - Azioni o decisioni basate su contenuti generati dall'AI
+- Perdita di dati o chat dovuta a perdita della password (impossibilità di decrittazione)
+- Violazioni di sicurezza causate da negligenza dell'utente o attacchi informatici sofisticati
+- Comportamento delle API di terze parti o loro politiche sulla privacy
 
-### 9.3 Limite di Responsabilità
-Nella misura in cui la legge applicabile non lo vieti, la responsabilità totale di Nebula AI per qualsiasi reclamo relativo al Servizio non supererà l'importo che hai pagato a Nebula AI nei 12 mesi precedenti alla data del reclamo.
+### 9.3 Limitazione Specifica per Chat Crittografate
+Nebula AI non può essere ritenuta responsabile per la perdita di accesso alle chat crittografate in caso di perdita della password. La crittografia end-to-end garantisce che solo tu possiedi la chiave di decrittazione, e questa è una caratteristica di sicurezza, non un difetto del servizio. La perdita della password comporta la perdita permanente e irreversibile di accesso alle chat crittografate.
+
+### 9.4 Limite di Responsabilità
+Nella misura in cui la legge applicabile non lo vieti, la responsabilità totale di Nebula AI per qualsiasi reclamo relativo al Servizio non supererà l'importo che hai pagato a Nebula AI nei 12 mesi precedenti alla data del reclamo (o zero per utenti gratuiti).
 
 ## 10. RISARCIMENTO
 
@@ -203,5 +246,6 @@ Per domande, reclami o richieste riguardo a questi Termini di Utilizzo, puoi con
 ---
 
 **Nota**: Questi Termini di Utilizzo sono stati redatti in conformità con la normativa italiana e il Regolamento Generale sulla Protezione dei Dati (GDPR). Si consiglia di consultare un avvocato per adattamenti specifici alla propria situazione giuridica.
+
 
 

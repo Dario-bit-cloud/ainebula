@@ -54,9 +54,20 @@ function detectUnescapedHTML(content) {
   return hasHTMLTags || htmlTagCount >= 2;
 }
 
-// Renderizza markdown in HTML sicuro
+// Cache per memoization del rendering markdown
+const markdownCache = new Map();
+const MAX_CACHE_SIZE = 100; // Limita la dimensione della cache
+
+// Renderizza markdown in HTML sicuro con memoization per performance
 export function renderMarkdown(markdown, options = {}) {
   if (!markdown) return '';
+  
+  // Usa cache per evitare re-render inutili
+  const cacheKey = markdown.substring(0, 1000); // Usa primi 1000 caratteri come chiave
+  if (markdownCache.has(cacheKey) && markdownCache.get(cacheKey).full === markdown) {
+    return markdownCache.get(cacheKey).html;
+  }
+  
   try {
     let processedMarkdown = markdown;
     
@@ -112,6 +123,14 @@ export function renderMarkdown(markdown, options = {}) {
         ${match}
       </div>`;
     });
+    
+    // Salva in cache (con limitazione dimensione)
+    if (markdownCache.size >= MAX_CACHE_SIZE) {
+      // Rimuovi il primo elemento (FIFO)
+      const firstKey = markdownCache.keys().next().value;
+      markdownCache.delete(firstKey);
+    }
+    markdownCache.set(cacheKey, { full: markdown, html });
     
     return html;
   } catch (error) {

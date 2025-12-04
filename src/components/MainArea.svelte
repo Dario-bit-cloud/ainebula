@@ -18,13 +18,19 @@
   import { showAlert, showPrompt } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
   import TopBar from './TopBar.svelte';
-  import { throttle } from '../utils/performance.js';
+  import { throttle, memoize } from '../utils/performance.js';
   import { logError } from '../utils/logger.js';
   import Skeleton from './Skeleton.svelte';
   import EmptyState from './EmptyState.svelte';
   import { showSuccess, showError, showWarning } from '../services/toastService.js';
   
   const dispatch = createEventDispatcher();
+  
+  // Memoizza il rendering markdown per evitare re-render inutili
+  const memoizedRenderMarkdown = memoize(renderMarkdown, (content) => {
+    // Usa i primi 500 caratteri come chiave per la cache
+    return content ? content.substring(0, 500) + content.length : '';
+  });
   
   function handleOpenAuth(event) {
     dispatch('openAuth', event.detail);
@@ -517,7 +523,8 @@
   
   // Throttled scroll per performance durante streaming
   // Su mobile, throttle più aggressivo per migliori performance
-  const scrollThrottleDelay = get(isMobile) ? 200 : 100;
+  // Ridotto ulteriormente per migliorare la reattività
+  const scrollThrottleDelay = get(isMobile) ? 150 : 50;
   const throttledScrollToBottom = throttle(() => {
     scrollToBottom(false);
   }, scrollThrottleDelay);
@@ -692,149 +699,149 @@
       chatId = await createNewChat();
     }
     
-    // Aggiungi messaggio utente IMMEDIATAMENTE (ottimistico)
+    // Crea AbortController per poter fermare la generazione (prima di tutto)
+    const abortController = new AbortController();
+    setAbortController(abortController);
+    
+    // Aggiungi messaggio utente IMMEDIATAMENTE (ottimistico) - sincrono per velocità
     const userMessage = { 
       type: 'user', 
       content: messageText,
       timestamp: new Date().toISOString() 
     };
     
-    // Usa requestAnimationFrame per aggiornamento UI non bloccante
+    // Aggiorna UI immediatamente senza requestAnimationFrame per velocità
+    addMessage(chatId, userMessage);
+    
+    // Crea messaggio AI vuoto IMMEDIATAMENTE (ottimistico)
+    const aiMessageId = Date.now().toString();
+    currentStreamingMessageId = aiMessageId;
+    const aiMessage = { 
+      id: aiMessageId,
+      type: 'ai', 
+      content: '', 
+      timestamp: new Date().toISOString() 
+    };
+    
+    // Aggiorna UI immediatamente
+    addMessage(chatId, aiMessage);
+    
+    // Scroll in background (non bloccante)
     requestAnimationFrame(() => {
-      addMessage(chatId, userMessage);
       scrollToBottom();
     });
-      
-      // Crea AbortController per poter fermare la generazione
-      const abortController = new AbortController();
-      setAbortController(abortController);
-      
-      // Crea messaggio AI vuoto IMMEDIATAMENTE (ottimistico)
-      const aiMessageId = Date.now().toString();
-      currentStreamingMessageId = aiMessageId;
-      const aiMessage = { 
-        id: aiMessageId,
-        type: 'ai', 
-        content: '', 
-        timestamp: new Date().toISOString() 
-      };
-      
-      // Usa requestAnimationFrame per aggiornamento UI non bloccante
-      requestAnimationFrame(() => {
-        addMessage(chatId, aiMessage);
-        scrollToBottom();
-      });
-      
-      // Procedi con la generazione in background
-      // Usa un piccolo delay per assicurarsi che la chat sia disponibile nello store
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      try {
-        const currentChatData = get(currentChat);
+    
+    // Procedi con la generazione in background senza delay
+    // Non aspettare setTimeout - procedi direttamente
+    
+    try {
+      // Ottieni i dati della chat - usa un piccolo timeout solo se necessario
+      let currentChatData = get(currentChat);
+      if (!currentChatData) {
+        // Prova una volta con un micro-delay
+        await new Promise(resolve => setTimeout(resolve, 10));
+        currentChatData = get(currentChat);
         if (!currentChatData) {
-          // Se la chat non è ancora disponibile, aspetta un altro frame
-          await new Promise(resolve => requestAnimationFrame(resolve));
-          const retryChatData = get(currentChat);
-          if (!retryChatData) {
-            throw new Error('Chat corrente non disponibile');
-          }
-        }
-        
-        const messageIndex = currentChatData.messages.length - 1;
-        
-        // Rileva se è una richiesta di generazione immagini
-        const isImageRequest = isImageGenerationRequest(messageText);
-        
-        // Determina il modello da usare
-        let modelToUse = isImageRequest ? 'gemini-2.5-flash-image' : effectiveModel;
-        
-        // Se thinking mode è abilitato e il modello è Flash, usa la versione thinking
-        if ($isThinkingModeEnabled && modelToUse === 'gemini-2.5-flash-preview-09-2025') {
-          modelToUse = 'gemini-2.5-flash-preview-09-2025-thinking';
-        }
-        
-        // Generazione testo normale
-        let fullResponse = '';
-        const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
-        
-        // Ottieni il system prompt dalla chat se presente (per nebulini)
-        const customSystemPrompt = currentChatData.systemPrompt || null;
-        
-        for await (const chunk of generateResponseStream(
-          messageText, 
-          modelToUse, 
-          chatHistory,
-          [],
-          abortController,
-          deepResearchEnabled,
-          customSystemPrompt
-        )) {
-          // Gestisci sia oggetti che stringhe (per compatibilità)
-          const chunkContent = typeof chunk === 'string' ? chunk : (chunk.content || '');
-          fullResponse += chunkContent;
-          // Aggiorna il messaggio in tempo reale SENZA normalizzazione (più veloce)
-          // skipSave = true per evitare salvataggi durante lo streaming
-          updateMessage(chatId, messageIndex, { content: fullResponse }, true);
-          // Su mobile, riduci tick per performance
-          if (!get(isMobile)) {
-            await tick();
-          }
-          throttledScrollToBottom(); // Scroll throttled per performance
-        }
-        
-        // Normalizza e salva la risposta finale (solo una volta alla fine)
-        const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
-        // skipSave = true qui perché salveremo dopo che isGenerating è false
-        updateMessage(chatId, messageIndex, { content: normalizedFinalResponse }, true);
-        
-        currentStreamingMessageId = null;
-        
-      } catch (error) {
-        logError('Error generating response:', error);
-        
-        // Rimuovi il messaggio vuoto se è stato interrotto
-        const currentChatData = get(currentChat);
-        if (currentStreamingMessageId && error.message && error.message.includes('interrotta')) {
-          if (currentChatData && currentChatData.messages.length > 0) {
-            await deleteMessage(chatId, currentChatData.messages.length - 1);
-          }
-        } else {
-          const errorMsg = error?.message || get(t)('errorOccurred');
-          if (currentChatData && currentChatData.messages.length > 0) {
-            updateMessage(chatId, currentChatData.messages.length - 1, { 
-              content: `❌ Errore: ${errorMsg}`
-            });
-          } else {
-            // Se non c'è un messaggio AI, aggiungilo
-            addMessage(chatId, {
-              type: 'ai',
-              content: `❌ Errore: ${errorMsg}`,
-              timestamp: new Date().toISOString()
-            });
-          }
-        }
-        currentStreamingMessageId = null;
-      } finally {
-        isGenerating.set(false);
-        setAbortController(null);
-        await tick();
-        scrollToBottom();
-        
-        // Salva la chat dopo che la generazione è completata
-        // Questo evita salvataggi multipli durante lo streaming
-        const currentChatData = get(currentChat);
-        if (currentChatData && currentChatData.id === chatId) {
-          try {
-            await saveChatImmediately(currentChatData);
-          } catch (error) {
-            logError('Errore durante salvataggio chat dopo generazione:', error);
-          }
+          throw new Error('Chat corrente non disponibile');
         }
       }
+      
+      const messageIndex = currentChatData.messages.length - 1;
+      
+      // Rileva se è una richiesta di generazione immagini
+      const isImageRequest = isImageGenerationRequest(messageText);
+      
+      // Determina il modello da usare
+      let modelToUse = isImageRequest ? 'gemini-2.5-flash-image' : effectiveModel;
+      
+      // Thinking mode non è più supportato - rimosso riferimento al modello thinking
+      
+      // Generazione testo normale
+      let fullResponse = '';
+      const chatHistory = currentChatData.messages.slice(0, -1); // Escludi il messaggio corrente
+      
+      // Ottieni il system prompt dalla chat se presente (per nebulini)
+      const customSystemPrompt = currentChatData.systemPrompt || null;
+      
+      let chunkCount = 0;
+      const TICK_INTERVAL = 3; // Aggiorna DOM ogni 3 chunk invece che ogni chunk
+      
+      for await (const chunk of generateResponseStream(
+        messageText, 
+        modelToUse, 
+        chatHistory,
+        [],
+        abortController,
+        deepResearchEnabled,
+        customSystemPrompt
+      )) {
+        // Gestisci sia oggetti che stringhe (per compatibilità)
+        const chunkContent = typeof chunk === 'string' ? chunk : (chunk.content || '');
+        fullResponse += chunkContent;
+        chunkCount++;
+        
+        // Aggiorna il messaggio in tempo reale SENZA normalizzazione (più veloce)
+        // Usa scheduleUpdate per batchizzare gli aggiornamenti DOM
+        scheduleUpdate(() => {
+          updateMessage(chatId, messageIndex, { content: fullResponse }, true);
+        });
+        
+        // Riduci tick per performance - solo ogni N chunk
+        if (chunkCount % TICK_INTERVAL === 0 && !get(isMobile)) {
+          await tick();
+        }
+        
+        throttledScrollToBottom(); // Scroll throttled per performance
+      }
+      
+      // Normalizza e salva la risposta finale (solo una volta alla fine)
+      const normalizedFinalResponse = normalizeTextSpacing(fullResponse);
+      // skipSave = true qui perché salveremo dopo che isGenerating è false
+      updateMessage(chatId, messageIndex, { content: normalizedFinalResponse }, true);
+      
+      currentStreamingMessageId = null;
+      
     } catch (error) {
-      logError('Error in handleSubmit:', error);
-      // In caso di errore, resetta tutto
+      logError('Error generating response:', error);
+      
+      // Rimuovi il messaggio vuoto se è stato interrotto
+      const currentChatData = get(currentChat);
+      if (currentStreamingMessageId && error.message && error.message.includes('interrotta')) {
+        if (currentChatData && currentChatData.messages.length > 0) {
+          await deleteMessage(chatId, currentChatData.messages.length - 1);
+        }
+      } else {
+        const errorMsg = error?.message || get(t)('errorOccurred');
+        if (currentChatData && currentChatData.messages.length > 0) {
+          updateMessage(chatId, currentChatData.messages.length - 1, { 
+            content: `❌ Errore: ${errorMsg}`
+          });
+        } else {
+          // Se non c'è un messaggio AI, aggiungilo
+          addMessage(chatId, {
+            type: 'ai',
+            content: `❌ Errore: ${errorMsg}`,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+      currentStreamingMessageId = null;
+    } finally {
       isGenerating.set(false);
+      setAbortController(null);
+      await tick();
+      scrollToBottom();
+      
+      // Salva la chat dopo che la generazione è completata
+      // Questo evita salvataggi multipli durante lo streaming
+      const currentChatData = get(currentChat);
+      if (currentChatData && currentChatData.id === chatId) {
+        try {
+          await saveChatImmediately(currentChatData);
+        } catch (error) {
+          logError('Errore durante salvataggio chat dopo generazione:', error);
+        }
+      }
     }
   }
   
@@ -1806,7 +1813,7 @@
         {#if message.content}
           <div class="message-content">
             {#if message.type === 'ai'}
-              {@html renderMarkdown(message.content)}
+              {@html memoizedRenderMarkdown(message.content)}
               {#if currentStreamingMessageId === message.id && message.content.trim().length < 50}
                 <div class="typing-indicator-inline">
                   <span></span>
@@ -2340,9 +2347,10 @@
             title={$t('stopGeneration')}
             on:click={handleStop}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="stop-icon">
               <rect x="6" y="6" width="12" height="12" rx="2"/>
             </svg>
+            <div class="stop-pulse"></div>
           </button>
         {:else}
           <button 
@@ -2351,9 +2359,9 @@
             on:click={handleSubmit}
             disabled={!inputValue.trim() && attachedImages.length === 0}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"/>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 2L11 13"/>
+              <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
             </svg>
           </button>
         {/if}
@@ -4050,18 +4058,22 @@
     
     .send-button,
     .stop-button {
-      width: 40px; /* Ridotto da 44px */
-      height: 40px; /* Ridotto da 44px */
-      min-width: 40px; /* Ridotto da 44px */
-      min-height: 40px; /* Ridotto da 44px */
-      padding: 8px; /* Ridotto da 10px */
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      min-height: 40px;
+      padding: 8px;
       touch-action: manipulation;
     }
     
     .send-button svg,
     .stop-button svg {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
+    }
+    
+    .stop-button .stop-pulse {
+      animation-duration: 1.5s;
     }
   }
   
@@ -4098,6 +4110,10 @@
       height: 40px;
       min-width: 40px;
       min-height: 40px;
+    }
+    
+    .stop-button .stop-pulse {
+      animation-duration: 1.2s;
     }
   }
 
@@ -4422,25 +4438,83 @@
   }
   
   .stop-button {
-    background: none;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     border: none;
-    color: #ef4444;
+    color: white;
     cursor: pointer;
-    padding: 4px;
+    padding: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 4px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
     transform: scale(1);
-    min-width: 40px;
-    min-height: 40px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
     touch-action: manipulation;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+    overflow: visible;
   }
   
   .stop-button:hover {
-    background-color: rgba(239, 68, 68, 0.1);
-    transform: scale(1.1);
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.6);
+  }
+  
+  .stop-button:active {
+    transform: scale(0.92);
+    box-shadow: 0 1px 4px rgba(239, 68, 68, 0.3);
+  }
+  
+  .stop-button .stop-icon {
+    position: relative;
+    z-index: 2;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+    animation: stopIconPulse 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes stopIconPulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.9;
+    }
+  }
+  
+  .stop-pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.3);
+    animation: stopPulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    pointer-events: none;
+  }
+  
+  @keyframes stopPulseRing {
+    0% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.3);
+      opacity: 0.4;
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(1.6);
+      opacity: 0;
+    }
   }
   
   .scroll-to-top {
@@ -5037,34 +5111,41 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 50%;
     transform: scale(1);
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     flex-shrink: 0;
     touch-action: manipulation;
+    position: relative;
   }
   
   .send-button:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
+    pointer-events: none;
   }
   
   .send-button:active:not(:disabled) {
-    transform: scale(0.95);
+    transform: scale(0.92);
   }
   
   .send-button:not(:disabled) {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
   }
   
   .send-button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.5);
+  }
+  
+  .send-button:not(:disabled) svg {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
   }
 
 

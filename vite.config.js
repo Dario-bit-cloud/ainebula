@@ -20,6 +20,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
+          // Chunk critici per il primo caricamento (main bundle)
+          if (id.includes('src/main.js') || id.includes('src/App.svelte')) {
+            return 'main';
+          }
           // Separa le dipendenze vendor
           if (id.includes('node_modules')) {
             if (id.includes('svelte')) {
@@ -83,7 +87,9 @@ export default defineConfig({
   },
   // Ottimizzazioni per le dipendenze
   optimizeDeps: {
-    include: ['svelte', 'svelte/store', 'marked', 'highlight.js']
+    include: ['svelte', 'svelte/store', 'marked', 'highlight.js'],
+    // Pre-bundle dipendenze comuni per velocità
+    force: false
   }
 });
 

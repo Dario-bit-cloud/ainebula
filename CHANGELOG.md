@@ -75,3 +75,4 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 - **Patch** (0.0.X): Correzioni di bug compatibili con versioni precedenti
 
 
+

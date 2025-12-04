@@ -30,31 +30,17 @@ export const tokenInfo = derived(
       const allowsPremiumFeatures = selectedModelData?.allowsPremiumFeatures || false;
       const hasPremium = (isPremiumModel && hasActiveSubscription()) || (allowsPremiumFeatures && isGeminiFlash);
       const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel || isGeminiFlash;
-      const isNebula15 = $selectedModel === 'gemini-2.5-flash-preview-09-2025-thinking';
-      const isRegistered = $isAuthenticatedStore;
       
       let maxTokens;
       let tokenUsagePercentage = 0;
       let tokenWarning = false;
       
-      if (hasPremium) {
-        maxTokens = Infinity;
-        tokenUsagePercentage = 0;
-        tokenWarning = false;
-      } else if (isAdvancedModel) {
-        // gpt-5.1-codex-mini ha limite di 400K token
-        maxTokens = $selectedModel === 'gpt-5.1-codex-mini' ? 400000 : 1000000;
-        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-        tokenWarning = tokenUsagePercentage > 80;
-      } else if (isNebula15 && isRegistered) {
-        maxTokens = 15000;
-        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-        tokenWarning = tokenUsagePercentage > 80;
-      } else {
-        maxTokens = 4000;
-        tokenUsagePercentage = (currentChatTokens / maxTokens) * 100;
-        tokenWarning = tokenUsagePercentage > 80;
-      }
+      // TEMPORANEO: Limite infinito per tutti (limite nascosto 300.000 per evitare costi eccessivi)
+      const HIDDEN_MAX_TOKENS = 300000;
+      maxTokens = Infinity; // Mostrato come infinito nell'UI
+      // Calcola la percentuale usando il limite nascosto per i warning
+      tokenUsagePercentage = (currentChatTokens / HIDDEN_MAX_TOKENS) * 100;
+      tokenWarning = tokenUsagePercentage > 80;
       
       return {
         currentChatTokens,
@@ -70,19 +56,9 @@ export const tokenInfo = derived(
       const allowsPremiumFeatures = selectedModelData?.allowsPremiumFeatures || false;
       const hasPremium = (isPremiumModel && hasActiveSubscription()) || (allowsPremiumFeatures && isGeminiFlash);
       const isAdvancedModel = $selectedModel === 'gpt-5.1-codex-mini' || isPremiumModel || isGeminiFlash;
-      const isNebula15 = $selectedModel === 'gemini-2.5-flash-preview-09-2025-thinking';
-      const isRegistered = $isAuthenticatedStore;
       
-      let maxTokens;
-      if (hasPremium) {
-        maxTokens = Infinity;
-      } else if (isAdvancedModel) {
-        maxTokens = $selectedModel === 'gpt-5.1-codex-mini' ? 400000 : 1000000;
-      } else if (isNebula15 && isRegistered) {
-        maxTokens = 15000;
-      } else {
-        maxTokens = 4000;
-      }
+      // TEMPORANEO: Limite infinito per tutti (limite nascosto 300.000 per evitare costi eccessivi)
+      let maxTokens = Infinity;
       
       return {
         currentChatTokens: 0,

@@ -20,8 +20,16 @@
   import { resetPWAInstallPrompt, isPWAInstalled } from '../utils/mobile.js';
   import { isDownloadAppModalOpen } from '../stores/app.js';
   import { applyTheme, setTheme, getTheme } from '../utils/theme.js';
+  import { testDatabaseConnection } from '../services/databaseService.js';
+  import { encryptMessage, decryptMessage, deriveEncryptionKey, getCachedPassword } from '../services/encryptionService.js';
+  import { invalidateCache } from '../utils/apiCache.js';
+  import { getChatsFromDatabase } from '../services/chatService.js';
+  import TermsModal from './TermsModal.svelte';
+  import PrivacyModal from './PrivacyModal.svelte';
   
   let activeSection = 'generale';
+  let isTermsModalOpen = false;
+  let isPrivacyModalOpen = false;
   let theme = 'system';
   let uiStyle = 'material';
   let language = 'system';
@@ -40,6 +48,7 @@
     { id: 'profilo', label: 'Profilo', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
     { id: 'abbonamento', label: 'Abbonamento', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
     { id: 'dati', label: 'Dati', icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4' },
+    { id: 'troubleshooting', label: 'Troubleshooting', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
     { id: 'informazioni', label: 'Informazioni', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }
   ];
   
@@ -763,13 +772,11 @@
   }
   
   function handleViewTerms() {
-    // Apri in una nuova finestra o mostra modal
-    window.open('https://nebula-ai.com/terms', '_blank');
+    isTermsModalOpen = true;
   }
   
   function handleViewPrivacy() {
-    // Apri in una nuova finestra o mostra modal
-    window.open('https://nebula-ai.com/privacy', '_blank');
+    isPrivacyModalOpen = true;
   }
   
   async function handleManageSharedLinks() {
@@ -856,6 +863,525 @@
     isDownloadAppModalOpen.set(true);
     // Chiudi le impostazioni
     isSettingsOpen.set(false);
+  }
+  
+  // ==================== TROUBLESHOOTING ====================
+  let troubleshootingStatus = {};
+  let isRunningTest = false;
+  let testResults = {};
+  
+  async function testDatabase() {
+    isRunningTest = true;
+    troubleshootingStatus.database = 'testing';
+    try {
+      const result = await testDatabaseConnection();
+      if (result.success) {
+        troubleshootingStatus.database = 'success';
+        testResults.database = `✅ Connessione riuscita!\nVersione: ${result.version || 'N/A'}`;
+        await showAlert(testResults.database, 'Test Database', 'OK', 'success');
+      } else {
+        troubleshootingStatus.database = 'error';
+        testResults.database = `❌ Errore: ${result.message || result.error || 'Connessione fallita'}`;
+        await showAlert(testResults.database, 'Test Database', 'OK', 'error');
+      }
+    } catch (error) {
+      troubleshootingStatus.database = 'error';
+      testResults.database = `❌ Errore: ${error.message}`;
+      await showAlert(testResults.database, 'Test Database', 'OK', 'error');
+    } finally {
+      isRunningTest = false;
+    }
+  }
+  
+  async function testEncryption() {
+    isRunningTest = true;
+    troubleshootingStatus.encryption = 'testing';
+    try {
+      const testMessage = 'Test crittografia Nebula AI';
+      const testUserId = $authUser?.id || 'test-user';
+      const testPassword = 'test-password-123';
+      
+      // Deriva la chiave
+      const key = await deriveEncryptionKey(testPassword, testUserId);
+      
+      // Crittografa
+      const encrypted = await encryptMessage(testMessage, key);
+      
+      // Decrittografa
+      const decrypted = await decryptMessage(encrypted, key);
+      
+      if (decrypted === testMessage) {
+        troubleshootingStatus.encryption = 'success';
+        testResults.encryption = '✅ Crittografia funzionante correttamente!';
+        await showAlert(testResults.encryption, 'Test Crittografia', 'OK', 'success');
+      } else {
+        troubleshootingStatus.encryption = 'error';
+        testResults.encryption = '❌ Errore: Il messaggio decrittografato non corrisponde';
+        await showAlert(testResults.encryption, 'Test Crittografia', 'OK', 'error');
+      }
+    } catch (error) {
+      troubleshootingStatus.encryption = 'error';
+      testResults.encryption = `❌ Errore: ${error.message}`;
+      await showAlert(testResults.encryption, 'Test Crittografia', 'OK', 'error');
+    } finally {
+      isRunningTest = false;
+    }
+  }
+  
+  async function clearCache() {
+    const confirmed = await showConfirm(
+      'Vuoi pulire la cache dell\'applicazione?\n\nQuesto rimuoverà:\n• Cache delle API\n• Dati temporanei\n• Cache del browser\n\nLe tue chat e impostazioni non verranno eliminate.',
+      'Pulizia Cache',
+      'Pulisci',
+      'Annulla',
+      'warning'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      // Pulisci cache API
+      invalidateCache();
+      
+      // Pulisci cache del browser (solo per questo dominio)
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+      }
+      
+      await showAlert(
+        '✅ Cache pulita con successo!\n\nLa pagina verrà ricaricata per applicare le modifiche.',
+        'Cache Pulita',
+        'OK',
+        'success'
+      );
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      await showAlert(
+        `❌ Errore durante la pulizia: ${error.message}`,
+        'Errore',
+        'OK',
+        'error'
+      );
+    }
+  }
+  
+  function checkStorage() {
+    try {
+      let totalSize = 0;
+      let itemCount = 0;
+      const items = [];
+      
+      // Controlla localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        const size = new Blob([value]).size;
+        totalSize += size;
+        itemCount++;
+        items.push({ key, size });
+      }
+      
+      // Controlla sessionStorage
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        const value = sessionStorage.getItem(key);
+        const size = new Blob([value]).size;
+        totalSize += size;
+        itemCount++;
+        items.push({ key, size, type: 'session' });
+      }
+      
+      const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
+      const sizeKB = (totalSize / 1024).toFixed(2);
+      const displaySize = totalSize > 1024 * 1024 ? `${sizeMB} MB` : `${sizeKB} KB`;
+      
+      // Limite approssimativo per localStorage (circa 5-10MB)
+      const limitMB = 5;
+      const usagePercent = ((totalSize / 1024 / 1024) / limitMB * 100).toFixed(1);
+      
+      let status = '✅';
+      let statusText = 'Storage in buono stato';
+      if (totalSize > limitMB * 1024 * 1024 * 0.8) {
+        status = '⚠️';
+        statusText = 'Storage quasi pieno';
+      }
+      
+      const message = `${status} ${statusText}\n\n` +
+        `Spazio utilizzato: ${displaySize}\n` +
+        `Numero di elementi: ${itemCount}\n` +
+        `Utilizzo approssimativo: ${usagePercent}% di ~${limitMB}MB\n\n` +
+        `Elementi più grandi:\n` +
+        items.sort((a, b) => b.size - a.size).slice(0, 5).map(item => 
+          `• ${item.key}: ${(item.size / 1024).toFixed(2)} KB`
+        ).join('\n');
+      
+      showAlert(message, 'Verifica Storage', 'OK', totalSize > limitMB * 1024 * 1024 * 0.8 ? 'warning' : 'info');
+    } catch (error) {
+      showAlert(`❌ Errore: ${error.message}`, 'Errore', 'OK', 'error');
+    }
+  }
+  
+  async function testAPI() {
+    isRunningTest = true;
+    troubleshootingStatus.api = 'testing';
+    try {
+      const getApiBaseUrl = () => {
+        if (typeof window !== 'undefined') {
+          const hostname = window.location.hostname;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3001/api';
+          }
+          const backendUrl = import.meta.env.VITE_API_BASE_URL;
+          if (backendUrl) {
+            return `${backendUrl}/api`;
+          }
+          return '/api';
+        }
+        return 'http://localhost:3001/api';
+      };
+      
+      const apiBase = getApiBaseUrl();
+      const startTime = Date.now();
+      
+      // Test endpoint health o auth/me
+      const token = getToken();
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${apiBase}/auth/me`, {
+        method: 'GET',
+        headers
+      });
+      
+      const responseTime = Date.now() - startTime;
+      
+      if (response.ok || response.status === 401) {
+        troubleshootingStatus.api = 'success';
+        testResults.api = `✅ API raggiungibile!\nTempo di risposta: ${responseTime}ms\nStatus: ${response.status}`;
+        await showAlert(testResults.api, 'Test API', 'OK', 'success');
+      } else {
+        troubleshootingStatus.api = 'error';
+        testResults.api = `⚠️ API risponde ma con errore\nStatus: ${response.status}\nTempo: ${responseTime}ms`;
+        await showAlert(testResults.api, 'Test API', 'OK', 'warning');
+      }
+    } catch (error) {
+      troubleshootingStatus.api = 'error';
+      testResults.api = `❌ Errore: ${error.message}`;
+      await showAlert(testResults.api, 'Test API', 'OK', 'error');
+    } finally {
+      isRunningTest = false;
+    }
+  }
+  
+  async function resetLocalSettings() {
+    const confirmed = await showConfirm(
+      'Vuoi resettare le impostazioni locali?\n\nQuesto rimuoverà:\n• Tema personalizzato\n• Stile UI\n• Lingua\n• Altre preferenze locali\n\nLe tue chat e account non verranno toccati.',
+      'Reset Impostazioni',
+      'Reset',
+      'Annulla',
+      'warning'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      // Rimuovi solo le impostazioni locali, non i dati
+      localStorage.removeItem('nebula-theme');
+      localStorage.removeItem('nebula-ui-style');
+      localStorage.removeItem('nebula-language');
+      
+      await showAlert(
+        '✅ Impostazioni locali resettate!\n\nLa pagina verrà ricaricata per applicare le impostazioni predefinite.',
+        'Reset Completato',
+        'OK',
+        'success'
+      );
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      await showAlert(`❌ Errore: ${error.message}`, 'Errore', 'OK', 'error');
+    }
+  }
+  
+  async function repairChats() {
+    const confirmed = await showConfirm(
+      'Vuoi tentare di riparare le chat corrotte?\n\nQuesta operazione:\n• Verifica l\'integrità delle chat\n• Rimuove chat duplicate\n• Ripara formati corrotti\n• Sincronizza con il database\n\nLe chat valide non verranno modificate.',
+      'Ripara Chat',
+      'Ripara',
+      'Annulla',
+      'info'
+    );
+    
+    if (!confirmed) return;
+    
+    isRunningTest = true;
+    troubleshootingStatus.repair = 'testing';
+    
+    try {
+      let repaired = 0;
+      let removed = 0;
+      let errors = 0;
+      
+      const allChats = get(chats);
+      const validChats = [];
+      const seenIds = new Set();
+      
+      for (const chat of allChats) {
+        // Verifica duplicati
+        if (seenIds.has(chat.id)) {
+          removed++;
+          continue;
+        }
+        seenIds.add(chat.id);
+        
+        // Verifica struttura base
+        if (!chat.id || !chat.title) {
+          // Tenta di riparare
+          if (!chat.id) {
+            chat.id = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            repaired++;
+          }
+          if (!chat.title) {
+            chat.title = 'Chat senza titolo';
+            repaired++;
+          }
+        }
+        
+        // Verifica messaggi
+        if (chat.messages && Array.isArray(chat.messages)) {
+          chat.messages = chat.messages.filter(msg => {
+            if (!msg || typeof msg !== 'object') {
+              errors++;
+              return false;
+            }
+            return true;
+          });
+        }
+        
+        validChats.push(chat);
+      }
+      
+      chats.set(validChats);
+      
+      // Salva in localStorage
+      localStorage.setItem('nebula-ai-chats', JSON.stringify(validChats));
+      
+      // Se autenticato, sincronizza con database
+      if ($isAuthenticatedStore) {
+        try {
+          const result = await getChatsFromDatabase();
+          if (result.success && result.chats) {
+            chats.set(result.chats);
+          }
+        } catch (error) {
+          console.warn('Errore sincronizzazione database:', error);
+        }
+      }
+      
+      troubleshootingStatus.repair = 'success';
+      const message = `✅ Riparazione completata!\n\n` +
+        `Chat valide: ${validChats.length}\n` +
+        `Chat riparate: ${repaired}\n` +
+        `Chat duplicate rimosse: ${removed}\n` +
+        `Errori corretti: ${errors}`;
+      
+      await showAlert(message, 'Riparazione Completata', 'OK', 'success');
+    } catch (error) {
+      troubleshootingStatus.repair = 'error';
+      await showAlert(`❌ Errore: ${error.message}`, 'Errore', 'OK', 'error');
+    } finally {
+      isRunningTest = false;
+    }
+  }
+  
+  async function syncData() {
+    if (!$isAuthenticatedStore) {
+      await showAlert(
+        '⚠️ Devi essere autenticato per sincronizzare i dati.',
+        'Autenticazione Richiesta',
+        'OK',
+        'warning'
+      );
+      return;
+    }
+    
+    isRunningTest = true;
+    troubleshootingStatus.sync = 'testing';
+    
+    try {
+      // Carica chat dal database
+      const result = await getChatsFromDatabase();
+      
+      if (result.success && result.chats) {
+        chats.set(result.chats);
+        // Salva anche in localStorage
+        localStorage.setItem('nebula-ai-chats', JSON.stringify(result.chats));
+        
+        troubleshootingStatus.sync = 'success';
+        await showAlert(
+          `✅ Sincronizzazione completata!\n\n${result.chats.length} chat sincronizzate con il database.`,
+          'Sincronizzazione',
+          'OK',
+          'success'
+        );
+      } else {
+        troubleshootingStatus.sync = 'error';
+        await showAlert(
+          `⚠️ ${result.message || 'Errore durante la sincronizzazione'}`,
+          'Sincronizzazione',
+          'OK',
+          'warning'
+        );
+      }
+    } catch (error) {
+      troubleshootingStatus.sync = 'error';
+      await showAlert(
+        `❌ Errore durante la sincronizzazione: ${error.message}`,
+        'Errore',
+        'OK',
+        'error'
+      );
+    } finally {
+      isRunningTest = false;
+    }
+  }
+  
+  function checkBrowserPermissions() {
+    const permissions = [];
+    const checks = [];
+    
+    // Check localStorage
+    try {
+      localStorage.setItem('test', 'test');
+      localStorage.removeItem('test');
+      checks.push({ name: 'localStorage', status: '✅ Disponibile' });
+    } catch (e) {
+      checks.push({ name: 'localStorage', status: '❌ Non disponibile', error: e.message });
+    }
+    
+    // Check sessionStorage
+    try {
+      sessionStorage.setItem('test', 'test');
+      sessionStorage.removeItem('test');
+      checks.push({ name: 'sessionStorage', status: '✅ Disponibile' });
+    } catch (e) {
+      checks.push({ name: 'sessionStorage', status: '❌ Non disponibile', error: e.message });
+    }
+    
+    // Check IndexedDB
+    if ('indexedDB' in window) {
+      checks.push({ name: 'IndexedDB', status: '✅ Disponibile' });
+    } else {
+      checks.push({ name: 'IndexedDB', status: '⚠️ Non disponibile' });
+    }
+    
+    // Check Web Crypto API
+    if (window.crypto && window.crypto.subtle) {
+      checks.push({ name: 'Web Crypto API', status: '✅ Disponibile' });
+    } else {
+      checks.push({ name: 'Web Crypto API', status: '❌ Non disponibile' });
+    }
+    
+    // Check Fetch API
+    if ('fetch' in window) {
+      checks.push({ name: 'Fetch API', status: '✅ Disponibile' });
+    } else {
+      checks.push({ name: 'Fetch API', status: '❌ Non disponibile' });
+    }
+    
+    // Check Service Worker
+    if ('serviceWorker' in navigator) {
+      checks.push({ name: 'Service Worker', status: '✅ Disponibile' });
+    } else {
+      checks.push({ name: 'Service Worker', status: '⚠️ Non disponibile' });
+    }
+    
+    const message = 'Verifica Permessi Browser:\n\n' +
+      checks.map(c => `${c.status} ${c.name}${c.error ? `\n   Errore: ${c.error}` : ''}`).join('\n');
+    
+    const hasErrors = checks.some(c => c.status.includes('❌'));
+    showAlert(message, 'Permessi Browser', 'OK', hasErrors ? 'warning' : 'info');
+  }
+  
+  function showPerformanceDiagnostics() {
+    const perf = {
+      memory: null,
+      connection: null,
+      timing: null
+    };
+    
+    // Memory info (se disponibile)
+    if (performance.memory) {
+      const memory = performance.memory;
+      perf.memory = {
+        used: (memory.usedJSHeapSize / 1024 / 1024).toFixed(2) + ' MB',
+        total: (memory.totalJSHeapSize / 1024 / 1024).toFixed(2) + ' MB',
+        limit: (memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2) + ' MB'
+      };
+    }
+    
+    // Connection info (se disponibile)
+    if (navigator.connection) {
+      const conn = navigator.connection;
+      perf.connection = {
+        effectiveType: conn.effectiveType || 'N/A',
+        downlink: conn.downlink ? conn.downlink + ' Mbps' : 'N/A',
+        rtt: conn.rtt ? conn.rtt + ' ms' : 'N/A',
+        saveData: conn.saveData ? 'Attivo' : 'Disattivo'
+      };
+    }
+    
+    // Navigation timing
+    if (performance.timing) {
+      const timing = performance.timing;
+      const loadTime = timing.loadEventEnd - timing.navigationStart;
+      perf.timing = {
+        loadTime: (loadTime / 1000).toFixed(2) + ' s',
+        domReady: ((timing.domContentLoadedEventEnd - timing.navigationStart) / 1000).toFixed(2) + ' s'
+      };
+    }
+    
+    let message = 'Diagnostica Performance:\n\n';
+    
+    if (perf.memory) {
+      message += `Memoria:\n` +
+        `• Utilizzata: ${perf.memory.used}\n` +
+        `• Totale: ${perf.memory.total}\n` +
+        `• Limite: ${perf.memory.limit}\n\n`;
+    }
+    
+    if (perf.connection) {
+      message += `Connessione:\n` +
+        `• Tipo: ${perf.connection.effectiveType}\n` +
+        `• Velocità: ${perf.connection.downlink}\n` +
+        `• Latenza: ${perf.connection.rtt}\n` +
+        `• Risparmio dati: ${perf.connection.saveData}\n\n`;
+    }
+    
+    if (perf.timing) {
+      message += `Tempi di Caricamento:\n` +
+        `• Caricamento completo: ${perf.timing.loadTime}\n` +
+        `• DOM pronto: ${perf.timing.domReady}\n`;
+    }
+    
+    if (!perf.memory && !perf.connection && !perf.timing) {
+      message = '⚠️ Informazioni di performance limitate.\n\nIl tuo browser potrebbe non supportare tutte le API di performance.';
+    }
+    
+    showAlert(message, 'Diagnostica Performance', 'OK', 'info');
   }
   
   // Ottieni abbonamento dal database
@@ -1328,6 +1854,231 @@
             </div>
           {/if}
           
+          <!-- Troubleshooting -->
+          {#if activeSection === 'troubleshooting'}
+            <div class="setting-section" class:section-visible={activeSection === 'troubleshooting'}>
+              <h3 class="setting-title">Test Connessioni</h3>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Test Database</div>
+                  <div class="setting-description">Verifica la connessione al database e lo stato del servizio</div>
+                </div>
+                <button 
+                  class="manage-button" 
+                  on:click={testDatabase} 
+                  disabled={isRunningTest}
+                >
+                  {#if troubleshootingStatus.database === 'testing'}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 6v6l4 2"/>
+                    </svg>
+                    Test in corso...
+                  {:else}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Testa
+                  {/if}
+                </button>
+              </div>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Test Crittografia</div>
+                  <div class="setting-description">Verifica che il sistema di crittografia funzioni correttamente</div>
+                </div>
+                <button 
+                  class="manage-button" 
+                  on:click={testEncryption} 
+                  disabled={isRunningTest}
+                >
+                  {#if troubleshootingStatus.encryption === 'testing'}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 6v6l4 2"/>
+                    </svg>
+                    Test in corso...
+                  {:else}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                    Testa
+                  {/if}
+                </button>
+              </div>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Test API</div>
+                  <div class="setting-description">Verifica che le API del server rispondano correttamente</div>
+                </div>
+                <button 
+                  class="manage-button" 
+                  on:click={testAPI} 
+                  disabled={isRunningTest}
+                >
+                  {#if troubleshootingStatus.api === 'testing'}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 6v6l4 2"/>
+                    </svg>
+                    Test in corso...
+                  {:else}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 16V8a2 2 0 00-2-2h-5l-2-3H6a2 2 0 00-2 2v8a2 2 0 002 2h13a2 2 0 002-2z"/>
+                      <circle cx="12" cy="13" r="3"/>
+                    </svg>
+                    Testa
+                  {/if}
+                </button>
+              </div>
+            </div>
+            
+            <div class="setting-section" class:section-visible={activeSection === 'troubleshooting'}>
+              <h3 class="setting-title">Manutenzione</h3>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Pulizia Cache</div>
+                  <div class="setting-description">Rimuove la cache dell'applicazione e del browser per risolvere problemi di caricamento</div>
+                </div>
+                <button class="manage-button" on:click={clearCache}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                  </svg>
+                  Pulisci
+                </button>
+              </div>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Verifica Storage</div>
+                  <div class="setting-description">Controlla lo spazio utilizzato in localStorage e sessionStorage</div>
+                </div>
+                <button class="manage-button" on:click={checkStorage}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 00-2-2h-5l-2-3H6a2 2 0 00-2 2v8a2 2 0 002 2h13a2 2 0 002-2z"/>
+                    <circle cx="12" cy="13" r="3"/>
+                  </svg>
+                  Verifica
+                </button>
+              </div>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Reset Impostazioni Locali</div>
+                  <div class="setting-description">Ripristina tema, stile UI e altre preferenze alle impostazioni predefinite</div>
+                </div>
+                <button class="manage-button secondary" on:click={resetLocalSettings}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 003.51 15"/>
+                  </svg>
+                  Reset
+                </button>
+              </div>
+            </div>
+            
+            <div class="setting-section" class:section-visible={activeSection === 'troubleshooting'}>
+              <h3 class="setting-title">Riparazione Dati</h3>
+              
+              {#if $isAuthenticatedStore}
+                <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                  <div class="setting-info">
+                    <div class="setting-label">Ripara Chat</div>
+                    <div class="setting-description">Verifica e ripara chat corrotte, rimuove duplicati e corregge errori di formato</div>
+                  </div>
+                  <button 
+                    class="manage-button" 
+                    on:click={repairChats} 
+                    disabled={isRunningTest}
+                  >
+                    {#if troubleshootingStatus.repair === 'testing'}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                      </svg>
+                      Riparazione...
+                    {:else}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 010-8.49l-2.82-2.83a6 6 0 01-8.49 0l-3.76 3.76a1 1 0 00-.38 1.11l.95 4.57-4.95 4.95a2 2 0 000 2.83l2.82 2.82a2 2 0 002.83 0l4.95-4.95.95.95a1 1 0 001.11.38l4.57-.95a1 1 0 00.62-.52l.74-1.48a1 1 0 00-.16-1.34l-3.77-3.77z"/>
+                      </svg>
+                      Ripara
+                    {/if}
+                  </button>
+                </div>
+                
+                <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                  <div class="setting-info">
+                    <div class="setting-label">Sincronizza Dati</div>
+                    <div class="setting-description">Forza una sincronizzazione completa con il database</div>
+                  </div>
+                  <button 
+                    class="manage-button" 
+                    on:click={syncData} 
+                    disabled={isRunningTest}
+                  >
+                    {#if troubleshootingStatus.sync === 'testing'}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                      </svg>
+                      Sincronizzazione...
+                    {:else}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      Sincronizza
+                    {/if}
+                  </button>
+                </div>
+              {:else}
+                <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                  <div class="setting-info">
+                    <div class="setting-label">Autenticazione richiesta</div>
+                    <div class="setting-description">Accedi per utilizzare le funzioni di riparazione e sincronizzazione</div>
+                  </div>
+                </div>
+              {/if}
+            </div>
+            
+            <div class="setting-section" class:section-visible={activeSection === 'troubleshooting'}>
+              <h3 class="setting-title">Diagnostica</h3>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Verifica Permessi Browser</div>
+                  <div class="setting-description">Controlla i permessi e le API disponibili nel tuo browser</div>
+                </div>
+                <button class="manage-button" on:click={checkBrowserPermissions}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  Verifica
+                </button>
+              </div>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'troubleshooting'}>
+                <div class="setting-info">
+                  <div class="setting-label">Diagnostica Performance</div>
+                  <div class="setting-description">Mostra informazioni su memoria, connessione e tempi di caricamento</div>
+                </div>
+                <button class="manage-button" on:click={showPerformanceDiagnostics}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                  Mostra
+                </button>
+              </div>
+            </div>
+          {/if}
+          
           <!-- Informazioni -->
           {#if activeSection === 'informazioni'}
             <div class="setting-row" class:row-visible={activeSection === 'informazioni'}>
@@ -1345,6 +2096,9 @@
     </div>
   </div>
 {/if}
+
+<TermsModal bind:isOpen={isTermsModalOpen} />
+<PrivacyModal bind:isOpen={isPrivacyModalOpen} />
 
 <style>
   .modal-backdrop {
@@ -2304,4 +3058,29 @@
   }
 
   /* Rimuovi stili duplicati - già gestiti sopra */
+  
+  /* Troubleshooting styles */
+  .spinning {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .manage-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  
+  .manage-button:disabled:hover {
+    transform: none;
+    background-color: var(--bg-tertiary);
+  }
 </style>
