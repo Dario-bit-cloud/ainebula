@@ -184,11 +184,16 @@ async function authenticateToken(req) {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    console.warn('⚠️ [CHAT API] Token non fornito');
     return { error: 'Token non fornito', status: 401 };
   }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('🔐 [CHAT API] Token JWT verificato:', {
+      userId: decoded.userId || decoded.id,
+      hasToken: !!token
+    });
     
     const sessions = await sql`
       SELECT s.*, u.id as user_id, u.email, u.username, u.is_active
@@ -200,11 +205,20 @@ async function authenticateToken(req) {
     `;
     
     if (sessions.length === 0) {
+      console.warn('⚠️ [CHAT API] Sessione non trovata o scaduta per token:', token.substring(0, 20) + '...');
       return { error: 'Sessione non valida', status: 401 };
     }
     
-    return { user: sessions[0] };
+    const user = sessions[0];
+    console.log('✅ [CHAT API] Autenticazione riuscita:', {
+      userId: user.user_id,
+      username: user.username,
+      email: user.email
+    });
+    
+    return { user };
   } catch (error) {
+    console.error('❌ [CHAT API] Errore verifica token:', error.message);
     return { error: 'Token non valido', status: 403 };
   }
 }
@@ -237,6 +251,30 @@ export default async function handler(req, res) {
   try {
     // GET - Ottieni tutte le chat dell'utente
     if (req.method === 'GET') {
+      console.log('📥 [CHAT API] Caricamento chat per user_id:', user.user_id);
+      
+      // Prima verifica che l'utente esista e abbia chat
+      const userCheck = await sql`
+        SELECT id FROM users WHERE id = ${user.user_id}
+      `;
+      
+      if (userCheck.length === 0) {
+        console.error('❌ [CHAT API] Utente non trovato:', user.user_id);
+        return res.status(404).json({
+          success: false,
+          message: 'Utente non trovato'
+        });
+      }
+      
+      // Conta le chat dell'utente per debug
+      const chatCount = await sql`
+        SELECT COUNT(*) as count FROM chats 
+        WHERE user_id = ${user.user_id} AND is_temporary = false
+      `;
+      console.log('📊 [CHAT API] Numero di chat trovate:', chatCount[0]?.count || 0);
+      
+      // Query ottimizzata: carica solo i metadati delle chat (lazy loading messaggi)
+      // I messaggi verranno caricati on-demand quando si apre una chat
       const chats = await sql`
         SELECT 
           c.id,
@@ -245,35 +283,35 @@ export default async function handler(req, res) {
           c.created_at,
           c.updated_at,
           c.is_temporary,
-          COALESCE(
-            json_agg(
-              json_build_object(
-                'id', m.id,
-                'type', m.type,
-                'content', m.content,
-                'hidden', m.hidden,
-                'timestamp', m.timestamp
-              ) ORDER BY m.timestamp
-            ) FILTER (WHERE m.id IS NOT NULL),
-            '[]'::json
-          ) as messages
+          (
+            SELECT COUNT(*)::int
+            FROM messages m
+            WHERE m.chat_id = c.id AND COALESCE(m.hidden, false) = false
+          ) as message_count
         FROM chats c
-        LEFT JOIN messages m ON c.id = m.chat_id
         WHERE c.user_id = ${user.user_id}
           AND c.is_temporary = false
-        GROUP BY c.id, c.title, c.project_id, c.created_at, c.updated_at, c.is_temporary
-        ORDER BY c.updated_at DESC
+        ORDER BY c.updated_at DESC NULLS LAST
+        LIMIT 100
       `;
       
-      const formattedChats = chats.map(chat => ({
-        id: chat.id,
-        title: chat.title,
-        projectId: chat.project_id,
-        messages: chat.messages || [],
-        createdAt: chat.created_at,
-        updatedAt: chat.updated_at,
-        isTemporary: chat.is_temporary
-      }));
+      console.log('✅ [CHAT API] Chat caricate dal database:', chats.length);
+      
+      // Formatta le chat per il frontend (senza messaggi per performance)
+      const formattedChats = chats.map(chat => {
+        return {
+          id: chat.id,
+          title: chat.title || 'Nuova chat',
+          projectId: chat.project_id || null,
+          messages: [], // Messaggi caricati lazy on-demand
+          messageCount: chat.message_count || 0,
+          createdAt: chat.created_at ? new Date(chat.created_at).toISOString() : new Date().toISOString(),
+          updatedAt: chat.updated_at ? new Date(chat.updated_at).toISOString() : new Date().toISOString(),
+          isTemporary: chat.is_temporary || false
+        };
+      });
+      
+      console.log('✅ [CHAT API] Chat formattate:', formattedChats.length);
       
       return res.json({
         success: true,
@@ -285,20 +323,56 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const { id, title, messages, projectId, isTemporary } = req.body;
       
+      console.log('💾 [CHAT API] Salvataggio chat:', {
+        chatId: id,
+        userId: user.user_id,
+        title: title?.substring(0, 50),
+        messagesCount: messages?.length || 0,
+        isTemporary: isTemporary || false
+      });
+      
       if (!id || !title) {
+        console.error('❌ [CHAT API] ID o titolo mancanti:', { id, title });
         return res.status(400).json({
           success: false,
           message: 'ID e titolo sono obbligatori'
         });
       }
       
+      // Verifica che l'utente esista
+      const userCheck = await sql`
+        SELECT id FROM users WHERE id = ${user.user_id}
+      `;
+      
+      if (userCheck.length === 0) {
+        console.error('❌ [CHAT API] Utente non trovato durante salvataggio:', user.user_id);
+        return res.status(404).json({
+          success: false,
+          message: 'Utente non trovato'
+        });
+      }
+      
       // Verifica se la chat esiste già
       const existingChat = await sql`
-        SELECT id FROM chats WHERE id = ${id} AND user_id = ${user.user_id}
+        SELECT id, user_id FROM chats WHERE id = ${id}
       `;
       
       if (existingChat.length > 0) {
+        // Verifica che la chat appartenga all'utente
+        if (existingChat[0].user_id !== user.user_id) {
+          console.error('❌ [CHAT API] Tentativo di modificare chat di altro utente:', {
+            chatId: id,
+            chatUserId: existingChat[0].user_id,
+            currentUserId: user.user_id
+          });
+          return res.status(403).json({
+            success: false,
+            message: 'Non autorizzato a modificare questa chat'
+          });
+        }
+        
         // Aggiorna la chat esistente
+        console.log('🔄 [CHAT API] Aggiornamento chat esistente:', id);
         await sql`
           UPDATE chats 
           SET title = ${title}, 
@@ -309,39 +383,74 @@ export default async function handler(req, res) {
         `;
       } else {
         // Crea una nuova chat
-        await sql`
-          INSERT INTO chats (id, user_id, title, project_id, is_temporary, updated_at)
-          VALUES (${id}, ${user.user_id}, ${title}, ${projectId || null}, ${isTemporary || false}, NOW())
-        `;
+        console.log('✨ [CHAT API] Creazione nuova chat:', id);
+        try {
+          await sql`
+            INSERT INTO chats (id, user_id, title, project_id, is_temporary, created_at, updated_at)
+            VALUES (${id}, ${user.user_id}, ${title}, ${projectId || null}, ${isTemporary || false}, NOW(), NOW())
+          `;
+          console.log('✅ [CHAT API] Chat creata con successo:', id);
+        } catch (insertError) {
+          console.error('❌ [CHAT API] Errore creazione chat:', insertError);
+          // Se l'errore è dovuto a un duplicato, prova ad aggiornare
+          if (insertError.message?.includes('duplicate') || insertError.code === '23505') {
+            console.log('🔄 [CHAT API] Chat già esistente, aggiorno:', id);
+            await sql`
+              UPDATE chats 
+              SET title = ${title}, 
+                  project_id = ${projectId || null}, 
+                  is_temporary = ${isTemporary || false},
+                  updated_at = NOW()
+              WHERE id = ${id} AND user_id = ${user.user_id}
+            `;
+          } else {
+            throw insertError;
+          }
+        }
       }
       
       // Salva i messaggi
-      if (messages && messages.length > 0) {
+      if (messages && Array.isArray(messages) && messages.length > 0) {
+        console.log('💬 [CHAT API] Salvataggio messaggi:', messages.length);
+        
         // Elimina i messaggi esistenti per questa chat
         await sql`DELETE FROM messages WHERE chat_id = ${id}`;
         
         // Filtra solo i messaggi non nascosti
         const visibleMessages = messages.filter(msg => !msg.hidden);
+        console.log('💬 [CHAT API] Messaggi visibili da salvare:', visibleMessages.length);
         
-        // Batch insert: inserisci tutti i messaggi in batch (molto più veloce del loop sequenziale)
+        // Batch insert ottimizzato: inserisci tutti i messaggi in parallelo (chunked)
         if (visibleMessages.length > 0) {
-          // Inserisci in batch usando Promise.all per parallelizzare
-          // Questo è più veloce di un loop sequenziale ma mantiene la compatibilità
-          const insertPromises = visibleMessages.map(msg => 
-            sql`
-              INSERT INTO messages (chat_id, type, content, hidden, timestamp)
-              VALUES (${id}, ${msg.type}, ${msg.content}, ${msg.hidden || false}, ${msg.timestamp || new Date().toISOString()})
-            `
-          );
+          // Usa chunk di 200 per bilanciare performance e memoria
+          const chunkSize = 200;
+          const chunks = [];
+          for (let i = 0; i < visibleMessages.length; i += chunkSize) {
+            chunks.push(visibleMessages.slice(i, i + chunkSize));
+          }
           
-          // Esegui tutti gli insert in parallelo
-          await Promise.all(insertPromises);
+          // Esegui tutti i chunk in parallelo per massima velocità
+          await Promise.all(chunks.map(chunk => 
+            Promise.all(chunk.map(msg => {
+              const timestamp = msg.timestamp 
+                ? (msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp)
+                : new Date().toISOString();
+              
+              return sql`
+                INSERT INTO messages (chat_id, type, content, hidden, timestamp)
+                VALUES (${id}, ${msg.type || 'user'}, ${msg.content || ''}, ${msg.hidden || false}, ${timestamp})
+              `;
+            }))
+          ));
+          
+          console.log('✅ [CHAT API] Messaggi salvati con successo (batch parallelo):', visibleMessages.length);
         }
       }
       
       // Applica limite di 50MB per utente (nascosto)
       await enforceChatHistoryLimit(user.user_id);
       
+      console.log('✅ [CHAT API] Chat salvata con successo:', id);
       return res.json({
         success: true,
         message: 'Chat salvata con successo'

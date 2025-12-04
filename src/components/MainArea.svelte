@@ -673,36 +673,43 @@
       return; // Non inviare il messaggio all'IA
     }
     
-    try {
-      const chatId = $currentChatId || await createNewChat();
-      
-      const userMessage = { 
-        type: 'user', 
-        content: messageText,
-        timestamp: new Date().toISOString() 
-      };
-      
+    // OTTIMIZZAZIONE MOBILE: Blur immediato per chiudere tastiera velocemente
+    if (get(isMobile) && textareaRef) {
+      textareaRef.blur();
+    }
+    
+    // Reset input IMMEDIATAMENTE per feedback visivo istantaneo
+    inputValue = '';
+    attachedImages = [];
+    
+    // Mostra loading IMMEDIATAMENTE (prima di qualsiasi operazione pesante)
+    isGenerating.set(true);
+    
+    // Ottieni o crea chatId - createNewChat è veloce (solo store update)
+    let chatId = $currentChatId;
+    if (!chatId) {
+      // Crea chat immediatamente (è veloce, non fa chiamate API sincrone)
+      chatId = await createNewChat();
+    }
+    
+    // Aggiungi messaggio utente IMMEDIATAMENTE (ottimistico)
+    const userMessage = { 
+      type: 'user', 
+      content: messageText,
+      timestamp: new Date().toISOString() 
+    };
+    
+    // Usa requestAnimationFrame per aggiornamento UI non bloccante
+    requestAnimationFrame(() => {
       addMessage(chatId, userMessage);
-      
-      // Reset input immediatamente per feedback visivo veloce
-      inputValue = '';
-      attachedImages = [];
-      
-      // Non aspettare tick su mobile - più veloce
-      if (get(isMobile)) {
-        scrollToBottom();
-      } else {
-        await tick();
-        scrollToBottom();
-      }
-      
-      isGenerating.set(true);
+      scrollToBottom();
+    });
       
       // Crea AbortController per poter fermare la generazione
       const abortController = new AbortController();
       setAbortController(abortController);
       
-      // Crea messaggio AI vuoto
+      // Crea messaggio AI vuoto IMMEDIATAMENTE (ottimistico)
       const aiMessageId = Date.now().toString();
       currentStreamingMessageId = aiMessageId;
       const aiMessage = { 
@@ -711,12 +718,26 @@
         content: '', 
         timestamp: new Date().toISOString() 
       };
-      addMessage(chatId, aiMessage);
+      
+      // Usa requestAnimationFrame per aggiornamento UI non bloccante
+      requestAnimationFrame(() => {
+        addMessage(chatId, aiMessage);
+        scrollToBottom();
+      });
+      
+      // Procedi con la generazione in background
+      // Usa un piccolo delay per assicurarsi che la chat sia disponibile nello store
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       try {
         const currentChatData = get(currentChat);
         if (!currentChatData) {
-          throw new Error('Chat corrente non disponibile');
+          // Se la chat non è ancora disponibile, aspetta un altro frame
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          const retryChatData = get(currentChat);
+          if (!retryChatData) {
+            throw new Error('Chat corrente non disponibile');
+          }
         }
         
         const messageIndex = currentChatData.messages.length - 1;

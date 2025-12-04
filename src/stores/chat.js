@@ -20,33 +20,9 @@ export const currentChat = derived(
 
 // Funzioni helper
 export async function createNewChat(projectId = null) {
-  const allChats = get(chats);
-  const currentId = get(currentChatId);
-  
-  // Elimina automaticamente le chat "Nuova chat" vuote prima di crearne una nuova
-  // Non eliminare la chat corrente se è "Nuova chat" (potrebbe essere quella in uso)
-  const emptyNewChats = allChats.filter(chat => {
-    // Seleziona solo chat con titolo "Nuova chat"
-    if (chat.title !== 'Nuova chat') return false;
-    
-    // Non eliminare la chat corrente
-    if (chat.id === currentId) return false;
-    
-    // Elimina solo chat vuote (senza messaggi o con solo messaggi nascosti/vuoti)
-    const hasVisibleMessages = chat.messages && 
-                              chat.messages.length > 0 && 
-                              chat.messages.some(msg => !msg.hidden && msg.content && msg.content.trim().length > 0);
-    
-    return !hasVisibleMessages;
-  });
-  
-  // Elimina le chat "Nuova chat" vuote
-  for (const chatToDelete of emptyNewChats) {
-    await deleteChat(chatToDelete.id);
-  }
-  
   const incognito = get(isIncognitoMode);
   
+  // Crea la chat IMMEDIATAMENTE nello store (non bloccante)
   const newChat = {
     id: Date.now().toString(),
     title: 'Nuova chat',
@@ -59,20 +35,36 @@ export async function createNewChat(projectId = null) {
   chats.update(allChats => [newChat, ...allChats]);
   currentChatId.set(newChat.id);
   
-  // Salva in localStorage e backup solo se non è in modalità incognito
-  if (!incognito) {
-    // Salva immediatamente in localStorage
-    try {
-      saveChatsToStorage();
-      log('✅ [CHAT STORE] Nuova chat salvata in localStorage');
-    } catch (error) {
-      logError('❌ [CHAT STORE] Errore durante salvataggio nuova chat in localStorage:', error);
-    }
+  // Operazioni pesanti in background (non bloccanti)
+  setTimeout(() => {
+    const allChats = get(chats);
+    const currentId = get(currentChatId);
     
-    // Salva anche nel backup se autenticato
-    if (get(isAuthenticatedStore)) {
+    // Elimina automaticamente le chat "Nuova chat" vuote (in background)
+    const emptyNewChats = allChats.filter(chat => {
+      if (chat.title !== 'Nuova chat') return false;
+      if (chat.id === currentId) return false;
+      const hasVisibleMessages = chat.messages && 
+                                chat.messages.length > 0 && 
+                                chat.messages.some(msg => !msg.hidden && msg.content && msg.content.trim().length > 0);
+      return !hasVisibleMessages;
+    });
+    
+    // Elimina in background
+    emptyNewChats.forEach(chatToDelete => {
+      deleteChat(chatToDelete.id).catch(err => logError('Errore eliminazione chat vuota:', err));
+    });
+    
+    // Salva in localStorage in background
+    if (!incognito) {
       try {
-        const allChats = get(chats);
+        saveChatsToStorage();
+      } catch (error) {
+        logError('❌ [CHAT STORE] Errore durante salvataggio nuova chat in localStorage:', error);
+      }
+      
+      // Salva anche nel backup se autenticato (in background)
+      if (get(isAuthenticatedStore)) {
         const chatsToBackup = allChats.filter(c => 
           c.messages && 
           c.messages.length > 0 && 
@@ -80,15 +72,13 @@ export async function createNewChat(projectId = null) {
         );
         
         if (chatsToBackup.length > 0) {
-          await saveChatsBackup(chatsToBackup);
-          log('✅ [CHAT STORE] Nuova chat sincronizzata nel backup');
+          saveChatsBackup(chatsToBackup).catch(err => 
+            logWarn('⚠️ [CHAT STORE] Errore durante salvataggio backup nuova chat:', err)
+          );
         }
-      } catch (error) {
-        logWarn('⚠️ [CHAT STORE] Errore durante salvataggio backup nuova chat:', error);
       }
     }
-  }
-  // Le chat temporanee rimangono solo in memoria
+  }, 0);
   
   return newChat.id;
 }
@@ -115,6 +105,7 @@ export function removeChatFromProject(chatId) {
 }
 
 export async function addMessage(chatId, message) {
+  // Aggiorna lo store IMMEDIATAMENTE (sincrono, non bloccante)
   chats.update(allChats => {
     return allChats.map(chat => {
       if (chat.id === chatId) {
@@ -135,13 +126,15 @@ export async function addMessage(chatId, message) {
     });
   });
   
-  // Salva solo se ha almeno un messaggio visibile
-  const allChats = get(chats);
-  const chat = allChats.find(c => c.id === chatId);
-  if (chat && chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
-    // Usa debounce per salvataggi automatici
-    debouncedSaveChat(chat);
-  }
+  // Salvataggio in background (non bloccante) - usa setTimeout per non bloccare l'UI
+  setTimeout(() => {
+    const allChats = get(chats);
+    const chat = allChats.find(c => c.id === chatId);
+    if (chat && chat.messages && chat.messages.length > 0 && chat.messages.some(msg => !msg.hidden)) {
+      // Usa debounce per salvataggi automatici
+      debouncedSaveChat(chat);
+    }
+  }, 0);
 }
 
 // Flag per prevenire eliminazioni multiple simultanee
@@ -207,12 +200,33 @@ export async function deleteChat(chatId) {
 export async function loadChat(chatId) {
   currentChatId.set(chatId);
   
-  // Lazy decryption: decrittografa i messaggi della chat quando viene aperta
   const allChats = get(chats);
   const chat = allChats.find(c => c.id === chatId);
   
-  if (chat && chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
-    // Controlla se i messaggi sono crittografati (hanno il prefisso "encrypted:")
+  // Lazy loading: carica i messaggi dal database se non sono già caricati
+  if (chat && (!chat.messages || chat.messages.length === 0) && chat.messageCount > 0) {
+    log(`📥 [CHAT STORE] Caricamento lazy messaggi per chat ${chatId}...`);
+    
+    try {
+      const { getChatMessagesFromDatabase } = await import('../services/chatService.js');
+      const result = await getChatMessagesFromDatabase(chatId);
+      
+      if (result.success && result.messages) {
+        // Aggiorna la chat con i messaggi caricati
+        chats.update(allChats => 
+          allChats.map(c => 
+            c.id === chatId 
+              ? { ...c, messages: result.messages || [] }
+              : c
+          )
+        );
+        log(`✅ [CHAT STORE] Caricati ${result.messages.length} messaggi per chat ${chatId}`);
+      }
+    } catch (error) {
+      logError(`❌ [CHAT STORE] Errore caricamento messaggi chat ${chatId}:`, error);
+    }
+  } else if (chat && chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+    // Lazy decryption: decrittografa i messaggi della chat se sono crittografati
     const hasEncryptedMessages = chat.messages.some(msg => 
       msg.content && typeof msg.content === 'string' && msg.content.startsWith('encrypted:')
     );
@@ -221,7 +235,6 @@ export async function loadChat(chatId) {
       // Decrittografa solo questa chat (lazy decryption)
       const { getCurrentUser } = await import('../services/authService.js');
       const { getEncryptionKeyForUser } = await import('../services/encryptionService.js');
-      const { decryptMessages } = await import('../services/encryptionService.js');
       
       const user = getCurrentUser();
       if (user && user.id) {

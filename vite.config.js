@@ -13,7 +13,8 @@ export default defineConfig({
     // Rimuove console.log in produzione tramite esbuild
     esbuild: {
       drop: ['console', 'debugger'],
-      legalComments: 'none'
+      legalComments: 'none',
+      treeShaking: true
     },
     // Code splitting ottimizzato
     rollupOptions: {
@@ -47,6 +48,12 @@ export default defineConfig({
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]'
+      },
+      // Tree shaking più aggressivo
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false
       }
     },
     // Aumenta il limite di warning per chunk size (dopo code splitting sarà più piccolo)
@@ -63,13 +70,16 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug']
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+        passes: 2 // Doppio passaggio per migliore compressione
       }
     },
     // Ottimizza le dipendenze
     commonjsOptions: {
       transformMixedEsModules: true
-    }
+    },
+    // Abilita compressione brotli/gzip
+    reportCompressedSize: true
   },
   // Ottimizzazioni per le dipendenze
   optimizeDeps: {

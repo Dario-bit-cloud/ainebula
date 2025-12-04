@@ -11,6 +11,7 @@ import {
 } from './encryptionService.js';
 import { getCurrentUser } from './authService.js';
 import { log, logWarn, logError } from '../utils/logger.js';
+import { getCachedData, invalidateCache } from '../utils/apiCache.js';
 
 // Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
@@ -113,34 +114,38 @@ async function batchDecryptChats(chats, encryptionKey, userId) {
 
 /**
  * Ottiene tutte le chat dell'utente dal database e le decrittografa
+ * Usa cache per evitare richieste duplicate
  */
 export async function getChatsFromDatabase() {
   const url = API_BASE_URL;
+  const cacheKey = 'chats_list';
   
-  log('💬 [CHAT SERVICE] Caricamento chat dal database:', {
-    url,
-    timestamp: new Date().toISOString()
-  });
-  
-  try {
-    const token = localStorage.getItem('auth_token');
-    
-    if (!token) {
-      logWarn('⚠️ [CHAT SERVICE] Nessun token trovato');
-      return { success: false, message: 'Non autenticato' };
-    }
-    
-    log('📤 [CHAT SERVICE] Invio richiesta GET:', { url });
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Accept-Encoding': 'identity' // Disabilita compressione per evitare ERR_CONTENT_DECODING_FAILED
-      }
+  // Usa cache con TTL di 30 secondi per le chat
+  return getCachedData(cacheKey, async () => {
+    log('💬 [CHAT SERVICE] Caricamento chat dal database:', {
+      url,
+      timestamp: new Date().toISOString()
     });
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      if (!token) {
+        logWarn('⚠️ [CHAT SERVICE] Nessun token trovato');
+        return { success: false, message: 'Non autenticato' };
+      }
+      
+      log('📤 [CHAT SERVICE] Invio richiesta GET:', { url });
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Accept-Encoding': 'identity' // Disabilita compressione per evitare ERR_CONTENT_DECODING_FAILED
+        }
+      });
     
     log('📥 [CHAT SERVICE] Risposta ricevuta:', {
       status: response.status,
@@ -251,6 +256,104 @@ export async function getChatsFromDatabase() {
       url
     };
   }
+  }, 30000); // Cache per 30 secondi
+}
+
+/**
+ * Invalida la cache delle chat (da chiamare dopo salvataggio/eliminazione)
+ */
+export function invalidateChatsCache() {
+  invalidateCache('chats_list');
+}
+
+/**
+ * Carica i messaggi di una singola chat dal database (lazy loading)
+ * Usa cache per evitare richieste duplicate
+ */
+export async function getChatMessagesFromDatabase(chatId) {
+  const url = `${API_BASE_URL}/${chatId}`;
+  const cacheKey = `chat_messages_${chatId}`;
+  
+  // Usa cache con TTL di 60 secondi per i messaggi
+  return getCachedData(cacheKey, async () => {
+    log('💬 [CHAT SERVICE] Caricamento messaggi chat:', {
+      url,
+      chatId,
+      timestamp: new Date().toISOString()
+    });
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      if (!token) {
+        logWarn('⚠️ [CHAT SERVICE] Nessun token trovato');
+        return { success: false, message: 'Non autenticato' };
+      }
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Errore sconosciuto');
+        return {
+          success: false,
+          message: `Errore server: ${response.status} ${response.statusText}`,
+          error: errorText
+        };
+      }
+      
+      const data = await response.json();
+      
+      // Decrittografa i messaggi se necessario
+      if (data && data.success && data.messages && Array.isArray(data.messages)) {
+        const user = getCurrentUser();
+        if (user && user.id) {
+          const password = getCachedPassword(user.id);
+          if (password) {
+            const encryptionKey = await getEncryptionKeyForUser(user.id, password);
+            if (encryptionKey) {
+              try {
+                const { decryptMessages } = await import('./encryptionService.js');
+                const decryptedMessages = await decryptMessages(data.messages, encryptionKey);
+                data.messages = decryptedMessages;
+                log(`✅ [CHAT SERVICE] Decrittografati ${data.messages.length} messaggi`);
+              } catch (error) {
+                logError('❌ [CHAT SERVICE] Errore durante decrittografia messaggi:', error);
+              }
+            }
+          }
+        }
+      }
+      
+      return data;
+    } catch (error) {
+      logError('❌ [CHAT SERVICE] Errore durante caricamento messaggi:', {
+        name: error.name,
+        message: error.message,
+        chatId,
+        url
+      });
+      
+      return {
+        success: false,
+        message: 'Errore nella comunicazione con il server',
+        error: error.message
+      };
+    }
+  }, 60000); // Cache per 60 secondi
+}
+
+/**
+ * Invalida la cache dei messaggi di una chat (da chiamare dopo salvataggio)
+ */
+export function invalidateChatMessagesCache(chatId) {
+  invalidateCache(`chat_messages_${chatId}`);
 }
 
 /**
@@ -359,6 +462,9 @@ export async function saveChatToDatabase(chat) {
       data = JSON.parse(responseText);
       if (data.success) {
         log('✅ [CHAT SERVICE] Chat salvata con successo:', chat.id);
+        // Invalida la cache dopo il salvataggio
+        invalidateChatsCache();
+        invalidateChatMessagesCache(chat.id);
       } else {
         logWarn('⚠️ [CHAT SERVICE] Salvataggio fallito:', data);
       }
@@ -445,6 +551,9 @@ export async function deleteChatFromDatabase(chatId) {
     
     if (data.success) {
       log('✅ [CHAT SERVICE] Chat eliminata con successo:', chatId);
+      // Invalida la cache dopo l'eliminazione
+      invalidateChatsCache();
+      invalidateChatMessagesCache(chatId);
     } else {
       logWarn('⚠️ [CHAT SERVICE] Eliminazione fallita:', data);
     }

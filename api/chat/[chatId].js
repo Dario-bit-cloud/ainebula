@@ -65,6 +65,45 @@ export default async function handler(req, res) {
   const chatId = req.query.chatId || req.query.id;
 
   try {
+    // GET - Carica i messaggi di una singola chat (lazy loading)
+    if (req.method === 'GET') {
+      // Verifica che la chat appartenga all'utente
+      const chat = await sql`
+        SELECT id FROM chats WHERE id = ${chatId} AND user_id = ${user.user_id}
+      `;
+      
+      if (chat.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Chat non trovata'
+        });
+      }
+      
+      // Carica i messaggi della chat
+      const messages = await sql`
+        SELECT 
+          id,
+          type,
+          content,
+          COALESCE(hidden, false) as hidden,
+          timestamp
+        FROM messages
+        WHERE chat_id = ${chatId}
+        ORDER BY timestamp ASC
+      `;
+      
+      return res.json({
+        success: true,
+        messages: messages.map(msg => ({
+          id: msg.id,
+          type: msg.type,
+          content: msg.content,
+          hidden: msg.hidden,
+          timestamp: msg.timestamp ? new Date(msg.timestamp).toISOString() : new Date().toISOString()
+        }))
+      });
+    }
+
     // DELETE - Elimina una chat
     if (req.method === 'DELETE') {
       // Verifica che la chat appartenga all'utente
