@@ -1,7 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { isAuthenticatedStore } from './auth.js';
 import { isIncognitoMode } from './app.js';
-import { getChatsFromDatabase, saveChatToDatabase, deleteChatFromDatabase, updateChatInDatabase } from '../services/chatService.js';
+import { saveChatsBackup, loadChatsBackup } from '../services/backupChatService.js';
 import { debounce } from '../utils/performance.js';
 import { log, logWarn, logError } from '../utils/logger.js';
 
@@ -59,21 +59,33 @@ export async function createNewChat(projectId = null) {
   chats.update(allChats => [newChat, ...allChats]);
   currentChatId.set(newChat.id);
   
-  // Salva nel database solo se autenticato E non è in modalità incognito
+  // Salva in localStorage e backup solo se non è in modalità incognito
   if (!incognito) {
-    const isAuthenticated = get(isAuthenticatedStore);
-    const token = localStorage.getItem('auth_token');
+    // Salva immediatamente in localStorage
+    try {
+      saveChatsToStorage();
+      log('✅ [CHAT STORE] Nuova chat salvata in localStorage');
+    } catch (error) {
+      logError('❌ [CHAT STORE] Errore durante salvataggio nuova chat in localStorage:', error);
+    }
     
-    if (isAuthenticated && token) {
-      // Per nuove chat, salva immediatamente (non debounce)
+    // Salva anche nel backup se autenticato
+    if (get(isAuthenticatedStore)) {
       try {
-        await saveChatToDatabase(newChat);
+        const allChats = get(chats);
+        const chatsToBackup = allChats.filter(c => 
+          c.messages && 
+          c.messages.length > 0 && 
+          c.messages.some(msg => !msg.hidden)
+        );
+        
+        if (chatsToBackup.length > 0) {
+          await saveChatsBackup(chatsToBackup);
+          log('✅ [CHAT STORE] Nuova chat sincronizzata nel backup');
+        }
       } catch (error) {
-        logError('❌ [CHAT STORE] Errore durante salvataggio nuova chat:', error);
+        logWarn('⚠️ [CHAT STORE] Errore durante salvataggio backup nuova chat:', error);
       }
-    } else {
-      // Se non autenticato, la chat rimane solo in memoria (temporanea)
-      log('ℹ️ [CHAT STORE] Utente non autenticato, chat temporanea non salvata');
     }
   }
   // Le chat temporanee rimangono solo in memoria
@@ -159,32 +171,17 @@ export async function deleteChat(chatId) {
   // Importa il servizio toast per il feedback
   const { showSuccess, showError } = await import('../services/toastService.js');
   
-  // Elimina dal database PRIMA di rimuovere dallo store (per permettere rollback)
-  if (!incognito && get(isAuthenticatedStore)) {
-    try {
-      const result = await deleteChatFromDatabase(chatId);
-      
-      if (!result.success) {
-        // Se l'eliminazione dal database fallisce, non rimuovere dallo store
-        logError('Errore durante eliminazione chat dal database:', result.message || result.error);
-        showError(result.message || 'Errore durante l\'eliminazione della chat');
-        deletingChats.delete(chatId); // Rimuovi dalla lista delle eliminazioni in corso
-        return;
-      }
-    } catch (error) {
-      // Se c'è un errore di rete o altro, non rimuovere dallo store
-      logError('Errore durante eliminazione chat dal database:', error);
-      showError('Errore di connessione durante l\'eliminazione della chat');
-      deletingChats.delete(chatId); // Rimuovi dalla lista delle eliminazioni in corso
-      return;
-    }
-  }
-  
-  // Rimuovi la chat dallo store solo se l'eliminazione dal database è riuscita
-  // (o se è in modalità incognito/non autenticato)
+  // Rimuovi la chat dallo store
   chats.update(allChats => allChats.filter(c => c.id !== chatId));
   
-  // Le chat non sono più salvate in localStorage, quindi non serve rimuoverle
+  // Salva in localStorage dopo l'eliminazione
+  if (!incognito) {
+    try {
+      saveChatsToStorage();
+    } catch (error) {
+      logError('❌ [CHAT STORE] Errore durante salvataggio dopo eliminazione:', error);
+    }
+  }
   
   // Se era la chat corrente, gestisci la transizione
   if (wasCurrentChat) {
@@ -318,7 +315,7 @@ const STORAGE_KEY = 'nebula-ai-chats';
 const saveTimeouts = new Map();
 const SAVE_DEBOUNCE_MS = 2000; // 2 secondi di debounce
 
-// Funzione helper per salvare una chat (con debounce)
+// Funzione helper per salvare tutte le chat come backup (con debounce)
 async function debouncedSaveChat(chat) {
   if (!chat) return;
   
@@ -339,24 +336,34 @@ async function debouncedSaveChat(chat) {
       return;
     }
     
-    // Se autenticato, salva SOLO su Supabase (non in localStorage)
-    if (get(isAuthenticatedStore)) {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        try {
-          const result = await saveChatToDatabase(chat);
-          if (!result.success) {
-            logWarn('⚠️ [CHAT STORE] Salvataggio chat fallito:', result);
-          }
-        } catch (error) {
-          logError('❌ [CHAT STORE] Errore durante salvataggio chat:', error);
+    // Salva in localStorage per backup locale
+    try {
+      saveChatsToStorage();
+      log('✅ [CHAT STORE] Chat salvata in localStorage');
+    } catch (error) {
+      logError('❌ [CHAT STORE] Errore durante salvataggio chat in localStorage:', error);
+    }
+    
+    // Salva backup completo nel database (sincronizzazione tra dispositivi)
+    try {
+      const allChats = get(chats);
+      // Salva solo le chat che hanno almeno un messaggio visibile
+      const chatsToBackup = allChats.filter(c => 
+        c.messages && 
+        c.messages.length > 0 && 
+        c.messages.some(msg => !msg.hidden)
+      );
+      
+      if (chatsToBackup.length > 0) {
+        const result = await saveChatsBackup(chatsToBackup);
+        if (result.success) {
+          log(`✅ [CHAT STORE] Backup salvato nel database: ${chatsToBackup.length} chat`);
+        } else {
+          logWarn('⚠️ [CHAT STORE] Salvataggio backup fallito:', result.message);
         }
-      } else {
-        logWarn('⚠️ [CHAT STORE] Token non disponibile, chat non salvata');
       }
-    } else {
-      // Se non autenticato, non salvare (solo temporanee in memoria)
-      log('ℹ️ [CHAT STORE] Utente non autenticato, chat temporanea non salvata');
+    } catch (error) {
+      logError('❌ [CHAT STORE] Errore durante salvataggio backup:', error);
     }
   }, SAVE_DEBOUNCE_MS);
   
@@ -377,80 +384,154 @@ export async function saveChatImmediately(chat) {
     return;
   }
   
-  // Se autenticato, salva SOLO su Supabase (non in localStorage)
-  if (get(isAuthenticatedStore)) {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      try {
-        const result = await saveChatToDatabase(chat);
-        if (!result.success) {
-          logWarn('⚠️ [CHAT STORE] Salvataggio chat fallito:', result);
-        }
-      } catch (error) {
-        logError('❌ [CHAT STORE] Errore durante salvataggio chat:', error);
+  // Salva in localStorage per backup locale
+  try {
+    saveChatsToStorage();
+    log('✅ [CHAT STORE] Chat salvata immediatamente in localStorage');
+  } catch (error) {
+    logError('❌ [CHAT STORE] Errore durante salvataggio chat in localStorage:', error);
+  }
+  
+  // Salva backup completo nel database (sincronizzazione tra dispositivi)
+  try {
+    const allChats = get(chats);
+    // Salva solo le chat che hanno almeno un messaggio visibile
+    const chatsToBackup = allChats.filter(c => 
+      c.messages && 
+      c.messages.length > 0 && 
+      c.messages.some(msg => !msg.hidden)
+    );
+    
+    if (chatsToBackup.length > 0) {
+      const result = await saveChatsBackup(chatsToBackup);
+      if (result.success) {
+        log(`✅ [CHAT STORE] Backup salvato immediatamente nel database: ${chatsToBackup.length} chat`);
+      } else {
+        logWarn('⚠️ [CHAT STORE] Salvataggio backup fallito:', result.message);
       }
-    } else {
-      logWarn('⚠️ [CHAT STORE] Token non disponibile, chat non salvata');
     }
-  } else {
-    // Se non autenticato, non salvare (solo temporanee in memoria)
-    log('ℹ️ [CHAT STORE] Utente non autenticato, chat temporanea non salvata');
+  } catch (error) {
+    logError('❌ [CHAT STORE] Errore durante salvataggio backup:', error);
   }
 }
 
-// DEPRECATO: Non salvare più in localStorage
-// Le chat vengono salvate solo su Supabase quando l'utente è autenticato
-// Le chat temporanee rimangono solo in memoria
+// Salva tutte le chat in localStorage
 export function saveChatsToStorage() {
-  // Funzione mantenuta per retrocompatibilità ma non fa più nulla
-  // Le chat vengono salvate solo su Supabase
-  log('ℹ️ [CHAT STORE] saveChatsToStorage chiamato ma deprecato - le chat vengono salvate solo su Supabase');
+  if (typeof window === 'undefined') {
+    return;
+  }
+  
+  const incognito = get(isIncognitoMode);
+  // In modalità incognito, non salvare nulla
+  if (incognito) {
+    return;
+  }
+  
+  try {
+    const allChats = get(chats);
+    // Salva solo le chat che hanno almeno un messaggio visibile
+    const chatsToSave = allChats.filter(chat => 
+      chat.messages && 
+      chat.messages.length > 0 && 
+      chat.messages.some(msg => !msg.hidden)
+    );
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(chatsToSave));
+    log(`✅ [CHAT STORE] Salvate ${chatsToSave.length} chat in localStorage`);
+  } catch (error) {
+    logError('❌ [CHAT STORE] Errore durante salvataggio in localStorage:', error);
+  }
 }
 
-// DEPRECATO: Non caricare più da localStorage
-// Le chat vengono caricate solo da Supabase quando l'utente è autenticato
+// Carica tutte le chat da localStorage
 export function loadChatsFromStorage() {
-  // Funzione mantenuta per retrocompatibilità ma non fa più nulla
-  // Le chat vengono caricate solo da Supabase
-  log('ℹ️ [CHAT STORE] loadChatsFromStorage chiamato ma deprecato - le chat vengono caricate solo da Supabase');
+  if (typeof window === 'undefined') {
+    return;
+  }
+  
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const localChats = JSON.parse(stored);
+      if (Array.isArray(localChats)) {
+        chats.set(localChats);
+        log(`✅ [CHAT STORE] Caricate ${localChats.length} chat da localStorage`);
+        return localChats;
+      }
+    }
+  } catch (error) {
+    logError('❌ [CHAT STORE] Errore durante caricamento da localStorage:', error);
+  }
+  
+  return [];
 }
 
-// Carica le chat dal database se autenticato, altrimenti da localStorage
+// Carica le chat dal backup nel database (sincronizzazione tra dispositivi)
 export async function loadChats() {
   // Evita caricamenti multipli simultanei
   if (isLoadingChats) {
-    log('Caricamento chat già in corso, skip loadChats');
+    log('⏸️ [CHAT STORE] Caricamento chat già in corso, skip loadChats');
     return;
   }
   
   isLoadingChats = true;
   
   try {
-    let dbChats = [];
-    let localChats = [];
-    
     const incognito = get(isIncognitoMode);
     
-    // In modalità incognito, non caricare chat dal database
+    // In modalità incognito, non caricare chat
     if (incognito) {
+      log('🔒 [CHAT STORE] Modalità incognito, nessuna chat caricata');
       chats.set([]);
       return;
     }
     
+    // Prima prova a caricare dal backup nel database (sincronizzazione tra dispositivi)
     if (get(isAuthenticatedStore)) {
-      // Carica dal database
-      const result = await getChatsFromDatabase();
-      if (result.success && result.chats) {
-        dbChats = result.chats;
+      log('📥 [CHAT STORE] Caricamento chat dal backup nel database...');
+      
+      try {
+        const backupResult = await loadChatsBackup();
+        
+        if (backupResult.success && backupResult.chats && backupResult.chats.length > 0) {
+          chats.set(backupResult.chats);
+          // Sincronizza anche localStorage con il backup
+          saveChatsToStorage();
+          log(`✅ [CHAT STORE] Caricate ${backupResult.chats.length} chat dal backup nel database`);
+          return;
+        } else {
+          log('ℹ️ [CHAT STORE] Nessun backup trovato nel database, provo localStorage...');
+        }
+      } catch (error) {
+        logWarn('⚠️ [CHAT STORE] Errore durante caricamento backup, provo localStorage:', error);
       }
-    } else {
-      // Carica tutte le chat da localStorage se non autenticato
-      loadChatsFromStorage();
-      return; // loadChatsFromStorage già imposta le chat
     }
     
-    // Imposta le chat dal database
-    chats.set(dbChats);
+    // Fallback: carica da localStorage se il backup non è disponibile
+    log('📥 [CHAT STORE] Caricamento chat da localStorage...');
+    
+    const localChats = loadChatsFromStorage();
+    
+    if (Array.isArray(localChats) && localChats.length > 0) {
+      chats.set(localChats);
+      log(`✅ [CHAT STORE] Caricate ${localChats.length} chat da localStorage`);
+      
+      // Se autenticato, sincronizza il backup nel database con localStorage
+      if (get(isAuthenticatedStore)) {
+        try {
+          await saveChatsBackup(localChats);
+          log('✅ [CHAT STORE] Backup sincronizzato con localStorage');
+        } catch (error) {
+          logWarn('⚠️ [CHAT STORE] Errore durante sincronizzazione backup:', error);
+        }
+      }
+    } else {
+      chats.set([]);
+      log('ℹ️ [CHAT STORE] Nessuna chat trovata');
+    }
+  } catch (error) {
+    logError('❌ [CHAT STORE] Errore durante loadChats:', error);
+    chats.set([]);
   } finally {
     isLoadingChats = false;
   }
@@ -459,25 +540,9 @@ export async function loadChats() {
 // Flag per evitare caricamenti multipli simultanei
 let isLoadingChats = false;
 
-// Sincronizza le chat quando l'utente fa login
+// Sincronizza le chat quando l'utente fa login (carica dal backup nel database)
 export async function syncChatsOnLogin() {
   log('🔄 [CHAT STORE] syncChatsOnLogin chiamato');
-  
-  // Verifica che il token sia disponibile
-  const token = localStorage.getItem('auth_token');
-  if (!token) {
-    logWarn('⚠️ [CHAT STORE] Token non disponibile, skip syncChatsOnLogin');
-    return;
-  }
-  
-  // Verifica che l'utente sia autenticato
-  if (!get(isAuthenticatedStore)) {
-    log('⚠️ [CHAT STORE] Utente non autenticato, skip syncChatsOnLogin');
-    // Prova comunque se c'è un token (potrebbe essere un problema di timing)
-    if (!token) {
-      return;
-    }
-  }
   
   // Evita caricamenti multipli simultanei
   if (isLoadingChats) {
@@ -488,191 +553,58 @@ export async function syncChatsOnLogin() {
   isLoadingChats = true;
   
   try {
-    log('📥 [CHAT STORE] Inizio caricamento chat dal database...');
-    
-    // Prima pulisci le chat esistenti (potrebbero essere chat locali)
-    chats.set([]);
-    currentChatId.set(null);
-    
     const incognito = get(isIncognitoMode);
     
-    // In modalità incognito, non caricare chat dal database
+    // In modalità incognito, non caricare chat
     if (incognito) {
       chats.set([]);
       log('🔒 [CHAT STORE] Modalità incognito attiva, nessuna chat caricata');
       return;
     }
     
-    // Carica dal database
-    const result = await getChatsFromDatabase();
-    log('📊 [CHAT STORE] Risultato getChatsFromDatabase:', {
-      success: result.success,
-      chatsCount: result.chats?.length || 0,
-      message: result.message,
-      error: result.error
-    });
+    // Prima prova a caricare dal backup nel database (sincronizzazione tra dispositivi)
+    log('📥 [CHAT STORE] Caricamento chat dal backup nel database...');
     
-    let dbChats = [];
-    if (result.success && result.chats) {
-      dbChats = result.chats;
-      log(`✅ [CHAT STORE] Caricate ${dbChats.length} chat dal database`);
-    } else {
-      logWarn('⚠️ [CHAT STORE] Nessuna chat trovata o errore nel caricamento:', result);
-      if (result.error) {
-        logError('❌ [CHAT STORE] Errore dettagliato:', result.error);
-      }
-    }
-    
-    // Prima di sovrascrivere, salva le chat locali che potrebbero non essere nel database
-    const stored = localStorage.getItem(STORAGE_KEY);
-    let localChatsToMigrate = [];
-    if (stored) {
-      try {
-        const localChats = JSON.parse(stored);
-        if (Array.isArray(localChats)) {
-          const existingChatIds = new Set(dbChats.map(c => c.id));
-          // Trova chat locali che non sono nel database (nuove chat da migrare)
-          localChatsToMigrate = localChats.filter(chat => 
-            !existingChatIds.has(chat.id) && 
-            chat.messages && 
-            chat.messages.length > 0 &&
-            chat.messages.some(msg => !msg.hidden)
-          );
-        }
-      } catch (error) {
-        logError('Errore durante lettura localStorage per migrazione:', error);
-      }
-    }
-    
-    // Imposta le chat dal database
-    chats.set(dbChats);
-    log(`✅ [CHAT STORE] Totale chat caricate: ${dbChats.length}`);
-    
-    // Non salvare più in localStorage - le chat vengono solo da Supabase
-    
-    // Migra le nuove chat locali che non sono nel database (solo per retrocompatibilità)
-    if (localChatsToMigrate.length > 0) {
-      log(`🔄 Trovate ${localChatsToMigrate.length} nuove chat locali da migrare`);
-      let migratedCount = 0;
-      for (const chat of localChatsToMigrate) {
-        try {
-          const saveResult = await saveChatToDatabase(chat);
-          if (saveResult.success) {
-            migratedCount++;
-            log(`✅ Migrata chat: ${chat.title || chat.id}`);
-          }
-        } catch (error) {
-          logError(`❌ Errore migrazione chat ${chat.id}:`, error);
-        }
-      }
+    try {
+      const backupResult = await loadChatsBackup();
       
-      // Ricarica le chat dal database dopo la migrazione
-      if (migratedCount > 0) {
-        const updatedResult = await getChatsFromDatabase();
-        if (updatedResult.success && updatedResult.chats) {
-          chats.set(updatedResult.chats);
-          // Non salvare più in localStorage
-          log(`✅ Dopo migrazione, caricate ${updatedResult.chats.length} chat totali`);
-        }
+      if (backupResult.success && backupResult.chats && backupResult.chats.length > 0) {
+        chats.set(backupResult.chats);
+        // Sincronizza anche localStorage con il backup
+        saveChatsToStorage();
+        log(`✅ [CHAT STORE] Caricate ${backupResult.chats.length} chat dal backup nel database`);
+        return;
+      } else {
+        log('ℹ️ [CHAT STORE] Nessun backup trovato nel database, provo localStorage...');
       }
+    } catch (error) {
+      logWarn('⚠️ [CHAT STORE] Errore durante caricamento backup, provo localStorage:', error);
+    }
+    
+    // Fallback: carica da localStorage se il backup non è disponibile
+    const localChats = loadChatsFromStorage();
+    
+    if (Array.isArray(localChats) && localChats.length > 0) {
+      chats.set(localChats);
+      log(`✅ [CHAT STORE] Caricate ${localChats.length} chat da localStorage`);
+      
+      // Sincronizza il backup nel database con localStorage
+      try {
+        await saveChatsBackup(localChats);
+        log('✅ [CHAT STORE] Backup sincronizzato con localStorage');
+      } catch (error) {
+        logWarn('⚠️ [CHAT STORE] Errore durante sincronizzazione backup:', error);
+      }
+    } else {
+      chats.set([]);
+      log('ℹ️ [CHAT STORE] Nessuna chat trovata');
     }
   } catch (error) {
     logError('❌ [CHAT STORE] Errore in syncChatsOnLogin:', error);
-    // In caso di errore, prova comunque a migrare da localStorage
-    try {
-      await migrateChatsFromLocalStorage();
-    } catch (migrationError) {
-      logError('❌ [CHAT STORE] Errore durante migrazione:', migrationError);
-    }
+    chats.set([]);
   } finally {
     isLoadingChats = false;
     log('✅ [CHAT STORE] syncChatsOnLogin completato');
-  }
-}
-
-// Migra le chat da localStorage al database
-// IMPORTANTE: Questa funzione viene chiamata DOPO che syncChatsOnLogin ha già sovrascritto il localStorage
-// Quindi qui dobbiamo solo gestire eventuali chat che erano in localStorage PRIMA della sincronizzazione
-// e che non sono ancora nel database (nuove chat locali non ancora migrate)
-export async function migrateChatsFromLocalStorage() {
-  if (!get(isAuthenticatedStore)) {
-    return;
-  }
-  
-  if (typeof window === 'undefined') {
-    return;
-  }
-  
-  // Carica le chat attuali dal database
-  const dbResult = await getChatsFromDatabase();
-  const existingChatIds = new Set();
-  if (dbResult.success && dbResult.chats) {
-    dbResult.chats.forEach(chat => existingChatIds.add(chat.id));
-  }
-  
-  // Carica le chat dal localStorage (potrebbero essere state sovrascritte da syncChatsOnLogin)
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) {
-    return;
-  }
-  
-  try {
-    const localChats = JSON.parse(stored);
-    if (!Array.isArray(localChats) || localChats.length === 0) {
-      return;
-    }
-    
-    // Trova solo le chat che sono in localStorage ma NON nel database
-    // Queste sono nuove chat locali che devono essere migrate
-    const chatsToMigrate = localChats.filter(chat => {
-      // Deve avere messaggi
-      if (!chat.messages || chat.messages.length === 0) {
-        return false;
-      }
-      // Non deve esistere già nel database
-      return !existingChatIds.has(chat.id);
-    });
-    
-    if (chatsToMigrate.length === 0) {
-      log('ℹ️ Nessuna chat da migrare: tutte le chat in localStorage sono già nel database');
-      return;
-    }
-    
-    log(`🔄 Trovate ${chatsToMigrate.length} nuove chat locali da migrare`);
-    
-    let migratedCount = 0;
-    let failedCount = 0;
-    
-    // Migra solo le nuove chat
-    for (const chat of chatsToMigrate) {
-      try {
-        const saveResult = await saveChatToDatabase(chat);
-        if (saveResult.success) {
-          migratedCount++;
-          log(`✅ Migrata chat: ${chat.title || chat.id}`);
-        } else {
-          failedCount++;
-          logWarn(`⚠️ Errore migrazione chat ${chat.id}:`, saveResult.message);
-        }
-      } catch (error) {
-        failedCount++;
-        logError(`❌ Errore migrazione chat ${chat.id}:`, error);
-      }
-    }
-    
-    // Dopo la migrazione, ricarica le chat dal database
-    const updatedResult = await getChatsFromDatabase();
-    if (updatedResult.success && updatedResult.chats) {
-      chats.set(updatedResult.chats);
-      // Non salvare più in localStorage
-      log(`✅ Dopo migrazione, caricate ${updatedResult.chats.length} chat totali dal database`);
-    }
-    
-    if (migratedCount > 0) {
-      log(`✅ Migrazione completata: ${migratedCount} chat migrate, ${failedCount} fallite`);
-    }
-  } catch (error) {
-    logError('❌ Errore durante migrazione chat:', error);
   }
 }
 
@@ -680,10 +612,6 @@ export async function migrateChatsFromLocalStorage() {
 export async function recoverChatsFromLocalStorage() {
   if (typeof window === 'undefined') {
     return { success: false, message: 'Non disponibile lato server' };
-  }
-  
-  if (!get(isAuthenticatedStore)) {
-    return { success: false, message: 'Utente non autenticato' };
   }
   
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -697,8 +625,13 @@ export async function recoverChatsFromLocalStorage() {
       return { success: false, message: 'Nessuna chat valida in localStorage' };
     }
     
-    return await migrateChatsFromLocalStorage();
+    // Carica le chat da localStorage
+    chats.set(localChats);
+    log(`✅ [CHAT STORE] Recuperate ${localChats.length} chat da localStorage`);
+    
+    return { success: true, message: `Recuperate ${localChats.length} chat` };
   } catch (error) {
+    logError('❌ [CHAT STORE] Errore durante recupero chat:', error);
     return { 
       success: false, 
       message: 'Errore durante il recupero',
@@ -707,14 +640,15 @@ export async function recoverChatsFromLocalStorage() {
   }
 }
 
-// Pulisci le chat quando l'utente esce (rimuove solo quelle salvate sull'account)
+// Pulisci le chat quando l'utente esce
 export function clearChatsOnLogout() {
   // Rimuovi tutte le chat dallo store
   chats.set([]);
   // Resetta il currentChatId
   currentChatId.set(null);
-  // Le chat non sono più salvate in localStorage
+  // Pulisci anche localStorage
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEY);
+  }
 }
-
-// Non caricare più da localStorage all'avvio - le chat vengono caricate solo da Supabase quando autenticato
 

@@ -9,6 +9,8 @@
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
   import { createDataExport, downloadDataExport } from '../services/dataExportService.js';
   import { deleteAllChatsFromDatabase } from '../services/chatService.js';
+  import { loadChatsBackup, exportChatsBackup, importChatsBackup } from '../services/backupChatService.js';
+  import { chats, loadChats } from '../stores/chat.js';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
@@ -378,6 +380,9 @@
   }
   
   let isExporting = false;
+  let isRestoringBackup = false;
+  let isExportingBackup = false;
+  let isImportingBackup = false;
   
   async function handleExportData() {
     // Mostra avviso che il file contiene informazioni sensibili
@@ -561,6 +566,156 @@
   }
   
   let isDeletingAllChats = false;
+  
+  async function handleRestoreBackup() {
+    const confirmed = await showConfirm(
+      'Vuoi ripristinare le chat dall\'ultimo backup salvato nel database?\n\n' +
+      '⚠️ ATTENZIONE: Questa operazione sostituirà tutte le chat attuali con quelle del backup.\n\n' +
+      'Le chat attuali verranno perse se non sono già nel backup.',
+      'Ripristina dal Backup',
+      'Ripristina',
+      'Annulla',
+      'warning'
+    );
+    
+    if (!confirmed) return;
+    
+    isRestoringBackup = true;
+    try {
+      const backupResult = await loadChatsBackup();
+      
+      if (backupResult.success && backupResult.chats && backupResult.chats.length > 0) {
+        chats.set(backupResult.chats);
+        // Salva anche in localStorage
+        localStorage.setItem('nebula-ai-chats', JSON.stringify(backupResult.chats));
+        await showAlert(
+          `✅ Backup ripristinato con successo!\n\n${backupResult.chats.length} chat caricate.`,
+          'Backup Ripristinato',
+          'OK',
+          'success'
+        );
+      } else {
+        await showAlert(
+          'Nessun backup trovato nel database.\n\nAssicurati di aver salvato almeno un backup prima.',
+          'Nessun Backup',
+          'OK',
+          'warning'
+        );
+      }
+    } catch (error) {
+      console.error('Errore durante ripristino backup:', error);
+      await showAlert(
+        'Errore durante il ripristino del backup. Riprova più tardi.',
+        'Errore',
+        'OK',
+        'error'
+      );
+    } finally {
+      isRestoringBackup = false;
+    }
+  }
+  
+  async function handleExportBackup() {
+    isExportingBackup = true;
+    try {
+      const allChats = get(chats);
+      const chatsToExport = allChats.filter(chat => 
+        chat.messages && 
+        chat.messages.length > 0 && 
+        chat.messages.some(msg => !msg.hidden)
+      );
+      
+      if (chatsToExport.length === 0) {
+        await showAlert(
+          'Nessuna chat da esportare.\n\nCrea almeno una chat prima di esportare il backup.',
+          'Nessuna Chat',
+          'OK',
+          'warning'
+        );
+        return;
+      }
+      
+      exportChatsBackup(chatsToExport);
+      await showAlert(
+        `✅ Backup esportato con successo!\n\n${chatsToExport.length} chat esportate.`,
+        'Backup Esportato',
+        'OK',
+        'success'
+      );
+    } catch (error) {
+      console.error('Errore durante esportazione backup:', error);
+      await showAlert(
+        'Errore durante l\'esportazione del backup. Riprova più tardi.',
+        'Errore',
+        'OK',
+        'error'
+      );
+    } finally {
+      isExportingBackup = false;
+    }
+  }
+  
+  async function handleImportBackup(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const confirmed = await showConfirm(
+      'Vuoi importare le chat dal file di backup?\n\n' +
+      '⚠️ ATTENZIONE: Questa operazione sostituirà tutte le chat attuali con quelle del backup.\n\n' +
+      'Le chat attuali verranno perse se non sono già nel backup.',
+      'Importa Backup',
+      'Importa',
+      'Annulla',
+      'warning'
+    );
+    
+    if (!confirmed) {
+      event.target.value = ''; // Reset file input
+      return;
+    }
+    
+    isImportingBackup = true;
+    try {
+      const importResult = await importChatsBackup(file);
+      
+      if (importResult.success && importResult.chats && importResult.chats.length > 0) {
+        chats.set(importResult.chats);
+        // Salva in localStorage
+        localStorage.setItem('nebula-ai-chats', JSON.stringify(importResult.chats));
+        
+        // Se autenticato, sincronizza anche nel database
+        if ($isAuthenticatedStore) {
+          const { saveChatsBackup } = await import('../services/backupChatService.js');
+          await saveChatsBackup(importResult.chats);
+        }
+        
+        await showAlert(
+          `✅ Backup importato con successo!\n\n${importResult.chats.length} chat caricate.`,
+          'Backup Importato',
+          'OK',
+          'success'
+        );
+      } else {
+        await showAlert(
+          'Il file di backup non è valido o non contiene chat.',
+          'Backup Non Valido',
+          'OK',
+          'error'
+        );
+      }
+    } catch (error) {
+      console.error('Errore durante importazione backup:', error);
+      await showAlert(
+        'Errore durante l\'importazione del backup. Assicurati che il file sia valido.',
+        'Errore',
+        'OK',
+        'error'
+      );
+    } finally {
+      isImportingBackup = false;
+      event.target.value = ''; // Reset file input
+    }
+  }
   
   async function handleDeleteAllChats() {
     const confirmed = await showConfirm(
@@ -1129,6 +1284,39 @@
                     {$t('importKey')}
                   </button>
                 </div>
+              </div>
+            {/if}
+            
+            {#if $isAuthenticatedStore}
+              <div class="setting-row" class:row-visible={activeSection === 'dati'}>
+                <div class="setting-info">
+                  <div class="setting-label">Ripristina Chat dal Backup</div>
+                  <div class="setting-description">Ripristina le chat dall'ultimo backup salvato nel database (sincronizzazione tra dispositivi)</div>
+                </div>
+                <button class="manage-button" on:click={handleRestoreBackup} disabled={isRestoringBackup}>
+                  {isRestoringBackup ? 'Ripristino...' : 'Ripristina dal Backup'}
+                </button>
+              </div>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'dati'}>
+                <div class="setting-info">
+                  <div class="setting-label">Esporta Backup Chat</div>
+                  <div class="setting-description">Scarica un file di backup con tutte le tue chat</div>
+                </div>
+                <button class="manage-button" on:click={handleExportBackup} disabled={isExportingBackup}>
+                  {isExportingBackup ? 'Esportazione...' : 'Esporta Backup'}
+                </button>
+              </div>
+              
+              <div class="setting-row" class:row-visible={activeSection === 'dati'}>
+                <div class="setting-info">
+                  <div class="setting-label">Importa Backup Chat</div>
+                  <div class="setting-description">Ripristina le chat da un file di backup</div>
+                </div>
+                <label class="manage-button secondary" style="cursor: pointer;">
+                  <input type="file" accept=".json" style="display: none;" on:change={handleImportBackup} disabled={isImportingBackup} />
+                  {isImportingBackup ? 'Importazione...' : 'Importa Backup'}
+                </label>
               </div>
             {/if}
             
