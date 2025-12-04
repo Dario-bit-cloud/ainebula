@@ -1,7 +1,5 @@
 // Servizio per gestire i progetti nel database
 
-import { getCurrentUser } from './authService.js';
-
 // Determina l'URL base dell'API in base all'ambiente
 const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
