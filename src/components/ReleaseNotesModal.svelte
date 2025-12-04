@@ -20,17 +20,27 @@
   const releases = [
     {
       version: '1.0.0',
-      date: '2025-11-25',
+      date: new Date().toISOString().split('T')[0], // Data corrente
       type: 'major',
       features: [
-        'Lancio iniziale di Nebula AI',
-        'Sistema di chat con supporto multi-modello',
-        'Autenticazione sicura con passkeys',
-        'Gestione progetti e organizzazione chat',
-        'Sistema di crittografia end-to-end',
-        'Interfaccia personalizzabile con temi',
-        'Supporto multi-lingua (IT, EN, ES, FR, DE)',
-        'Esportazione dati e backup'
+        '🚀 Lancio stabile di Nebula AI',
+        '💬 Sistema di chat avanzato con supporto multi-modello AI',
+        '🔐 Autenticazione sicura con JWT e passkeys (WebAuthn)',
+        '📁 Gestione progetti e organizzazione chat',
+        '🔒 Sistema di crittografia end-to-end per i messaggi',
+        '🎨 Interfaccia personalizzabile con temi e personalizzazione',
+        '🌍 Supporto multi-lingua (Italiano, Inglese, Spagnolo, Francese, Tedesco)',
+        '📤 Sistema di condivisione link per le chat',
+        '💾 Esportazione dati e backup automatici',
+        '🎨 Generazione immagini AI integrata',
+        '📚 Prompt library personalizzabile',
+        '🔬 Modalità "Deep Research" per analisi approfondite',
+        '🖼️ Supporto per immagini nelle chat (visione AI)',
+        '⚙️ Impostazioni AI avanzate (temperature, max tokens, ecc.)',
+        '🔗 Supporto per multiple API providers',
+        '🛡️ Sicurezza migliorata con CORS configurato e cookie sicuri',
+        '📊 Monitoraggio e logging avanzati',
+        '🚀 Ottimizzazioni performance e caching intelligente'
       ]
     }
   ];

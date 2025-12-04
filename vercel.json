@@ -16,26 +16,6 @@
       "destination": "/api/shared-links"
     },
     {
-      "source": "/api/patreon/callback",
-      "destination": "/api/patreon?action=callback"
-    },
-    {
-      "source": "/api/patreon/status",
-      "destination": "/api/patreon?action=status"
-    },
-    {
-      "source": "/api/patreon/link",
-      "destination": "/api/patreon?action=link"
-    },
-    {
-      "source": "/api/patreon/sync",
-      "destination": "/api/patreon?action=sync"
-    },
-    {
-      "source": "/api/patreon/unlink",
-      "destination": "/api/patreon?action=unlink"
-    },
-    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     }

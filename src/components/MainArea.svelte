@@ -10,11 +10,11 @@
   import { isThinkingModeEnabled, toggleThinkingMode } from '../stores/thinkingMode.js';
   import { isPremiumModalOpen, selectedPrompt, isMobile, sidebarView, isSidebarOpen, isIncognitoMode } from '../stores/app.js';
   import { currentAbortController, setAbortController, abortCurrentRequest } from '../stores/abortController.js';
+  import { devMode, enableDevMode } from '../stores/devMode.js';
   import { renderMarkdown, initCodeCopyButtons, normalizeTextSpacing } from '../utils/markdown.js';
   import MessageActions from './MessageActions.svelte';
   import { estimateChatTokens, estimateMessageTokens } from '../utils/tokenCounter.js';
   import { tokenInfo } from '../stores/tokenInfo.js';
-  import PrivacyModal from './PrivacyModal.svelte';
   import { showAlert, showPrompt } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
   import TopBar from './TopBar.svelte';
@@ -47,7 +47,6 @@
   let showImageStyles = false;
   let selectedImageIndex = null;
   let imageDescription = '';
-  let showPrivacyCard = true;
   let showAttachMenu = false;
   let showMobileActionsMenu = false;
   let mobileActionsRef;
@@ -62,12 +61,11 @@
   $: hasWebSearch = currentModel?.webSearch || false;
   $: allowsPremiumFeatures = currentModel?.allowsPremiumFeatures || false;
   
-  // Verifica se il modello corrente supporta thinking mode
-  $: supportsThinkingMode = $selectedModel === 'gemini-2.5-flash-preview-09-2025' || $selectedModel === 'gemini-2.5-flash-preview-09-2025-thinking';
+  // Verifica se il modello corrente supporta thinking mode (solo Flash normale)
+  $: supportsThinkingMode = $selectedModel === 'gemini-2.5-flash-preview-09-2025';
   
   // Thinking mode è abilitato solo se esplicitamente attivato dall'utente e il modello è Flash
   $: isThinkingModel = $isThinkingModeEnabled && supportsThinkingMode;
-  let isPrivacyModalOpen = false;
   let mainAreaElement;
   let deepResearchEnabled = false;
   let webSearchEnabled = false;
@@ -666,17 +664,25 @@
       return;
     }
     
+    // Intercetta comando segreto STARTDEVMODE
+    const messageText = inputValue.trim();
+    if (messageText === 'STARTDEVMODE') {
+      enableDevMode();
+      inputValue = '';
+      showSuccess('🔧 Dev Mode attivato!');
+      return; // Non inviare il messaggio all'IA
+    }
+    
     try {
       const chatId = $currentChatId || await createNewChat();
       
       const userMessage = { 
         type: 'user', 
-        content: inputValue.trim() || '',
+        content: messageText,
         timestamp: new Date().toISOString() 
       };
       
       addMessage(chatId, userMessage);
-      const messageText = inputValue.trim();
       
       // Reset input immediatamente per feedback visivo veloce
       inputValue = '';
@@ -722,7 +728,7 @@
         let modelToUse = isImageRequest ? 'gemini-2.5-flash-image' : effectiveModel;
         
         // Se thinking mode è abilitato e il modello è Flash, usa la versione thinking
-        if ($isThinkingModeEnabled && (modelToUse === 'gemini-2.5-flash-preview-09-2025' || modelToUse === 'gemini-2.5-flash-preview-09-2025-thinking')) {
+        if ($isThinkingModeEnabled && modelToUse === 'gemini-2.5-flash-preview-09-2025') {
           modelToUse = 'gemini-2.5-flash-preview-09-2025-thinking';
         }
         
@@ -1134,11 +1140,6 @@
   
   function handleToggleWebSearch() {
     webSearchEnabled = !webSearchEnabled;
-    if (webSearchEnabled) {
-      showAlert('Ricerca web attivata: l\'AI può accedere a informazioni in tempo reale dal web', 'Web Search', 'OK', 'success');
-    } else {
-      showAlert('Ricerca web disattivata', 'Web Search', 'OK', 'info');
-    }
   }
   
   // Funzione per rilevare se il messaggio contiene una richiesta di generazione immagini
@@ -1296,10 +1297,10 @@
     return allPatterns.some(pattern => pattern.test(lowerMessage));
   }
   
-  // Determina il modello da usare: se web search è attivo, usa il modello search, 
+  // Determina il modello da usare: se web search è attivo, usa il modello Surfer (gpt-4o-search-preview-2025-03-11), 
   // se è una richiesta di generazione immagini usa Gemini Flash Image, altrimenti quello selezionato
   $: effectiveModel = webSearchEnabled 
-    ? 'gpt-4o-mini-search-preview-2025-03-11' 
+    ? 'gpt-4o-search-preview-2025-03-11' 
     : $selectedModel;
   
   async function handleImageSelect(event) {
@@ -1751,70 +1752,6 @@
             </div>
           </div>
           
-          {#if showPrivacyCard}
-            <div class="privacy-card" on:click={() => isPrivacyModalOpen = true} role="button" tabindex="0" on:keydown={(e) => e.key === 'Enter' && (isPrivacyModalOpen = true)}>
-              <div class="privacy-card-header">
-                <div class="privacy-card-title-wrapper">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" data-rtl-flip="" class="privacy-icon-header">
-                    <path d="M4.52148 15.1664C4.61337 14.8108 4.39951 14.4478 4.04395 14.3559C3.73281 14.2756 3.41605 14.4295 3.28027 14.7074L3.2334 14.8334C3.13026 15.2324 3.0046 15.6297 2.86133 16.0287L2.71289 16.4281C2.63179 16.6393 2.66312 16.8775 2.79688 17.06C2.93067 17.2424 3.14825 17.3443 3.37402 17.3305L3.7793 17.3002C4.62726 17.2265 5.44049 17.0856 6.23438 16.8764C6.84665 17.1788 7.50422 17.4101 8.19434 17.558C8.55329 17.6348 8.9064 17.4062 8.9834 17.0473C9.06036 16.6882 8.83177 16.3342 8.47266 16.2572C7.81451 16.1162 7.19288 15.8862 6.62305 15.5815C6.50913 15.5206 6.38084 15.4946 6.25391 15.5053L6.12793 15.5277C5.53715 15.6955 4.93256 15.819 4.30566 15.9027C4.33677 15.8053 4.36932 15.7081 4.39844 15.6098L4.52148 15.1664Z"></path>
-                    <path d="M15.7998 14.5365C15.5786 14.3039 15.2291 14.2666 14.9668 14.4301L14.8604 14.5131C13.9651 15.3633 12.8166 15.9809 11.5273 16.2572C11.1682 16.3342 10.9396 16.6882 11.0166 17.0473C11.0936 17.4062 11.4467 17.6348 11.8057 17.558C13.2388 17.2509 14.5314 16.5858 15.5713 15.6645L15.7754 15.477C16.0417 15.2241 16.0527 14.8028 15.7998 14.5365Z"></path>
-                    <path d="M2.23828 7.58927C1.97668 8.34847 1.83496 9.15958 1.83496 10.0004C1.835 10.736 1.94324 11.4483 2.14551 12.1234L2.23828 12.4106C2.35793 12.7576 2.73588 12.9421 3.08301 12.8227C3.3867 12.718 3.56625 12.4154 3.52637 12.1088L3.49512 11.977C3.2808 11.3549 3.16508 10.6908 3.16504 10.0004C3.16504 9.30977 3.28072 8.64514 3.49512 8.02286C3.61476 7.67563 3.43024 7.2968 3.08301 7.17716C2.73596 7.05778 2.35799 7.24232 2.23828 7.58927Z"></path>
-                    <path d="M16.917 12.8227C17.2641 12.9421 17.6421 12.7576 17.7617 12.4106C18.0233 11.6515 18.165 10.8411 18.165 10.0004C18.165 9.15958 18.0233 8.34847 17.7617 7.58927C17.642 7.24231 17.264 7.05778 16.917 7.17716C16.5698 7.2968 16.3852 7.67563 16.5049 8.02286C16.7193 8.64514 16.835 9.30977 16.835 10.0004C16.8349 10.6908 16.7192 11.3549 16.5049 11.977C16.3852 12.3242 16.5698 12.703 16.917 12.8227Z"></path>
-                    <path d="M8.9834 2.95255C8.90632 2.59374 8.55322 2.3651 8.19434 2.44181C6.76126 2.74892 5.46855 3.41405 4.42871 4.33536L4.22461 4.52286C3.95829 4.77577 3.94729 5.19697 4.2002 5.46329C4.42146 5.69604 4.77088 5.73328 5.0332 5.56973L5.13965 5.4877C6.03496 4.63748 7.18337 4.0189 8.47266 3.74259C8.83177 3.66563 9.06036 3.31166 8.9834 2.95255Z"></path>
-                    <path d="M15.5713 4.33536C14.5314 3.41405 13.2387 2.74892 11.8057 2.44181C11.4468 2.3651 11.0937 2.59374 11.0166 2.95255C10.9396 3.31166 11.1682 3.66563 11.5273 3.74259C12.7361 4.00163 13.8209 4.56095 14.6895 5.33048L14.8604 5.4877L14.9668 5.56973C15.2291 5.73327 15.5785 5.69604 15.7998 5.46329C16.0211 5.23026 16.0403 4.87903 15.8633 4.6254L15.7754 4.52286L15.5713 4.33536Z"></path>
-                  </svg>
-                  <span class="privacy-card-title">Le tue conversazioni sono:</span>
-                </div>
-                <button class="privacy-card-close" on:click|stopPropagation={() => showPrivacyCard = false} title="Chiudi">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="privacy-features">
-                <div class="privacy-feature">
-                  <div class="privacy-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                      <path d="M9 12l2 2 4-4" stroke-width="2.5"/>
-                    </svg>
-                  </div>
-                  <h3 class="privacy-feature-title">Completamente Privata</h3>
-                  <p class="privacy-feature-description">Non registriamo né conserviamo le tue conversazioni. A differenza di altri assistenti, la tua privacy è la nostra priorità.</p>
-                </div>
-                <div class="privacy-feature">
-                  <div class="privacy-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke-width="2.5"/>
-                      <circle cx="12" cy="16" r="1" fill="currentColor"/>
-                    </svg>
-                  </div>
-                  <h3 class="privacy-feature-title">Crittografata e Sicura</h3>
-                  <p class="privacy-feature-description">Tutte le tue conversazioni sono protette con crittografia end-to-end. I tuoi dati sono al sicuro.</p>
-                </div>
-                <div class="privacy-feature">
-                  <div class="privacy-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M20 6L9 17l-5-5"/>
-                      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                      <path d="M2 17l10 5 10-5"/>
-                      <path d="M2 12l10 5 10-5"/>
-                    </svg>
-                  </div>
-                  <h3 class="privacy-feature-title">Rispettata e Protetta</h3>
-                  <p class="privacy-feature-description">Le tue conversazioni non vengono mai utilizzate per addestrare modelli AI. Il tuo contenuto rimane solo tuo.</p>
-                </div>
-              </div>
-              <div class="privacy-card-footer">
-                <span class="privacy-card-link">Scopri di più</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </div>
-            </div>
-          {/if}
         </div>
       </div>
     {/if}
@@ -2241,23 +2178,23 @@
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
                       </svg>
-                      <span>Modalità Thinking</span>
+                      <span>Ragionamento</span>
+                    </button>
+                  {:else}
+                    <button 
+                      class="mobile-action-item" 
+                      class:active={webSearchEnabled}
+                      on:click={() => { handleToggleWebSearch(); showMobileActionsMenu = false; }}
+                      disabled={$isGenerating}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                      </svg>
+                      <span>Ricerca web</span>
                     </button>
                   {/if}
-                  
-                  <button 
-                    class="mobile-action-item" 
-                    class:active={webSearchEnabled}
-                    on:click={() => { handleToggleWebSearch(); showMobileActionsMenu = false; }}
-                    disabled={$isGenerating}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="10"/>
-                      <line x1="2" y1="12" x2="22" y2="12"/>
-                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                    </svg>
-                    <span>Ricerca web</span>
-                  </button>
                 </div>
               {/if}
             </div>
@@ -2294,28 +2231,28 @@
                 class="chat-icon-button thinking-button" 
                 class:active={$isThinkingModeEnabled}
                 on:click={handleToggleThinking}
-                title="Modalità Thinking"
+                title="Ragionamento"
                 disabled={$isGenerating}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
                 </svg>
               </button>
+            {:else}
+              <button 
+                class="chat-icon-button web-search-button" 
+                class:active={webSearchEnabled}
+                on:click={handleToggleWebSearch}
+                title="Ricerca web"
+                disabled={$isGenerating}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+              </button>
             {/if}
-            
-            <button 
-              class="chat-icon-button web-search-button" 
-              class:active={webSearchEnabled}
-              on:click={handleToggleWebSearch}
-              title="Ricerca web"
-              disabled={$isGenerating}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
-            </button>
           {/if}
         </div>
         
@@ -2396,8 +2333,6 @@
     Contenuto generato da IA. Verificare sempre l'accuratezza delle risposte, che possono contenere inesattezze.
   </div>
 </main>
-
-<PrivacyModal bind:isOpen={isPrivacyModalOpen} />
 
 <!-- Modal errore microfono -->
 
@@ -2842,295 +2777,6 @@
     letter-spacing: -0.5px;
   }
   
-  .privacy-card {
-    background: linear-gradient(135deg, var(--md-sys-color-surface-container) 0%, var(--md-sys-color-surface-container-high) 100%);
-    border: 1px solid var(--md-sys-color-outline-variant);
-    border-radius: 20px;
-    padding: 28px;
-    animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--md-sys-elevation-level1);
-    position: relative;
-    overflow: hidden;
-    margin-top: 8px;
-  }
-  
-  .privacy-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 50%, var(--md-sys-color-tertiary) 100%);
-    opacity: 0;
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .privacy-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--md-sys-elevation-level4);
-    border-color: var(--md-sys-color-primary);
-    background: linear-gradient(135deg, var(--md-sys-color-surface-container-high) 0%, var(--md-sys-color-surface-container) 100%);
-  }
-  
-  .privacy-card:hover::before {
-    opacity: 1;
-  }
-  
-  .privacy-card:active {
-    transform: translateY(-2px);
-    box-shadow: var(--md-sys-elevation-level2);
-  }
-  
-  .privacy-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 24px;
-  }
-  
-  .privacy-card-title-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  .privacy-icon-header {
-    color: var(--md-sys-color-primary);
-    flex-shrink: 0;
-    opacity: 0.9;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    width: 24px;
-    height: 24px;
-  }
-  
-  .privacy-card:hover .privacy-icon-header {
-    opacity: 1;
-    transform: rotate(15deg) scale(1.1);
-    filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.4));
-  }
-  
-  .privacy-card-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--md-sys-color-on-surface);
-    letter-spacing: -0.3px;
-    font-family: var(--md-sys-typescale-title-medium-font);
-  }
-  
-  .privacy-card-close {
-    background: none;
-    border: none;
-    color: var(--md-sys-color-on-surface-variant);
-    cursor: pointer;
-    padding: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--md-sys-shape-corner-small);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    width: 32px;
-    height: 32px;
-  }
-  
-  .privacy-card-close:hover {
-    background-color: var(--md-sys-color-surface-container-high);
-    color: var(--md-sys-color-on-surface);
-    transform: rotate(90deg);
-  }
-  
-  .privacy-card-close:active {
-    transform: rotate(90deg) scale(0.9);
-  }
-  
-  .privacy-features {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-top: 8px;
-  }
-  
-  @media (max-width: 1200px) {
-    .privacy-features {
-      gap: 14px;
-    }
-  }
-  
-  @media (max-width: 1024px) {
-    .privacy-features {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    
-    .privacy-card {
-      padding: 24px;
-    }
-  }
-  
-  @media (max-width: 900px) {
-    .privacy-features {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-    
-    .privacy-feature {
-      text-align: left;
-    }
-    
-    .privacy-icon {
-      margin-bottom: 12px;
-    }
-  }
-  
-  @media (max-width: 1024px) {
-    .welcome-message {
-      padding: 20px 20px 120px 20px;
-    }
-    
-    .welcome-content {
-      gap: 20px;
-    }
-    
-    .privacy-features {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-    }
-    
-    .privacy-card {
-      padding: 24px;
-    }
-    
-    .welcome-title {
-      font-size: 38px;
-    }
-    
-    .welcome-subtitle {
-      font-size: 17px;
-    }
-    
-    .welcome-logo {
-      width: 90px;
-      height: 90px;
-    }
-  }
-  
-  @media (max-width: 900px) {
-    .privacy-features {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-    
-    .privacy-feature {
-      text-align: left;
-    }
-    
-    .privacy-icon {
-      margin-bottom: 12px;
-    }
-  }
-  
-  .privacy-feature {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-    border-radius: 12px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-  }
-  
-  .privacy-feature:hover {
-    background-color: var(--md-sys-color-surface-container);
-    transform: translateY(-2px);
-  }
-  
-  .privacy-icon {
-    width: 56px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(255, 152, 0, 0.15) 100%);
-    border-radius: 14px;
-    margin-bottom: 8px;
-    color: #ff6b35;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-  }
-  
-  .privacy-feature:hover .privacy-icon {
-    transform: scale(1.1) rotate(5deg);
-    background: linear-gradient(135deg, rgba(255, 107, 53, 0.25) 0%, rgba(255, 152, 0, 0.25) 100%);
-    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
-  }
-  
-  .privacy-icon svg {
-    width: 28px;
-    height: 28px;
-    filter: drop-shadow(0 2px 4px rgba(255, 107, 53, 0.3));
-  }
-  
-  .privacy-feature-title {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--md-sys-color-on-surface);
-    margin: 0 0 6px 0;
-    font-family: var(--md-sys-typescale-title-small-font);
-    letter-spacing: -0.2px;
-    line-height: 1.3;
-  }
-  
-  .privacy-feature-description {
-    font-size: 13px;
-    color: var(--md-sys-color-on-surface-variant);
-    line-height: 1.6;
-    margin: 0;
-    font-family: var(--md-sys-typescale-body-medium-font);
-  }
-  
-  .privacy-card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--md-sys-color-outline-variant);
-    color: var(--md-sys-color-primary);
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .privacy-card:hover .privacy-card-footer {
-    border-top-color: var(--md-sys-color-primary);
-  }
-  
-  .privacy-card-link {
-    color: var(--md-sys-color-primary);
-    transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-family: var(--md-sys-typescale-label-large-font);
-    font-weight: var(--md-sys-typescale-label-large-weight);
-  }
-  
-  .privacy-card:hover .privacy-card-link {
-    color: var(--md-sys-color-primary);
-    text-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
-  }
-  
-  .privacy-card-footer svg {
-    color: var(--md-sys-color-primary);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    width: 18px;
-    height: 18px;
-  }
-  
-  .privacy-card:hover .privacy-card-footer svg {
-    transform: translateX(6px);
-  }
-
   @media (max-width: 768px) {
     .welcome-message {
       min-height: auto;
@@ -3164,51 +2810,6 @@
     .welcome-logo {
       width: 80px;
       height: 80px;
-    }
-    
-    .privacy-card {
-      display: none;
-    }
-    
-    .privacy-features {
-      grid-template-columns: 1fr;
-      gap: 16px;
-      margin-top: 4px;
-    }
-    
-    .privacy-feature {
-      text-align: left;
-      padding: 12px;
-    }
-    
-    .privacy-icon {
-      margin-bottom: 10px;
-      width: 48px;
-      height: 48px;
-    }
-    
-    .privacy-icon svg {
-      width: 24px;
-      height: 24px;
-    }
-    
-    .privacy-feature-title {
-      font-size: 16px;
-      margin-bottom: 4px;
-    }
-    
-    .privacy-feature-description {
-      font-size: 12px;
-      line-height: 1.5;
-    }
-    
-    .privacy-card-title {
-      font-size: 16px;
-    }
-    
-    .privacy-card-footer {
-      margin-top: 16px;
-      padding-top: 16px;
     }
 
     .welcome-text {

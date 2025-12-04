@@ -1,0 +1,68 @@
+# ============================================
+# VARIABILI D'AMBIENTE PER VERCEL
+# ============================================
+# Copia queste variabili nel dashboard Vercel:
+# Settings > Environment Variables
+# ============================================
+
+# ============================================
+# DATABASE - PostgreSQL Connection (Server-side)
+# ============================================
+# NEON DATABASE ⭐
+# ============================================
+# 1. Vai su Neon Dashboard > Il tuo progetto > Connection Details
+# 2. Copia "Connection string" (con pooling) → DATABASE_URL
+# 3. Copia "Connection string" (senza pooling) → DATABASE_URL_UNPOOLED
+# 
+# NOTA: Il codice usa automaticamente DATABASE_URL se disponibile
+# 
+DATABASE_URL=postgresql://[USER]:[PASSWORD]@[HOST]/[DATABASE]?sslmode=require
+DATABASE_URL_UNPOOLED=postgresql://[USER]:[PASSWORD]@[HOST]/[DATABASE]?sslmode=require
+
+# ============================================
+# CLERK - RIMOSSO
+# ============================================
+# Clerk è stato rimosso. L'autenticazione ora usa solo Neon Database.
+# Non sono necessarie variabili d'ambiente per Clerk.
+
+# ============================================
+# JWT & SESSION
+# ============================================
+
+JWT_SECRET=[GENERA_UNA_STRINGA_CASUALE_LUNGA_MINIMO_32_CARATTERI]
+
+# ============================================
+# WEBAUTHN (Opzionali)
+# ============================================
+
+WEBAUTHN_RP_ID=ainebula.vercel.app
+
+WEBAUTHN_RP_NAME=Nebula AI
+
+WEBAUTHN_ORIGIN=https://ainebula.vercel.app
+
+# ============================================
+# NODE ENVIRONMENT
+# ============================================
+
+NODE_ENV=production
+
+# ============================================
+# ISTRUZIONI:
+# ============================================
+# 1. CONFIGURA IL DATABASE NEON:
+#    - Vai su Neon Dashboard > Il tuo progetto > Connection Details
+#    - Copia "Connection string" (con pooling) → DATABASE_URL
+#    - Copia "Connection string" (senza pooling) → DATABASE_URL_UNPOOLED
+#
+# 2. Genera JWT_SECRET:
+#    - Windows PowerShell: [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+#    - Linux/Mac: openssl rand -base64 32
+#
+# 4. Aggiungi tutte le variabili su Vercel:
+#    - Vai su Vercel Dashboard > Il tuo progetto > Settings > Environment Variables
+#    - Aggiungi ogni variabile
+#    - Seleziona gli ambienti: Production, Preview, Development
+#    - Salva e redeploy
+# ============================================
+

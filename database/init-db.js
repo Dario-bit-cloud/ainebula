@@ -10,9 +10,18 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Connessione al database
-const connectionString = process.env.DATABASE_URL || 
-  'postgresql://neondb_owner:npg_Xpw3ovIOqnz0@ep-spring-leaf-ads75xz2-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require';
+// Connessione al database Neon
+// Priorità: DATABASE_URL (con pooling) > DATABASE_URL_UNPOOLED (senza pooling)
+const connectionString = process.env.DATABASE_URL ||
+  process.env.DATABASE_URL_UNPOOLED;
+
+if (!connectionString) {
+  console.error('❌ Connection string PostgreSQL non trovata!');
+  console.error('Configura una di queste variabili d\'ambiente:');
+  console.error('  - DATABASE_URL (Neon con pooling)');
+  console.error('  - DATABASE_URL_UNPOOLED (Neon senza pooling)');
+  process.exit(1);
+}
 
 const sql = neon(connectionString);
 

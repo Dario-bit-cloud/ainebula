@@ -2,10 +2,18 @@
 // Il server NON può decrittografare i messaggi, solo verificare che siano crittografati
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
+import { setCorsHeaders, handleCorsPreflight } from '../utils/cors.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-const connectionString = process.env.DATABASE_URL;
+// Connessione al database PostgreSQL Neon
+// Priorità: DATABASE_URL (con pooling) > DATABASE_URL_UNPOOLED (senza pooling)
+const connectionString = process.env.DATABASE_URL ||
+  process.env.DATABASE_URL_UNPOOLED;
+if (!connectionString) {
+  throw new Error('Connection string PostgreSQL non trovata. Configura DATABASE_URL (Neon)');
+}
+
 const sql = neon(connectionString);
 
 // Middleware per verificare autenticazione
@@ -40,14 +48,9 @@ async function authenticateToken(req) {
 }
 
 export default async function handler(req, res) {
-  // Abilita CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
+  setCorsHeaders(req, res);
+  
+  if (handleCorsPreflight(req, res)) {
     return;
   }
 
@@ -84,11 +87,11 @@ export default async function handler(req, res) {
       try {
         // Verifica che sia un base64 valido
         const base64 = encryptedMessage.substring(10);
-        atob(base64); // Se non è base64 valido, lancerà un errore
+        // Usa Buffer per Node.js invece di atob (che è solo per browser)
+        const buffer = Buffer.from(base64, 'base64'); // Se non è base64 valido, lancerà un errore
         
         // Verifica che abbia almeno la dimensione minima (IV + qualche dato)
-        const binaryString = atob(base64);
-        if (binaryString.length < 12) {
+        if (buffer.length < 12) {
           return res.status(400).json({
             success: false,
             message: 'Messaggio crittografato non valido (dimensione insufficiente)',
@@ -164,5 +167,6 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 

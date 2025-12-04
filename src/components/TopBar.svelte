@@ -11,15 +11,6 @@
   
   const dispatch = createEventDispatcher();
   
-  
-  function openLoginModal() {
-    dispatch('openAuth', { mode: 'login' });
-  }
-  
-  function openRegisterModal() {
-    dispatch('openAuth', { mode: 'register' });
-  }
-  
   let isModelDropdownOpen = false;
   let modelSelectorButton;
   let modelDropdown;
@@ -213,6 +204,9 @@
         <span class="model-name">
           {#if $availableModels.find(m => m.id === $selectedModel)}
             {@const selected = $availableModels.find(m => m.id === $selectedModel)}
+            {#if selected.logo}
+              <img src={selected.logo} alt="{selected.name} logo" class="model-logo-small" />
+            {/if}
             {selected.name}
             {#if selected.limitedTimeFree}
               <span class="limited-time-badge-small" title="Gratuito per tempo limitato">
@@ -274,41 +268,6 @@
                         Gratuito
                       </span>
                     {/if}
-                    {#if model.vision}
-                      <span class="feature-badge vision-badge" title="Vision - Supporta analisi immagini">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                          <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                        Vision
-                      </span>
-                    {/if}
-                    {#if model.reasoning}
-                      <span class="feature-badge reasoning-badge" title="Reasoning - Supporta ragionamento avanzato">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                        </svg>
-                        Reasoning
-                      </span>
-                    {/if}
-                    {#if model.functionCall}
-                      <span class="feature-badge function-badge" title="Function Calling - Supporta chiamate a funzioni">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                        </svg>
-                        Functions
-                      </span>
-                    {/if}
-                    {#if model.webSearch}
-                      <span class="web-search-badge" title="Ricerca web in tempo reale">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <circle cx="11" cy="11" r="8"/>
-                          <path d="m21 21-4.35-4.35"/>
-                        </svg>
-                        Web
-                      </span>
-                    {/if}
                   </div>
                   {#if model.description}
                     <div class="model-description">{model.description}</div>
@@ -357,24 +316,10 @@
             >
               <div class="model-info">
                 <div class="model-name">
+                  {#if model.logo}
+                    <img src={model.logo} alt="{model.name} logo" class="model-logo" />
+                  {/if}
                   {model.name}
-                  {#if model.vision}
-                    <span class="feature-badge vision-badge" title="Vision - Supporta analisi immagini">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                      Vision
-                    </span>
-                  {/if}
-                  {#if model.reasoning}
-                    <span class="feature-badge reasoning-badge" title="Reasoning - Supporta ragionamento avanzato">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                      </svg>
-                      Reasoning
-                    </span>
-                  {/if}
                 </div>
                 {#if model.description}
                   <div class="model-description">{model.description}</div>
@@ -401,14 +346,7 @@
     </div>
   </div>
   <div class="right-section">
-    {#if !$isAuthenticatedStore && !$isLoading}
-      <button class="auth-button login-button" on:click={openLoginModal}>
-        Accedi
-      </button>
-      <button class="auth-button register-button" on:click={openRegisterModal}>
-        Registrati
-      </button>
-    {:else if $isAuthenticatedStore}
+    {#if $isAuthenticatedStore}
       <button class="icon-button" title="Libreria Prompt" on:click={togglePromptLibrary}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
@@ -641,6 +579,17 @@
     font-weight: var(--md-sys-typescale-title-medium-weight);
     font-family: var(--md-sys-typescale-body-medium-font);
     color: var(--md-sys-color-on-surface);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .model-logo-small {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+    border-radius: 3px;
   }
 
   .dropdown-icon {
@@ -921,6 +870,14 @@
     gap: 6px;
     flex-wrap: wrap;
     line-height: 1.3;
+  }
+
+  .model-logo {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    flex-shrink: 0;
+    border-radius: 4px;
   }
 
   .premium-badge {

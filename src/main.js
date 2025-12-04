@@ -19,12 +19,18 @@ import { showContextMenu } from './services/contextMenuService.js';
 initTheme();
 
 // Applica stile UI (Material Design o Liquid Glass)
+// Nota: Liquid Glass non è disponibile su iOS
 if (typeof window !== 'undefined') {
   const savedUIStyle = localStorage.getItem('nebula-ui-style') || 'material';
-  if (savedUIStyle === 'liquid') {
+  // Non applicare liquid glass su iOS
+  if (savedUIStyle === 'liquid' && !isIOS()) {
     document.body.classList.add('liquid-glass');
   } else {
     document.body.classList.remove('liquid-glass');
+    // Se era salvato liquid glass ma siamo su iOS, salva material
+    if (savedUIStyle === 'liquid' && isIOS()) {
+      localStorage.setItem('nebula-ui-style', 'material');
+    }
   }
 }
 
@@ -87,7 +93,12 @@ if (typeof window !== 'undefined') {
       return; // Lascia che il browser gestisca il menu contestuale
     }
     
-    // Previeni SEMPRE il menu contestuale del browser
+    // Permetti il menu del browser se si tiene premuto Shift (utile per dev mode)
+    if (event.shiftKey) {
+      return; // Lascia che il browser gestisca il menu contestuale
+    }
+    
+    // Previeni il menu contestuale del browser
     event.preventDefault();
     event.stopPropagation();
     

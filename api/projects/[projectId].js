@@ -1,10 +1,18 @@
 // API Route per gestire un singolo progetto su Vercel
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
+import { setCorsHeaders, handleCorsPreflight } from '../utils/cors.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-const connectionString = process.env.DATABASE_URL;
+// Connessione al database PostgreSQL Neon
+// Priorità: DATABASE_URL (con pooling) > DATABASE_URL_UNPOOLED (senza pooling)
+const connectionString = process.env.DATABASE_URL ||
+  process.env.DATABASE_URL_UNPOOLED;
+if (!connectionString) {
+  throw new Error('Connection string PostgreSQL non trovata. Configura DATABASE_URL (Neon)');
+}
+
 const sql = neon(connectionString);
 
 // Middleware per verificare autenticazione
@@ -39,14 +47,9 @@ async function authenticateToken(req) {
 }
 
 export default async function handler(req, res) {
-  // Abilita CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
+  setCorsHeaders(req, res);
+  
+  if (handleCorsPreflight(req, res)) {
     return;
   }
 

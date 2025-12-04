@@ -13,7 +13,6 @@
   import { currentChatId } from './stores/chat.js';
   import { isInputElement } from './utils/shortcuts.js';
   import { showConfirm, showAlert } from './services/dialogService.js';
-  import { linkPatreonAccount } from './services/patreonService.js';
   import { showSuccess as showToastSuccess, showError, showWarning, showInfo } from './services/toastService.js';
   import { isMobileDevice } from './utils/platform.js';
   import { hasPWAInstallPromptBeenShown, markPWAInstallPromptAsShown, isPWAInstalled } from './utils/mobile.js';
@@ -402,95 +401,6 @@
     window.showToastWarning = showWarning;
     window.showToastInfo = showInfo;
     
-    // Gestisci callback Patreon
-    const urlParams = new URLSearchParams(window.location.search);
-    const patreonCallback = urlParams.get('patreon_callback');
-    const patreonUserId = urlParams.get('patreon_user_id');
-    const patreonToken = urlParams.get('patreon_token');
-    const patreonError = urlParams.get('patreon_error');
-    
-    if (patreonError) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      showAlert(`Errore collegamento Patreon: ${decodeURIComponent(patreonError)}`, 'Errore Patreon', 'OK', 'error');
-    } else if (patreonCallback === 'true' && patreonUserId && patreonToken) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Processa collegamento quando l'utente è autenticato
-      const processPatreonLink = async () => {
-        if (!$isAuthenticatedStore) {
-          // Salva temporaneamente e aspetta autenticazione
-          localStorage.setItem('patreon_pending_user_id', patreonUserId);
-          localStorage.setItem('patreon_pending_token', decodeURIComponent(patreonToken));
-          return;
-        }
-        
-        try {
-          const linkResult = await linkPatreonAccount(patreonUserId, decodeURIComponent(patreonToken));
-          
-          if (linkResult.success) {
-            if (linkResult.hasActiveMembership) {
-              // Aggiorna store utente con subscription
-              user.update(u => ({
-                ...u,
-                subscription: {
-                  active: true,
-                  plan: 'premium',
-                  expiresAt: linkResult.subscription?.expires_at,
-                  key: `NEBULA-PREMIUM-PATREON-${Date.now()}`
-                }
-              }));
-              showAlert('Account Patreon collegato e abbonamento Premium attivato!', 'Patreon collegato', 'OK', 'success');
-            } else {
-              showAlert('Account Patreon collegato. Verifica il tuo abbonamento Premium su Patreon (minimo 5€/mese).', 'Account collegato', 'OK', 'info');
-            }
-          } else {
-            showAlert(linkResult.message || 'Errore durante il collegamento', 'Errore', 'OK', 'error');
-          }
-        } catch (error) {
-          console.error('Errore collegamento Patreon:', error);
-          showAlert('Errore durante il collegamento con Patreon', 'Errore', 'OK', 'error');
-        }
-      };
-      
-      // Processa immediatamente se autenticato, altrimenti aspetta
-      if ($isAuthenticatedStore) {
-        processPatreonLink();
-      } else {
-        const unsubscribe = isAuthenticatedStore.subscribe(async (isAuth) => {
-          if (isAuth) {
-            unsubscribe();
-            await new Promise(resolve => setTimeout(resolve, 500));
-            await processPatreonLink();
-          }
-        });
-        
-        // Cleanup
-        window._patreonUnsubscribe = unsubscribe;
-      }
-    }
-    
-    // Processa eventuali dati Patreon salvati in localStorage
-    const pendingUserId = localStorage.getItem('patreon_pending_user_id');
-    const pendingToken = localStorage.getItem('patreon_pending_token');
-    if (pendingUserId && pendingToken && $isAuthenticatedStore) {
-      localStorage.removeItem('patreon_pending_user_id');
-      localStorage.removeItem('patreon_pending_token');
-      
-      linkPatreonAccount(pendingUserId, pendingToken).then(result => {
-        if (result.success && result.hasActiveMembership) {
-          user.update(u => ({
-            ...u,
-            subscription: {
-              active: true,
-              plan: 'premium',
-              expiresAt: result.subscription?.expires_at,
-              key: `NEBULA-PREMIUM-PATREON-${Date.now()}`
-            }
-          }));
-        }
-      });
-    }
-    
     // Il tema viene già inizializzato in main.js prima del mount
     
     // Mostra automaticamente il prompt di installazione PWA su mobile (solo una volta)
@@ -520,11 +430,6 @@
   
   onDestroy(() => {
     window.removeEventListener('keydown', handleKeyboardShortcuts);
-    // Cleanup Patreon se presente
-    if (window._patreonUnsubscribe) {
-      window._patreonUnsubscribe();
-      delete window._patreonUnsubscribe;
-    }
   });
 </script>
 

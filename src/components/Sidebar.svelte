@@ -2,10 +2,10 @@
   import { user as userStore } from '../stores/user.js';
   import { chats, currentChatId, createNewChat, loadChat, deleteChat, moveChatToProject, removeChatFromProject, loadChats, syncChatsOnLogin } from '../stores/chat.js';
   import { isAuthenticatedStore, user as authUser } from '../stores/auth.js';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { get } from 'svelte/store';
   import { selectedModel, setModel } from '../stores/models.js';
-  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isSidebarCollapsed, isMobile, isNebuliniModalOpen, isPromptLibraryModalOpen, isImageGeneratorOpen } from '../stores/app.js';
+  import { sidebarView, isSearchOpen, searchQuery, isInviteModalOpen, isProjectModalOpen, isUserMenuOpen, isSidebarOpen, isSidebarCollapsed, isMobile, isNebuliniModalOpen, isPromptLibraryModalOpen, isImageGeneratorOpen, sidebarWidth } from '../stores/app.js';
   import { projects, updateProject, deleteProject, syncProjectsOnLogin, loadProjects } from '../stores/projects.js';
   import { showConfirm } from '../services/dialogService.js';
   import { currentLanguage, t } from '../stores/language.js';
@@ -25,6 +25,12 @@
   let searchInputRef = null;
   let draggedChatId = null;
   let dragOverProjectId = null;
+  
+  // Variabili per il ridimensionamento della sidebar
+  let sidebarElement = null;
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
   
   // Carica le chat e i progetti quando l'utente si autentica
   let lastAuthState = false;
@@ -414,13 +420,62 @@
     draggedChatId = null;
     dragOverProjectId = null;
   }
+  
+  // Funzioni per il ridimensionamento della sidebar
+  function handleResizeStart(event) {
+    // Solo su desktop, non mobile
+    if ($isMobile) return;
+    
+    event.preventDefault();
+    isResizing = true;
+    startX = event.clientX;
+    startWidth = $sidebarWidth;
+    
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+  
+  function handleResizeMove(event) {
+    if (!isResizing) return;
+    
+    const diff = event.clientX - startX;
+    const newWidth = startWidth + diff;
+    sidebarWidth.set(newWidth);
+  }
+  
+  function handleResizeEnd() {
+    if (!isResizing) return;
+    
+    isResizing = false;
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+  
+  // Cleanup al destroy
+  onDestroy(() => {
+    if (isResizing) {
+      handleResizeEnd();
+    }
+  });
 </script>
 
 {#if $isMobile && $isSidebarOpen}
   <div class="sidebar-overlay" on:click={closeSidebar}></div>
 {/if}
 
-<aside class="sidebar" class:sidebar-open={$isSidebarOpen} class:sidebar-mobile={$isMobile} class:collapsed={$isSidebarCollapsed && !$isMobile}>
+<aside 
+  class="sidebar" 
+  class:sidebar-open={$isSidebarOpen} 
+  class:sidebar-mobile={$isMobile} 
+  class:collapsed={$isSidebarCollapsed && !$isMobile}
+  class:resizing={isResizing}
+  bind:this={sidebarElement}
+  style="width: {$isSidebarCollapsed && !$isMobile ? '72px' : $sidebarWidth + 'px'}"
+>
   {#if $isMobile}
     <div class="sidebar-header-mobile">
       <div class="sidebar-logo">
@@ -1087,6 +1142,17 @@
       {/if}
     </button>
   </div>
+  
+  <!-- Handle per il ridimensionamento (solo su desktop) -->
+  {#if !$isMobile && !$isSidebarCollapsed}
+    <div 
+      class="resize-handle"
+      on:mousedown={handleResizeStart}
+      role="separator"
+      aria-label="Ridimensiona sidebar"
+      aria-orientation="vertical"
+    ></div>
+  {/if}
 </aside>
 
 <style>
@@ -1126,8 +1192,56 @@
     transition: width var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
   }
   
+  .sidebar.resizing {
+    transition: none;
+  }
+  
   .sidebar.collapsed {
     width: 72px;
+  }
+  
+  /* Handle per il ridimensionamento */
+  .resize-handle {
+    position: absolute;
+    top: 0;
+    right: -2px;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    background: transparent;
+    transition: background-color 0.2s ease;
+    /* Area di hover più grande per facilitare il trascinamento */
+    margin-right: -2px;
+  }
+  
+  .resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 2px;
+    width: 2px;
+    height: 100%;
+    background: transparent;
+    transition: background-color 0.2s ease;
+  }
+  
+  .resize-handle:hover::before {
+    background-color: var(--md-sys-color-primary);
+    opacity: 0.6;
+  }
+  
+  .resize-handle:active::before {
+    background-color: var(--md-sys-color-primary);
+    opacity: 0.9;
+  }
+  
+  /* Indicatore visivo durante il resize */
+  .sidebar.resizing .resize-handle::before {
+    background-color: var(--md-sys-color-primary);
+    opacity: 0.9;
+    width: 3px;
+    right: 1px;
   }
   
   .sidebar-header {
@@ -1246,7 +1360,7 @@
   /* Tablet styles */
   @media (min-width: 769px) and (max-width: 1024px) {
     .sidebar {
-      width: 240px;
+      /* La larghezza è gestita dinamicamente tramite lo store */
     }
 
     .sidebar-nav {

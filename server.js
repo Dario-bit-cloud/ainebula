@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -59,7 +59,7 @@ app.use(cors({
 if (isDevelopment) {
   app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
-    log(`\n📨 [REQUEST] ${req.method} ${req.path}`, {
+    log(`\nðŸ“¨ [REQUEST] ${req.method} ${req.path}`, {
       timestamp,
       origin: req.get('origin'),
       userAgent: req.get('user-agent'),
@@ -71,7 +71,7 @@ if (isDevelopment) {
 
 // Compression middleware - configurazione conservativa per evitare errori
 app.use(compression({
-  level: 6, // Livello di compressione (1-9, 6 è un buon compromesso)
+  level: 6, // Livello di compressione (1-9, 6 Ã¨ un buon compromesso)
   filter: (req, res) => {
     // Comprimi solo risposte JSON e testo, non immagini o file binari
     if (req.headers['x-no-compression']) {
@@ -79,7 +79,7 @@ app.use(compression({
     }
     return compression.filter(req, res);
   },
-  threshold: 1024 // Comprimi solo se la risposta è > 1KB
+  threshold: 1024 // Comprimi solo se la risposta Ã¨ > 1KB
 }));
 
 app.use(express.json({ limit: '50mb' })); // Aumenta il limite per le immagini
@@ -95,7 +95,7 @@ async function authenticateToken(req, res, next) {
     token = authHeader.split(' ')[1]; // Bearer TOKEN
   }
   
-  // Se non c'è token nell'header, prova con il cookie
+  // Se non c'Ã¨ token nell'header, prova con il cookie
   if (!token && req.cookies && req.cookies.auth_token) {
     token = req.cookies.auth_token;
   }
@@ -135,18 +135,22 @@ async function authenticateToken(req, res, next) {
   }
 }
 
-// Connessione al database Neon
-// Usa la variabile d'ambiente o il valore di default per sviluppo
-const connectionString = process.env.DATABASE_URL || 
-  'postgresql://neondb_owner:npg_Xpw3ovIOqnz0@ep-spring-leaf-ads75xz2-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require';
+// Connessione al database PostgreSQL Neon
+// PrioritÃ : DATABASE_URL (con pooling) > DATABASE_URL_UNPOOLED (senza pooling)
+const connectionString = process.env.DATABASE_URL ||
+  process.env.DATABASE_URL_UNPOOLED;
 
 if (!connectionString) {
-  console.error('❌ DATABASE_URL non trovata nelle variabili d\'ambiente');
+  console.error('âŒ Connection string PostgreSQL non trovata!');
+  console.error('Configura una di queste variabili d\'ambiente:');
+  console.error('  - DATABASE_URL (Neon con pooling)');
+  console.error('  - DATABASE_URL_UNPOOLED (Neon senza pooling)');
   process.exit(1);
 }
 
-log('✅ Database URL configurato');
+log('âœ… Database PostgreSQL URL configurato');
 
+// Usa @neondatabase/serverless per Neon Database
 const sql = neon(connectionString);
 
 // Limite nascosto di 50MB per la cronologia chat per utente
@@ -154,7 +158,7 @@ const MAX_CHAT_HISTORY_SIZE = 50 * 1024 * 1024; // 50MB in bytes
 
 /**
  * Applica il limite di 50MB alla cronologia chat dell'utente
- * Rimuove automaticamente i messaggi più vecchi se il limite viene superato
+ * Rimuove automaticamente i messaggi piÃ¹ vecchi se il limite viene superato
  */
 async function enforceChatHistoryLimit(userId) {
   try {
@@ -168,11 +172,11 @@ async function enforceChatHistoryLimit(userId) {
     
     const totalSize = parseInt(sizeResult[0]?.total_size || 0);
     
-    // Se la dimensione supera il limite, rimuovi i messaggi più vecchi
+    // Se la dimensione supera il limite, rimuovi i messaggi piÃ¹ vecchi
     if (totalSize > MAX_CHAT_HISTORY_SIZE) {
-      logWarn(`⚠️ [CHAT LIMIT] Utente ${userId} ha superato il limite: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+      logWarn(`âš ï¸ [CHAT LIMIT] Utente ${userId} ha superato il limite: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
       
-      // Ottieni i messaggi ordinati per timestamp (più vecchi prima)
+      // Ottieni i messaggi ordinati per timestamp (piÃ¹ vecchi prima)
       const messagesToDelete = await sql`
         SELECT m.id, m.chat_id, octet_length(m.content) as size
         FROM messages m
@@ -184,7 +188,7 @@ async function enforceChatHistoryLimit(userId) {
       let currentSize = totalSize;
       let deletedCount = 0;
       
-      // Elimina i messaggi più vecchi fino a scendere sotto il limite
+      // Elimina i messaggi piÃ¹ vecchi fino a scendere sotto il limite
       for (const msg of messagesToDelete) {
         if (currentSize <= MAX_CHAT_HISTORY_SIZE) {
           break;
@@ -204,11 +208,11 @@ async function enforceChatHistoryLimit(userId) {
         )
       `;
       
-      log(`✅ [CHAT LIMIT] Rimossi ${deletedCount} messaggi vecchi. Nuova dimensione: ${(currentSize / 1024 / 1024).toFixed(2)}MB`);
+      log(`âœ… [CHAT LIMIT] Rimossi ${deletedCount} messaggi vecchi. Nuova dimensione: ${(currentSize / 1024 / 1024).toFixed(2)}MB`);
     }
   } catch (error) {
-    logError('❌ [CHAT LIMIT] Errore nell\'applicazione del limite:', error);
-    // Non bloccare il salvataggio se c'è un errore nel controllo del limite
+    logError('âŒ [CHAT LIMIT] Errore nell\'applicazione del limite:', error);
+    // Non bloccare il salvataggio se c'Ã¨ un errore nel controllo del limite
   }
 }
 
@@ -300,29 +304,22 @@ app.get('/api/db/info', async (req, res) => {
 
 // ==================== ENDPOINT AUTENTICAZIONE ====================
 
-// Registrazione
-app.post('/api/auth/register', async (req, res) => {
-  const timestamp = new Date().toISOString();
-  log('\n📝 [SERVER REGISTER] Richiesta ricevuta:', {
-    timestamp,
-    ip: req.ip,
-    userAgent: req.get('user-agent'),
-    headers: {
-      origin: req.get('origin'),
-      referer: req.get('referer'),
-      'content-type': req.get('content-type')
-    }
+// DEPRECATO: Sincronizzazione utente Clerk - RIMOSSO
+// L'autenticazione ora usa solo Neon Database
+// Questo endpoint Ã¨ mantenuto per retrocompatibilitÃ  ma non dovrebbe essere usato
+app.post('/api/auth/clerk-sync', async (req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: 'Clerk Ã¨ stato rimosso. Usa /api/auth/register o /api/auth/login per autenticarti.'
   });
   
+  // CLERK NON PIU' SUPPORTATO
+});
+
+// Registrazione
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    log('📥 [SERVER REGISTER] Body ricevuto:', {
-      username: username || 'MISSING',
-      password: password ? '***' : 'MISSING',
-      hasUsername: !!username,
-      hasPassword: !!password
-    });
     
     // Validazione
     if (!username || !password) {
@@ -332,6 +329,7 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
     
+    // Validazione username
     if (username.length < 3) {
       return res.status(400).json({
         success: false,
@@ -339,6 +337,16 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
     
+    // Validazione caratteri username
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lo username può contenere solo lettere, numeri, underscore e trattini'
+      });
+    }
+    
+    // Validazione password
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
@@ -346,65 +354,99 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
     
-    // Verifica se username esiste già
-    const existing = await sql`
-      SELECT id FROM users 
-      WHERE username = ${username.toLowerCase()}
+    // Verifica se lo username esiste già
+    const existingUsers = await sql`
+      SELECT id FROM users WHERE username = ${username.toLowerCase()}
     `;
     
-    if (existing.length > 0) {
-      return res.status(400).json({
+    if (existingUsers.length > 0) {
+      return res.status(409).json({
         success: false,
-        message: 'Username già in uso'
+        message: 'Username già utilizzato'
       });
     }
     
     // Hash della password
     const passwordHash = await bcrypt.hash(password, 10);
+    
+    // Genera ID utente
     const userId = randomBytes(16).toString('hex');
-    const email = `${username.toLowerCase()}@nebula.local`; // Email fittizia basata su username
     
     // Crea l'utente
     await sql`
-      INSERT INTO users (id, email, username, password_hash)
-      VALUES (${userId}, ${email}, ${username.toLowerCase()}, ${passwordHash})
+      INSERT INTO users (id, email, username, password_hash, created_at, updated_at, is_active)
+      VALUES (
+        ${userId},
+        ${`${username}@nebula.local`},
+        ${username.toLowerCase()},
+        ${passwordHash},
+        NOW(),
+        NOW(),
+        true
+      )
     `;
     
-    // Crea sessione
-    const sessionToken = jwt.sign({ userId, email, username: username.toLowerCase() }, JWT_SECRET, { expiresIn: '7d' });
+    // Crea sessione JWT
+    const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
+    const sessionToken = jwt.sign(
+      { userId, username: username.toLowerCase() },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
     const sessionId = randomBytes(16).toString('hex');
     const expiresAt = new Date(Date.now() + SESSION_DURATION);
     
+    // Salva la sessione nel database
     await sql`
-      INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
-      VALUES (${sessionId}, ${userId}, ${sessionToken}, ${expiresAt}, ${req.ip}, ${req.get('user-agent')})
+      INSERT INTO sessions (id, user_id, token, expires_at, created_at, ip_address, user_agent)
+      VALUES (
+        ${sessionId},
+        ${userId},
+        ${sessionToken},
+        ${expiresAt.toISOString()},
+        NOW(),
+        ${req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown'},
+        ${req.headers['user-agent'] || 'unknown'}
+      )
     `;
     
-    // Aggiorna last_login
+    // Crea impostazioni utente di default
+    const settingsId = randomBytes(16).toString('hex');
     await sql`
-      UPDATE users SET last_login = NOW() WHERE id = ${userId}
+      INSERT INTO user_settings (id, user_id, created_at, updated_at)
+      VALUES (${settingsId}, ${userId}, NOW(), NOW())
     `;
     
-    const response = {
+    // Crea abbonamento gratuito di default
+    const subscriptionId = randomBytes(16).toString('hex');
+    await sql`
+      INSERT INTO subscriptions (id, user_id, plan, status, started_at, auto_renew)
+      VALUES (${subscriptionId}, ${userId}, 'free', 'active', NOW(), false)
+    `;
+    
+    log('✅ [AUTH] Utente registrato:', userId);
+    
+    // Imposta cookie
+    res.cookie('auth_token', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: SESSION_DURATION / 1000,
+      path: '/'
+    });
+    
+    return res.status(201).json({
       success: true,
-      message: 'Registrazione completata con successo',
       user: {
         id: userId,
         username: username.toLowerCase()
       },
       token: sessionToken
-    };
-    
-    log('✅ [SERVER REGISTER] Registrazione completata per:', username.toLowerCase());
-    res.json(response);
-  } catch (error) {
-    console.error('❌ [SERVER REGISTER] Errore:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      timestamp
     });
-    res.status(500).json({
+  } catch (error) {
+    logError('❌ [AUTH] Errore registrazione:', error);
+    return res.status(500).json({
       success: false,
       message: 'Errore durante la registrazione',
       error: error.message
@@ -414,50 +456,25 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Login
 app.post('/api/auth/login', async (req, res) => {
-  const timestamp = new Date().toISOString();
-  log('\n🔐 [SERVER LOGIN] Richiesta ricevuta:', {
-    timestamp,
-    ip: req.ip,
-    userAgent: req.get('user-agent'),
-    headers: {
-      origin: req.get('origin'),
-      referer: req.get('referer'),
-      'content-type': req.get('content-type')
-    }
-  });
-  
   try {
     const { username, password } = req.body;
     
-    log('📥 [SERVER LOGIN] Body ricevuto:', {
-      username: username || 'MISSING',
-      password: password ? '***' : 'MISSING',
-      hasUsername: !!username,
-      hasPassword: !!password
-    });
-    
+    // Validazione
     if (!username || !password) {
-      logWarn('⚠️ [SERVER LOGIN] Credenziali mancanti');
       return res.status(400).json({
         success: false,
         message: 'Username e password sono obbligatori'
       });
     }
     
-    const usernameLower = username.toLowerCase();
-    log('🔍 [SERVER LOGIN] Ricerca utente:', usernameLower);
-    
-    // Trova l'utente
+    // Trova l'utente per username
     const users = await sql`
-      SELECT id, email, username, password_hash, is_active
+      SELECT id, username, password_hash, is_active
       FROM users
-      WHERE username = ${usernameLower}
+      WHERE username = ${username.toLowerCase()}
     `;
     
-    log('👤 [SERVER LOGIN] Utenti trovati:', users.length);
-    
     if (users.length === 0) {
-      logWarn('❌ [SERVER LOGIN] Utente non trovato:', usernameLower);
       return res.status(401).json({
         success: false,
         message: 'Credenziali non valide'
@@ -465,14 +482,9 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     const user = users[0];
-    log('✅ [SERVER LOGIN] Utente trovato:', {
-      id: user.id,
-      username: user.username,
-      isActive: user.is_active
-    });
     
+    // Verifica se l'account è attivo
     if (!user.is_active) {
-      logWarn('⚠️ [SERVER LOGIN] Account disattivato:', user.id);
       return res.status(403).json({
         success: false,
         message: 'Account disattivato'
@@ -480,81 +492,102 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     // Verifica password
-    log('🔑 [SERVER LOGIN] Verifica password...');
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    log('🔑 [SERVER LOGIN] Password valida:', isValidPassword);
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
     
-    if (!isValidPassword) {
-      logWarn('❌ [SERVER LOGIN] Password non valida per utente:', user.username);
+    if (!passwordMatch) {
       return res.status(401).json({
         success: false,
         message: 'Credenziali non valide'
       });
     }
     
-    // Crea sessione
-    log('🎫 [SERVER LOGIN] Creazione sessione...');
+    // Elimina sessioni scadute
+    await sql`
+      DELETE FROM sessions
+      WHERE user_id = ${user.id} AND expires_at < NOW()
+    `;
+    
+    // Crea nuova sessione JWT
+    const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
     const sessionToken = jwt.sign(
-      { userId: user.id, email: user.email, username: user.username },
+      { userId: user.id, username: user.username },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+    
     const sessionId = randomBytes(16).toString('hex');
     const expiresAt = new Date(Date.now() + SESSION_DURATION);
     
+    // Salva la sessione nel database
     await sql`
-      INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
-      VALUES (${sessionId}, ${user.id}, ${sessionToken}, ${expiresAt}, ${req.ip}, ${req.get('user-agent')})
+      INSERT INTO sessions (id, user_id, token, expires_at, created_at, ip_address, user_agent)
+      VALUES (
+        ${sessionId},
+        ${user.id},
+        ${sessionToken},
+        ${expiresAt.toISOString()},
+        NOW(),
+        ${req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown'},
+        ${req.headers['user-agent'] || 'unknown'}
+      )
     `;
-    
-    log('✅ [SERVER LOGIN] Sessione creata:', {
-      sessionId,
-      expiresAt: expiresAt.toISOString()
-    });
     
     // Aggiorna last_login
     await sql`
-      UPDATE users SET last_login = NOW() WHERE id = ${user.id}
+      UPDATE users
+      SET last_login = NOW()
+      WHERE id = ${user.id}
     `;
     
-    // Imposta il cookie HTTP per mantenere la sessione
-    const cookieOptions = {
-      httpOnly: true, // Previene accesso JavaScript al cookie (sicurezza)
-      secure: process.env.NODE_ENV === 'production', // Solo HTTPS in produzione
-      sameSite: 'lax', // Protezione CSRF
-      maxAge: SESSION_DURATION / 1000, // Durata in secondi (7 giorni)
-      path: '/' // Disponibile su tutto il sito
-    };
+    log('✅ [AUTH] Login riuscito:', user.id);
     
-    res.cookie('auth_token', sessionToken, cookieOptions);
-    
-    log('🍪 [SERVER LOGIN] Cookie impostato:', {
-      httpOnly: cookieOptions.httpOnly,
-      secure: cookieOptions.secure,
-      sameSite: cookieOptions.sameSite,
-      maxAge: cookieOptions.maxAge
+    // Imposta cookie
+    res.cookie('auth_token', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: SESSION_DURATION / 1000,
+      path: '/'
     });
-
-    const response = {
+    
+    // Ottieni abbonamento
+    const subscriptions = await sql`
+      SELECT * FROM subscriptions 
+      WHERE user_id = ${user.id} 
+        AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > NOW())
+      ORDER BY started_at DESC
+      LIMIT 1
+    `;
+    
+    let subscription = null;
+    if (subscriptions.length > 0) {
+      const sub = subscriptions[0];
+      subscription = {
+        active: true,
+        plan: sub.plan,
+        expiresAt: sub.expires_at ? sub.expires_at.toISOString() : null
+      };
+    } else {
+      subscription = {
+        active: false,
+        plan: null,
+        expiresAt: null
+      };
+    }
+    
+    return res.json({
       success: true,
-      message: 'Login completato con successo',
       user: {
         id: user.id,
-        username: user.username
+        username: user.username,
+        subscription: subscription
       },
       token: sessionToken
-    };
-    
-    log('✅ [SERVER LOGIN] Login completato con successo per:', user.username);
-    res.json(response);
-  } catch (error) {
-    console.error('❌ [SERVER LOGIN] Errore:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      timestamp
     });
-    res.status(500).json({
+  } catch (error) {
+    logError('❌ [AUTH] Errore login:', error);
+    return res.status(500).json({
       success: false,
       message: 'Errore durante il login',
       error: error.message
@@ -622,7 +655,7 @@ const getRpId = () => {
   }
   // Per Vercel, usa il dominio principale
   if (process.env.VERCEL_URL) {
-    // VERCEL_URL può essere preview deployments, usa il dominio principale
+    // VERCEL_URL puÃ² essere preview deployments, usa il dominio principale
     return 'ainebula.vercel.app';
   }
   // In produzione, usa il dominio principale
@@ -649,7 +682,7 @@ const origin = getOrigin();
 
 // Log della configurazione (solo in sviluppo)
 if (isDevelopment) {
-  log('🔐 [WEBAUTHN] Configurazione:', {
+  log('ðŸ” [WEBAUTHN] Configurazione:', {
     rpId,
     rpName,
     origin,
@@ -930,7 +963,7 @@ app.post('/api/auth/passkey/login/finish', async (req, res) => {
       SELECT id, credential_id, public_key, counter FROM passkeys WHERE user_id = ${user.id}
     `;
     
-    // Il credential_id nel database è già una stringa base64url
+    // Il credential_id nel database Ã¨ giÃ  una stringa base64url
     const passkey = passkeys.find(pk => pk.credential_id === credentialId);
     
     if (!passkey) {
@@ -1094,7 +1127,7 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
       });
     }
     
-    // Verifica se la chat esiste già
+    // Verifica se la chat esiste giÃ 
     const existingChat = await sql`
       SELECT id FROM chats WHERE id = ${id} AND user_id = ${req.user.id}
     `;
@@ -1125,10 +1158,10 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
       // Filtra solo i messaggi non nascosti
       const visibleMessages = messages.filter(msg => !msg.hidden);
       
-      // Batch insert: inserisci tutti i messaggi in batch (molto più veloce del loop sequenziale)
+      // Batch insert: inserisci tutti i messaggi in batch (molto piÃ¹ veloce del loop sequenziale)
       if (visibleMessages.length > 0) {
         // Inserisci in batch usando Promise.all per parallelizzare
-        // Questo è più veloce di un loop sequenziale ma mantiene la compatibilità
+        // Questo Ã¨ piÃ¹ veloce di un loop sequenziale ma mantiene la compatibilitÃ 
         const insertPromises = visibleMessages.map(msg => 
           sql`
             INSERT INTO messages (chat_id, type, content, hidden, timestamp)
@@ -1350,7 +1383,7 @@ app.post('/api/projects', authenticateToken, async (req, res) => {
       });
     }
     
-    // Verifica se il progetto esiste già
+    // Verifica se il progetto esiste giÃ 
     const existingProject = await sql`
       SELECT id FROM projects WHERE id = ${id} AND user_id = ${req.user.id}
     `;
@@ -1647,557 +1680,10 @@ app.patch('/api/user/settings', authenticateToken, async (req, res) => {
 
 // ==================== FINE ENDPOINT IMPOSTAZIONI UTENTE ====================
 
-// ==================== ENDPOINT ABBONAMENTI ====================
-
-// Ottieni l'abbonamento corrente dell'utente
-app.get('/api/user/subscription', authenticateToken, async (req, res) => {
-  try {
-    const subscription = await sql`
-      SELECT * FROM subscriptions 
-      WHERE user_id = ${req.user.id} 
-        AND status = 'active'
-        AND (expires_at IS NULL OR expires_at > NOW())
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    
-    if (subscription.length === 0) {
-      // Crea abbonamento gratuito di default
-      const freeSubscriptionId = randomBytes(16).toString('hex');
-      await sql`
-        INSERT INTO subscriptions (id, user_id, plan, status, started_at)
-        VALUES (${freeSubscriptionId}, ${req.user.id}, 'free', 'active', NOW())
-      `;
-      const newSubscription = await sql`
-        SELECT * FROM subscriptions WHERE id = ${freeSubscriptionId}
-      `;
-      return res.json({
-        success: true,
-        subscription: newSubscription[0]
-      });
-    }
-    
-    res.json({
-      success: true,
-      subscription: subscription[0]
-    });
-  } catch (error) {
-    console.error('Errore recupero abbonamento:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore nel recupero dell\'abbonamento',
-      error: error.message
-    });
-  }
-});
-
-// Crea o aggiorna un abbonamento
-app.post('/api/user/subscription', authenticateToken, async (req, res) => {
-  try {
-    const { plan, billingCycle, amount, currency, paymentMethod, paymentId, expiresAt } = req.body;
-    
-    if (!plan) {
-      return res.status(400).json({
-        success: false,
-        message: 'Piano obbligatorio'
-      });
-    }
-    
-    // Disattiva abbonamenti precedenti
-    await sql`
-      UPDATE subscriptions 
-      SET status = 'cancelled', cancelled_at = NOW()
-      WHERE user_id = ${req.user.id} AND status = 'active'
-    `;
-    
-    // Crea nuovo abbonamento
-    const subscriptionId = randomBytes(16).toString('hex');
-    const expiresDate = expiresAt ? new Date(expiresAt) : null;
-    
-    await sql`
-      INSERT INTO subscriptions (
-        id, user_id, plan, status, billing_cycle, 
-        amount, currency, payment_method, payment_id, expires_at
-      )
-      VALUES (
-        ${subscriptionId}, ${req.user.id}, ${plan}, 'active',
-        ${billingCycle || 'monthly'}, ${amount || 0}, 
-        ${currency || 'EUR'}, ${paymentMethod || null}, 
-        ${paymentId || null}, ${expiresDate}
-      )
-    `;
-    
-    // Crea record di pagamento se fornito
-    if (amount && amount > 0) {
-      const paymentRecordId = randomBytes(16).toString('hex');
-      await sql`
-        INSERT INTO payments (
-          id, subscription_id, user_id, amount, currency,
-          status, payment_method, payment_provider, transaction_id, paid_at
-        )
-        VALUES (
-          ${paymentRecordId}, ${subscriptionId}, ${req.user.id},
-          ${amount}, ${currency || 'EUR'}, 'completed',
-          ${paymentMethod || null}, 'stripe', ${paymentId || null}, NOW()
-        )
-      `;
-    }
-    
-    const newSubscription = await sql`
-      SELECT * FROM subscriptions WHERE id = ${subscriptionId}
-    `;
-    
-    res.json({
-      success: true,
-      subscription: newSubscription[0]
-    });
-  } catch (error) {
-    console.error('Errore creazione abbonamento:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore nella creazione dell\'abbonamento',
-      error: error.message
-    });
-  }
-});
-
-// Cancella un abbonamento
-app.delete('/api/user/subscription/:subscriptionId', authenticateToken, async (req, res) => {
-  try {
-    const { subscriptionId } = req.params;
-    
-    await sql`
-      UPDATE subscriptions 
-      SET status = 'cancelled', cancelled_at = NOW(), auto_renew = false
-      WHERE id = ${subscriptionId} AND user_id = ${req.user.id}
-    `;
-    
-    res.json({
-      success: true,
-      message: 'Abbonamento cancellato con successo'
-    });
-  } catch (error) {
-    console.error('Errore cancellazione abbonamento:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore nella cancellazione dell\'abbonamento',
-      error: error.message
-    });
-  }
-});
-
-// Ottieni lo storico pagamenti
-app.get('/api/user/payments', authenticateToken, async (req, res) => {
-  try {
-    const payments = await sql`
-      SELECT p.*, s.plan, s.billing_cycle
-      FROM payments p
-      JOIN subscriptions s ON p.subscription_id = s.id
-      WHERE p.user_id = ${req.user.id}
-      ORDER BY p.created_at DESC
-      LIMIT 50
-    `;
-    
-    res.json({
-      success: true,
-      payments: payments
-    });
-  } catch (error) {
-    console.error('Errore recupero pagamenti:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore nel recupero dei pagamenti',
-      error: error.message
-    });
-  }
-});
-
-// ==================== FINE ENDPOINT ABBONAMENTI ====================
-
-// ==================== ENDPOINT PATREON ====================
-
-// Configurazione Patreon
-const PATREON_CLIENT_ID = process.env.PATREON_CLIENT_ID || 'NF2MmLVExjXVv4ZpcgijfosjlJIYQuPBblK7vE1PpSPRawgFbKhiVbzq0Nbl1YAf';
-const PATREON_CLIENT_SECRET = process.env.PATREON_CLIENT_SECRET || '8JZGmekMz0KcEs-20TV1mVFZUb4VpPny6vA_XXM_OFm4GwTTrbv7wTkQSzHgjiEm';
-const PATREON_CREATOR_ACCESS_TOKEN = process.env.PATREON_CREATOR_ACCESS_TOKEN || 'TWD_FwnKyJHjFNATwJHsUDQzzLSJuplWcbUpvIbTMrA';
-const PATREON_CREATOR_REFRESH_TOKEN = process.env.PATREON_CREATOR_REFRESH_TOKEN || 'Vb5aAzykB9meiShokfKv2mRt6h9Ov5kTNRYGVDNp58o';
-
-// Verifica stato collegamento Patreon
-app.get('/api/patreon/link-status', authenticateToken, async (req, res) => {
-  try {
-    const user = await sql`
-      SELECT patreon_user_id, patreon_access_token
-      FROM users
-      WHERE id = ${req.user.id}
-    `;
-    
-    if (user.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Utente non trovato'
-      });
-    }
-    
-    const isLinked = !!(user[0].patreon_user_id && user[0].patreon_access_token);
-    
-    res.json({
-      success: true,
-      isLinked,
-      patreonUserId: user[0].patreon_user_id || null
-    });
-  } catch (error) {
-    console.error('Errore verifica stato Patreon:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore nel recupero dello stato Patreon',
-      error: error.message
-    });
-  }
-});
-
-// Collega account Patreon
-app.post('/api/patreon/link-account', authenticateToken, async (req, res) => {
-  try {
-    const { patreonUserId, patreonAccessToken } = req.body;
-    
-    if (!patreonUserId || !patreonAccessToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Patreon User ID e Access Token richiesti'
-      });
-    }
-    
-    // Aggiorna utente con dati Patreon
-    await sql`
-      UPDATE users
-      SET patreon_user_id = ${patreonUserId},
-          patreon_access_token = ${patreonAccessToken},
-          updated_at = NOW()
-      WHERE id = ${req.user.id}
-    `;
-    
-    res.json({
-      success: true,
-      message: 'Account Patreon collegato con successo'
-    });
-  } catch (error) {
-    console.error('Errore collegamento Patreon:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore nel collegamento dell\'account Patreon',
-      error: error.message
-    });
-  }
-});
-
-// Scollega account Patreon
-app.post('/api/patreon/unlink-account', authenticateToken, async (req, res) => {
-  try {
-    // Rimuovi dati Patreon dall'utente
-    await sql`
-      UPDATE users
-      SET patreon_user_id = NULL,
-          patreon_access_token = NULL,
-          updated_at = NOW()
-      WHERE id = ${req.user.id}
-    `;
-    
-    // Disattiva abbonamenti attivi collegati a Patreon
-    await sql`
-      UPDATE subscriptions
-      SET status = 'cancelled',
-          cancelled_at = NOW(),
-          auto_renew = false
-      WHERE user_id = ${req.user.id}
-        AND payment_method = 'patreon'
-        AND status = 'active'
-    `;
-    
-    res.json({
-      success: true,
-      message: 'Account Patreon scollegato con successo'
-    });
-  } catch (error) {
-    console.error('Errore scollegamento Patreon:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore nello scollegamento dell\'account Patreon',
-      error: error.message
-    });
-  }
-});
-
-// Verifica membership Patreon e attiva abbonamento
-app.post('/api/patreon/check-membership', authenticateToken, async (req, res) => {
-  try {
-    const { patreonUserId } = req.body;
-    
-    if (!patreonUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Patreon User ID richiesto'
-      });
-    }
-    
-    // Verifica se l'utente ha un membership attivo su Patreon
-    // Usa l'API Patreon per verificare lo stato
-    try {
-      // Prima, verifica se l'utente è un patron attivo
-      const identityResponse = await fetch(`https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name`, {
-        headers: {
-          'Authorization': `Bearer ${PATREON_CREATOR_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!identityResponse.ok) {
-        throw new Error('Errore chiamata API Patreon');
-      }
-      
-      // Cerca il membership per questo utente
-      const membershipsResponse = await fetch(`https://www.patreon.com/api/oauth2/v2/members?fields[member]=patron_status,currently_entitled_amount_cents&include=currently_entitled_tiers`, {
-        headers: {
-          'Authorization': `Bearer ${PATREON_CREATOR_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!membershipsResponse.ok) {
-        throw new Error('Errore recupero memberships Patreon');
-      }
-      
-      const membershipsData = await membershipsResponse.json();
-      
-      // Cerca il membership per questo utente specifico
-      const userMembership = membershipsData.data?.find(member => 
-        member.relationships?.user?.data?.id === patreonUserId
-      );
-      
-      // Verifica se ha un tier attivo con importo >= 5€ (500 centesimi)
-      const hasPremiumTier = userMembership?.attributes?.patron_status === 'active_patron' &&
-                            (userMembership?.attributes?.currently_entitled_amount_cents >= 500 ||
-                             userMembership?.relationships?.currently_entitled_tiers?.data?.length > 0);
-      
-      if (hasPremiumTier) {
-        // Calcola data di scadenza (1 mese da ora)
-        const expiresAt = new Date();
-        expiresAt.setMonth(expiresAt.getMonth() + 1);
-        
-        // Disattiva abbonamenti precedenti
-        await sql`
-          UPDATE subscriptions 
-          SET status = 'cancelled', cancelled_at = NOW()
-          WHERE user_id = ${req.user.id} AND status = 'active'
-        `;
-        
-        // Crea nuovo abbonamento Premium
-        const subscriptionId = randomBytes(16).toString('hex');
-        await sql`
-          INSERT INTO subscriptions (
-            id, user_id, plan, status, billing_cycle, 
-            amount, currency, payment_method, payment_id, expires_at
-          )
-          VALUES (
-            ${subscriptionId}, ${req.user.id}, 'premium', 'active',
-            'monthly', 5.00, 'EUR', 'patreon', ${patreonUserId}, ${expiresAt}
-          )
-        `;
-        
-        // Crea record di pagamento
-        const paymentRecordId = randomBytes(16).toString('hex');
-        await sql`
-          INSERT INTO payments (
-            id, subscription_id, user_id, amount, currency,
-            status, payment_method, payment_provider, transaction_id, paid_at
-          )
-          VALUES (
-            ${paymentRecordId}, ${subscriptionId}, ${req.user.id},
-            5.00, 'EUR', 'completed',
-            'patreon', 'patreon', ${patreonUserId}, NOW()
-          )
-        `;
-        
-        const newSubscription = await sql`
-          SELECT * FROM subscriptions WHERE id = ${subscriptionId}
-        `;
-        
-        // Aggiorna anche l'utente con Patreon User ID se non già presente
-        await sql`
-          UPDATE users
-          SET patreon_user_id = ${patreonUserId},
-              updated_at = NOW()
-          WHERE id = ${req.user.id} AND patreon_user_id IS NULL
-        `;
-        
-        return res.json({
-          success: true,
-          subscription: newSubscription[0],
-          message: 'Abbonamento Premium attivato tramite Patreon'
-        });
-      } else {
-        return res.json({
-          success: false,
-          message: 'Nessun abbonamento Premium attivo su Patreon. Assicurati di essere iscritto al tier da almeno 5€/mese.'
-        });
-      }
-    } catch (patreonError) {
-      console.error('Errore chiamata API Patreon:', patreonError);
-      return res.status(500).json({
-        success: false,
-        message: 'Errore nella verifica con Patreon',
-        error: patreonError.message
-      });
-    }
-  } catch (error) {
-    console.error('Errore verifica Patreon:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore interno del server',
-      error: error.message
-    });
-  }
-});
-
-// Callback OAuth Patreon
-app.get('/api/patreon/callback', async (req, res) => {
-  try {
-    const { code, state, error } = req.query;
-    
-    if (error) {
-      return res.redirect(`/?patreon_error=${encodeURIComponent(error)}`);
-    }
-    
-    if (!code) {
-      return res.redirect('/?patreon_error=no_code');
-    }
-    
-    // Scambia code con access token
-    const tokenResponse = await fetch('https://www.patreon.com/api/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        code: code,
-        grant_type: 'authorization_code',
-        client_id: PATREON_CLIENT_ID,
-        client_secret: PATREON_CLIENT_SECRET,
-        redirect_uri: `${req.protocol}://${req.get('host')}/api/patreon/callback`
-      })
-    });
-    
-    if (!tokenResponse.ok) {
-      return res.redirect('/?patreon_error=token_exchange_failed');
-    }
-    
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-    
-    // Ottieni informazioni utente da Patreon
-    const userResponse = await fetch('https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=email,full_name', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!userResponse.ok) {
-      return res.redirect('/?patreon_error=user_info_failed');
-    }
-    
-    const userData = await userResponse.json();
-    const patreonUserId = userData.data.id;
-    
-    // Reindirizza alla pagina principale con i dati
-    // In produzione, dovresti salvare questi dati dopo che l'utente fa login
-    return res.redirect(`/?patreon_linked=true&patreon_user_id=${patreonUserId}&patreon_token=${accessToken}`);
-    
-  } catch (error) {
-    console.error('Errore callback Patreon:', error);
-    return res.redirect(`/?patreon_error=${encodeURIComponent(error.message)}`);
-  }
-});
-
-// Webhook Patreon (per aggiornamenti automatici)
-app.post('/api/patreon/webhook', async (req, res) => {
-  try {
-    // Verifica firma webhook (importante per sicurezza)
-    const signature = req.headers['x-patreon-signature'];
-    // TODO: Implementa verifica firma
-    
-    const event = req.body;
-    
-    // Gestisci diversi tipi di eventi
-    if (event.type === 'members:pledge:create' || event.type === 'members:pledge:update') {
-      const patreonUserId = event.data.relationships?.member?.data?.id;
-      const tierId = event.data.relationships?.tier?.data?.id;
-      const amountCents = event.data.attributes?.amount_cents || 0;
-      
-      // Verifica se è il tier Premium (>= 5€ = 500 centesimi)
-      if (amountCents >= 500) {
-        // Trova utente nel database tramite patreon_user_id
-        const users = await sql`
-          SELECT id FROM users WHERE patreon_user_id = ${patreonUserId}
-        `;
-        
-        if (users.length > 0) {
-          const userId = users[0].id;
-          
-          // Disattiva abbonamenti precedenti
-          await sql`
-            UPDATE subscriptions 
-            SET status = 'cancelled', cancelled_at = NOW()
-            WHERE user_id = ${userId} AND status = 'active'
-          `;
-          
-          // Crea nuovo abbonamento
-          const expiresAt = new Date();
-          expiresAt.setMonth(expiresAt.getMonth() + 1);
-          
-          const subscriptionId = randomBytes(16).toString('hex');
-          await sql`
-            INSERT INTO subscriptions (
-              id, user_id, plan, status, billing_cycle, 
-              amount, currency, payment_method, payment_id, expires_at
-            )
-            VALUES (
-              ${subscriptionId}, ${userId}, 'premium', 'active',
-              'monthly', ${amountCents / 100}, 'EUR', 'patreon', ${patreonUserId}, ${expiresAt}
-            )
-          `;
-        }
-      }
-    } else if (event.type === 'members:pledge:delete') {
-      const patreonUserId = event.data.relationships?.member?.data?.id;
-      
-      // Trova utente e disattiva abbonamento
-      const users = await sql`
-        SELECT id FROM users WHERE patreon_user_id = ${patreonUserId}
-      `;
-      
-      if (users.length > 0) {
-        const userId = users[0].id;
-        
-        await sql`
-          UPDATE subscriptions
-          SET status = 'cancelled',
-              cancelled_at = NOW(),
-              auto_renew = false
-          WHERE user_id = ${userId}
-            AND payment_method = 'patreon'
-            AND status = 'active'
-        `;
-      }
-    }
-    
-    res.status(200).json({ received: true });
-  } catch (error) {
-    console.error('Errore webhook Patreon:', error);
-    res.status(500).json({ error: 'Errore processing webhook' });
-  }
-});
-
-// ==================== FINE ENDPOINT PATREON ====================
+// ==================== BILLING GESTITO DA NEON DATABASE ====================
+// Gli abbonamenti sono gestiti completamente dal database Neon
+// Tabella: subscriptions
+// ==================== FINE BILLING CLERK ====================
 
 // ==================== ENDPOINT LINK CONDIVISI ====================
 
@@ -2475,7 +1961,7 @@ app.post('/api/data/export', authenticateToken, async (req, res) => {
     const exportToken = randomBytes(32).toString('hex');
     const exportId = randomBytes(16).toString('hex');
     
-    // Il link sarà valido per 7 giorni
+    // Il link sarÃ  valido per 7 giorni
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
     
@@ -2679,13 +2165,13 @@ async function cleanupExpiredSharedLinks() {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 50);
     
-    // Elimina link condivisi creati più di 50 giorni fa
+    // Elimina link condivisi creati piÃ¹ di 50 giorni fa
     const result = await sql`
       DELETE FROM shared_links
       WHERE created_at < ${cutoffDate.toISOString()}
     `;
     
-    log(`🧹 Pulizia link condivisi: eliminati link più vecchi di 50 giorni`);
+    log(`ðŸ§¹ Pulizia link condivisi: eliminati link piÃ¹ vecchi di 50 giorni`);
   } catch (error) {
     logError('Errore durante la pulizia automatica dei link condivisi:', error);
   }
@@ -2739,7 +2225,7 @@ app.post('/api/image/upload', async (req, res) => {
       timestamp: Date.now()
     });
 
-    // Pulisci immagini vecchie (più di 1 ora)
+    // Pulisci immagini vecchie (piÃ¹ di 1 ora)
     const now = Date.now();
     for (const [id, data] of tempImageStore.entries()) {
       if (now - data.timestamp > IMAGE_TTL) {
@@ -2779,7 +2265,7 @@ app.get('/api/image/:imageId', (req, res) => {
       });
     }
 
-    // Controlla se l'immagine è scaduta
+    // Controlla se l'immagine Ã¨ scaduta
     const now = Date.now();
     if (now - imageData.timestamp > IMAGE_TTL) {
       tempImageStore.delete(imageId);
@@ -2813,12 +2299,12 @@ app.get('/api/image/:imageId', (req, res) => {
 app.listen(PORT, () => {
   if (isDevelopment) {
     log('\n' + '='.repeat(60));
-    log(`🚀 Server API avviato su http://localhost:${PORT}`);
-    log(`📅 Data avvio: ${new Date().toISOString()}`);
-    log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-    log(`📊 Database: ${connectionString ? '✅ Configurato' : '❌ Non configurato'}`);
+    log(`ðŸš€ Server API avviato su http://localhost:${PORT}`);
+    log(`ðŸ“… Data avvio: ${new Date().toISOString()}`);
+    log(`ðŸŒ Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    log(`ðŸ“Š Database: ${connectionString ? 'âœ… Configurato' : 'âŒ Non configurato'}`);
     log('='.repeat(60));
-    log(`\n📊 Endpoint disponibili:`);
+    log(`\nðŸ“Š Endpoint disponibili:`);
     log(`   GET  /api/db/test - Test connessione`);
     log(`   GET  /api/db/info - Informazioni database`);
     log(`   POST /api/db/query - Esegui query SELECT`);
@@ -2837,17 +2323,14 @@ app.listen(PORT, () => {
     log(`   DELETE /api/projects/:id - Elimina progetto`);
     log(`   GET  /api/user/settings - Ottieni impostazioni utente`);
     log(`   PATCH /api/user/settings - Aggiorna impostazioni utente`);
-    log(`   GET  /api/user/subscription - Ottieni abbonamento utente`);
-    log(`   POST /api/user/subscription - Crea/aggiorna abbonamento`);
-    log(`   DELETE /api/user/subscription/:id - Cancella abbonamento`);
-    log(`   GET  /api/user/payments - Ottieni storico pagamenti`);
+    log(`   Billing gestito dal database Neon`);
     log(`   POST /api/image/upload - Carica immagine temporanea`);
     log(`   GET  /api/image/:imageId - Ottieni immagine temporanea`);
     log('\n' + '='.repeat(60));
-    log('✅ Server pronto a ricevere richieste\n');
+    log('âœ… Server pronto a ricevere richieste\n');
   } else {
     // In produzione, solo log essenziale
-    console.log(`🚀 Server API avviato su porta ${PORT}`);
+    console.log(`ðŸš€ Server API avviato su porta ${PORT}`);
   }
 });
 

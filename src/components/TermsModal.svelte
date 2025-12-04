@@ -32,9 +32,9 @@
       
       <div class="modal-body">
         <div class="terms-header">
-          <h1 id="terms-modal-title" class="terms-title">Termini di Servizio</h1>
+          <h1 id="terms-modal-title" class="terms-title">Termini di Utilizzo</h1>
           <p class="terms-intro">
-            Ultimo aggiornamento: {new Date().toLocaleDateString('it-IT', { year: 'numeric', month: 'long', day: 'numeric' })}
+            Ultimo aggiornamento: 27 Gennaio 2025
           </p>
         </div>
         
@@ -42,82 +42,165 @@
           <section class="terms-section">
             <h2 class="section-title">1. Accettazione dei Termini</h2>
             <p class="section-text">
-              Utilizzando Nebula AI, accetti di rispettare questi Termini di Servizio. 
-              Se non accetti questi termini, ti preghiamo di non utilizzare il servizio.
+              Accedendo e utilizzando Nebula AI (di seguito "il Servizio" o "Nebula AI"), accetti di essere vincolato da questi Termini di Utilizzo (di seguito "Termini"). Se non accetti questi Termini, ti preghiamo di non utilizzare il Servizio.
+            </p>
+            <p class="section-text">
+              Il Servizio è fornito da Nebula AI (di seguito "noi", "nostro", "ci").
             </p>
           </section>
           
           <section class="terms-section">
             <h2 class="section-title">2. Descrizione del Servizio</h2>
             <p class="section-text">
-              Nebula AI è una piattaforma di assistenza all'intelligenza artificiale che fornisce 
-              strumenti di chat e assistenza AI. Il servizio è fornito "così com'è" e può essere 
-              modificato o interrotto in qualsiasi momento.
+              Nebula AI è una piattaforma di assistenza all'intelligenza artificiale che fornisce strumenti di chat, generazione di contenuti, analisi e altre funzionalità basate su intelligenza artificiale. Il Servizio consente agli utenti di interagire con modelli di intelligenza artificiale per vari scopi.
+            </p>
+            <p class="section-text">
+              Il Servizio è fornito "così com'è" e può essere modificato, sospeso o interrotto in qualsiasi momento senza preavviso.
             </p>
           </section>
           
           <section class="terms-section">
-            <h2 class="section-title">3. Account e Registrazione</h2>
+            <h2 class="section-title">3. Età Minima e Capacità Giuridica</h2>
             <p class="section-text">
-              Per utilizzare alcune funzionalità di Nebula AI, potrebbe essere necessario creare un account. 
-              Sei responsabile di mantenere la riservatezza delle tue credenziali e di tutte le attività 
-              che si verificano sotto il tuo account.
+              Per utilizzare il Servizio, devi:
+            </p>
+            <ul class="section-list">
+              <li>Avere almeno 13 anni di età (o l'età minima richiesta nella tua giurisdizione)</li>
+              <li>Avere la capacità giuridica di accettare questi Termini</li>
+              <li>Non essere stato precedentemente sospeso o rimosso dal Servizio</li>
+            </ul>
+            <p class="section-text">
+              Se hai meno di 18 anni, dichiari di aver ottenuto il consenso del tuo genitore o tutore legale.
             </p>
           </section>
           
           <section class="terms-section">
-            <h2 class="section-title">4. Privacy e Dati</h2>
+            <h2 class="section-title">4. Registrazione e Account</h2>
             <p class="section-text">
-              La privacy è fondamentale per noi. Le tue conversazioni sono crittografate e salvate in modo sicuro. 
-              Non condividiamo i tuoi dati con terze parti senza il tuo consenso esplicito. 
-              Per maggiori informazioni, consulta la nostra <a href="#" class="link">Informativa sulla Privacy</a>.
+              <strong>4.1 Creazione Account</strong><br>
+              Per utilizzare alcune funzionalità del Servizio, potrebbe essere necessario creare un account. Durante la registrazione, ti impegni a fornire informazioni accurate, aggiornate e complete e a mantenere la sicurezza della tua password.
+            </p>
+            <p class="section-text">
+              <strong>4.2 Responsabilità dell'Account</strong><br>
+              Sei l'unico responsabile di tutte le attività che si verificano sotto il tuo account, della sicurezza del tuo account e di tutti i contenuti che pubblichi o condividi attraverso il Servizio.
+            </p>
+            <p class="section-text">
+              <strong>4.3 Sospensione e Cancellazione</strong><br>
+              Ci riserviamo il diritto di sospendere o cancellare il tuo account in qualsiasi momento, con o senza preavviso, per violazione di questi Termini o per qualsiasi altro motivo legittimo.
             </p>
           </section>
           
           <section class="terms-section">
             <h2 class="section-title">5. Uso Accettabile</h2>
             <p class="section-text">
-              Ti impegni a utilizzare Nebula AI solo per scopi legali e in modo che non violi i diritti di terzi. 
-              Non puoi utilizzare il servizio per:
+              Accetti di utilizzare il Servizio solo per scopi legali e in conformità con questi Termini e tutte le leggi applicabili.
+            </p>
+            <p class="section-text">
+              È vietato utilizzare il Servizio per:
             </p>
             <ul class="section-list">
-              <li>Attività illegali o fraudolente</li>
-              <li>Violare diritti di proprietà intellettuale</li>
-              <li>Trasmettere contenuti dannosi o offensivi</li>
-              <li>Interferire con il funzionamento del servizio</li>
+              <li>Attività illegali o non autorizzate (frode, furto, riciclaggio, terrorismo)</li>
+              <li>Violare diritti di proprietà intellettuale, privacy o altri diritti legali di terzi</li>
+              <li>Creare, trasmettere o condividere contenuti diffamatori, offensivi, discriminatori o incitanti alla violenza</li>
+              <li>Interferire con o interrompere il funzionamento del Servizio</li>
+              <li>Tentare accessi non autorizzati a sistemi o account di altri utenti</li>
+              <li>Inviare spam, email di phishing o altre comunicazioni non autorizzate</li>
+              <li>Impersonare qualsiasi persona o entità</li>
+              <li>Utilizzare il Servizio per scopi commerciali non autorizzati</li>
             </ul>
+            <p class="section-text">
+              <strong>Contenuti Generati dall'AI:</strong> Riconosci che i contenuti generati dall'AI potrebbero contenere errori o imprecisioni. Non costituiscono consulenza legale, medica, finanziaria o professionale. Sei responsabile di verificare l'accuratezza prima di utilizzarli.
+            </p>
           </section>
           
           <section class="terms-section">
             <h2 class="section-title">6. Proprietà Intellettuale</h2>
             <p class="section-text">
-              Tutti i contenuti, funzionalità e software di Nebula AI sono di proprietà di Nebula AI 
-              o dei suoi licenzianti e sono protetti da leggi sul copyright e altre leggi sulla proprietà intellettuale.
+              Tutti i contenuti, funzionalità, software, design, loghi e marchi presenti sul Servizio sono di proprietà di Nebula AI o dei suoi licenzianti e sono protetti da leggi sul copyright e altre leggi sulla proprietà intellettuale.
+            </p>
+            <p class="section-text">
+              Ti concediamo una licenza limitata, non esclusiva, non trasferibile e revocabile per accedere e utilizzare il Servizio esclusivamente per i tuoi scopi personali e non commerciali.
+            </p>
+            <p class="section-text">
+              I contenuti generati dall'AI attraverso il Servizio sono di tua proprietà, a condizione che non violino questi Termini o le leggi applicabili.
             </p>
           </section>
           
           <section class="terms-section">
-            <h2 class="section-title">7. Limitazione di Responsabilità</h2>
+            <h2 class="section-title">7. Privacy e Protezione dei Dati</h2>
             <p class="section-text">
-              Nebula AI è fornito "così com'è" senza garanzie di alcun tipo. Non ci assumiamo responsabilità 
-              per eventuali danni diretti, indiretti, incidentali o consequenziali derivanti dall'uso del servizio.
+              Il trattamento dei tuoi dati personali è disciplinato dalla nostra Informativa sulla Privacy, che forma parte integrante di questi Termini. Utilizzando il Servizio, accetti anche la nostra Informativa sulla Privacy.
             </p>
           </section>
           
           <section class="terms-section">
-            <h2 class="section-title">8. Modifiche ai Termini</h2>
+            <h2 class="section-title">8. Abbonamenti e Pagamenti</h2>
             <p class="section-text">
-              Ci riserviamo il diritto di modificare questi Termini di Servizio in qualsiasi momento. 
-              Le modifiche entreranno in vigore immediatamente dopo la pubblicazione. 
-              L'uso continuato del servizio dopo le modifiche costituisce accettazione dei nuovi termini.
+              Il Servizio può offrire diversi piani di abbonamento. Se scegli un piano a pagamento, accetti di pagare tutti i costi associati. I pagamenti sono non rimborsabili, salvo quanto previsto dalla legge applicabile. Gli abbonamenti possono rinnovarsi automaticamente a meno che non vengano disattivati.
             </p>
           </section>
           
           <section class="terms-section">
-            <h2 class="section-title">9. Contatti</h2>
+            <h2 class="section-title">9. Limitazione di Responsabilità</h2>
             <p class="section-text">
-              Per domande su questi Termini di Servizio, puoi contattarci all'indirizzo: 
-              <a href="mailto:legal@nebula-ai.com" class="link">legal@nebula-ai.com</a>
+              <strong>Disclaimer:</strong> IL SERVIZIO È FORNITO "COSÌ COM'È" E "COME DISPONIBILE", SENZA GARANZIE DI ALCUN TIPO, ESPLICITE O IMPLICITE.
+            </p>
+            <p class="section-text">
+              NELLA MASSIMA MISURA CONSENTITA DALLA LEGGE, NEBULA AI NON SARÀ RESPONSABILE PER DANNI DIRETTI, INDIRETTI, INCIDENTALI, SPECIALI O CONSEQUENZIALI, inclusi errori, bug o contenuti generati dall'AI imprecisi.
+            </p>
+            <p class="section-text">
+              La responsabilità totale di Nebula AI per qualsiasi reclamo non supererà l'importo che hai pagato nei 12 mesi precedenti.
+            </p>
+          </section>
+          
+          <section class="terms-section">
+            <h2 class="section-title">10. Risarcimento</h2>
+            <p class="section-text">
+              Accetti di risarcire, difendere e tenere indenne Nebula AI da qualsiasi reclamo, danno o responsabilità derivanti dal tuo utilizzo del Servizio, dalla violazione di questi Termini o dalla violazione di qualsiasi legge o diritto di terzi.
+            </p>
+          </section>
+          
+          <section class="terms-section">
+            <h2 class="section-title">11. Modifiche ai Termini</h2>
+            <p class="section-text">
+              Ci riserviamo il diritto di modificare questi Termini in qualsiasi momento. Le modifiche entreranno in vigore immediatamente dopo la pubblicazione. Ti notificheremo le modifiche sostanziali tramite notifica sul Servizio o email.
+            </p>
+            <p class="section-text">
+              Se non accetti le modifiche, devi interrompere l'utilizzo del Servizio e cancellare il tuo account.
+            </p>
+          </section>
+          
+          <section class="terms-section">
+            <h2 class="section-title">12. Risoluzione</h2>
+            <p class="section-text">
+              Puoi risolvere questi Termini in qualsiasi momento interrompendo l'utilizzo del Servizio e cancellando il tuo account.
+            </p>
+            <p class="section-text">
+              Ci riserviamo il diritto di sospendere o risolvere il tuo accesso al Servizio immediatamente, senza preavviso, per violazione di questi Termini o per qualsiasi altro motivo legittimo.
+            </p>
+          </section>
+          
+          <section class="terms-section">
+            <h2 class="section-title">13. Legge Applicabile e Foro Competente</h2>
+            <p class="section-text">
+              Questi Termini sono disciplinati e interpretati in conformità con le leggi italiane. Per qualsiasi controversia, le parti accettano di sottoporre la controversia alla giurisdizione esclusiva dei tribunali competenti italiani.
+            </p>
+          </section>
+          
+          <section class="terms-section">
+            <h2 class="section-title">14. Disposizioni Generali</h2>
+            <p class="section-text">
+              Questi Termini, insieme alla nostra Informativa sulla Privacy, costituiscono l'intero accordo tra te e Nebula AI. Se qualsiasi disposizione è ritenuta non valida, le restanti disposizioni continueranno ad essere in pieno vigore.
+            </p>
+          </section>
+          
+          <section class="terms-section">
+            <h2 class="section-title">15. Contatti</h2>
+            <p class="section-text">
+              Per domande, reclami o richieste riguardo a questi Termini di Utilizzo, puoi contattarci:
+            </p>
+            <p class="section-text">
+              <strong>Email:</strong> <a href="mailto:legal@nebula-ai.com" class="link">legal@nebula-ai.com</a>
             </p>
           </section>
         </div>
@@ -304,6 +387,8 @@
     }
   }
 </style>
+
+
 
 
 

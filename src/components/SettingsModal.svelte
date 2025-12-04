@@ -3,9 +3,9 @@
   import { chats } from '../stores/chat.js';
   import { user as userStore } from '../stores/user.js';
   import { user as authUser, isAuthenticatedStore, clearUser } from '../stores/auth.js';
-  import { deleteAccount, getToken, updateUsername, updatePassword, getCurrentUser } from '../services/authService.js';
+  import { deleteAccount, getToken, updateUsername, getCurrentUser } from '../services/authService.js';
   import { getCurrentAccount, removeAccount, accounts } from '../stores/accounts.js';
-  import { getSubscription, saveSubscription } from '../services/subscriptionService.js';
+  // Clerk rimosso - ora usiamo Supabase
   import { hasActiveSubscription, hasPlanOrHigher } from '../stores/user.js';
   import { createDataExport, downloadDataExport } from '../services/dataExportService.js';
   import { deleteAllChatsFromDatabase } from '../services/chatService.js';
@@ -14,7 +14,7 @@
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
   import { availableLanguages } from '../utils/i18n.js';
   import { currentLanguage, t, setLanguage } from '../stores/language.js';
-  import { isMobileDevice } from '../utils/platform.js';
+  import { isMobileDevice, isIOS } from '../utils/platform.js';
   import { resetPWAInstallPrompt, isPWAInstalled } from '../utils/mobile.js';
   import { isDownloadAppModalOpen } from '../stores/app.js';
   import { applyTheme, setTheme, getTheme } from '../utils/theme.js';
@@ -29,11 +29,7 @@
   let isSavingUsername = false;
   let isLoadingUsername = false;
   
-  let isEditingPassword = false;
-  let currentPassword = '';
-  let newPassword = '';
-  let confirmPassword = '';
-  let isSavingPassword = false;
+  // Password gestita da Supabase - non più disponibile qui
   
   let sidebarRef;
   
@@ -50,11 +46,18 @@
     const savedTheme = getTheme();
     theme = savedTheme;
     
-    // Carica stile UI salvato
+    // Carica stile UI salvato (ma non liquid glass su iOS)
     const savedUIStyle = localStorage.getItem('nebula-ui-style');
     if (savedUIStyle) {
-      uiStyle = savedUIStyle;
-      applyUIStyle(savedUIStyle);
+      // Se è liquid glass e siamo su iOS, forza material
+      if (savedUIStyle === 'liquid' && isIOS()) {
+        uiStyle = 'material';
+        localStorage.setItem('nebula-ui-style', 'material');
+        applyUIStyle('material');
+      } else {
+        uiStyle = savedUIStyle;
+        applyUIStyle(savedUIStyle);
+      }
     }
     
     // Carica lingua salvata
@@ -174,7 +177,8 @@
   
   function applyUIStyle(newStyle) {
     const body = document.body;
-    if (newStyle === 'liquid') {
+    // Non applicare liquid glass su iOS
+    if (newStyle === 'liquid' && !isIOS()) {
       body.classList.add('liquid-glass');
     } else {
       body.classList.remove('liquid-glass');
@@ -182,6 +186,10 @@
   }
   
   function handleUIStyleChange(newStyle) {
+    // Blocca liquid glass se è iOS o se è già bloccato
+    if (newStyle === 'liquid' && isIOS()) {
+      return; // Non permettere l'attivazione su iOS
+    }
     uiStyle = newStyle;
     localStorage.setItem('nebula-ui-style', newStyle);
     applyUIStyle(newStyle);
@@ -253,19 +261,7 @@
     usernameInput = username;
   }
   
-  function startEditingPassword() {
-    isEditingPassword = true;
-    currentPassword = '';
-    newPassword = '';
-    confirmPassword = '';
-  }
-  
-  function cancelEditingPassword() {
-    isEditingPassword = false;
-    currentPassword = '';
-    newPassword = '';
-    confirmPassword = '';
-  }
+  // Password gestita da Supabase - funzioni rimosse
   
   async function saveUsername() {
     if (isSavingUsername) return;
@@ -304,44 +300,7 @@
     }
   }
   
-  async function savePassword() {
-    if (isSavingPassword) return;
-    
-    if (!currentPassword) {
-      await showAlert('Inserisci la password attuale', 'Errore', 'OK', 'error');
-      return;
-    }
-    
-    if (!newPassword || newPassword.length < 6) {
-      await showAlert('La nuova password deve essere di almeno 6 caratteri', 'Errore', 'OK', 'error');
-      return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-      await showAlert('Le password non corrispondono', 'Errore', 'OK', 'error');
-      return;
-    }
-    
-    isSavingPassword = true;
-    try {
-      const result = await updatePassword(currentPassword, newPassword);
-      
-      if (result.success) {
-        isEditingPassword = false;
-        currentPassword = '';
-        newPassword = '';
-        confirmPassword = '';
-        await showAlert('Password aggiornata con successo', 'Successo', 'OK', 'success');
-      } else {
-        await showAlert(result.message || 'Errore durante l\'aggiornamento della password', 'Errore', 'OK', 'error');
-      }
-    } catch (error) {
-      console.error('Errore durante aggiornamento password:', error);
-      await showAlert('Errore durante l\'aggiornamento della password', 'Errore', 'OK', 'error');
-    } finally {
-      isSavingPassword = false;
-    }
-  }
+  // Password gestita da Supabase - funzione rimossa
   
   let isDeletingAccount = false;
   
@@ -662,33 +621,50 @@
     isSharedLinksModalOpen.set(true);
   }
   
-  let isLoadingSubscription = false;
-  let subscriptionData = null;
-  
-  async function loadSubscription() {
-    if (!$isAuthenticatedStore) return;
+  // Abbonamenti gestiti dal database Neon
+  async function getSubscription() {
+    if (!$isAuthenticatedStore || !$authUser) {
+      return null;
+    }
     
-    isLoadingSubscription = true;
     try {
-      const result = await getSubscription();
-      if (result.success && result.subscription) {
-        subscriptionData = result.subscription;
-        // Sincronizza con lo store utente
-        userStore.update(user => ({
-          ...user,
-          subscription: {
-            active: result.subscription.status === 'active',
-            plan: result.subscription.plan,
-            expiresAt: result.subscription.expires_at ? new Date(result.subscription.expires_at).toISOString() : null,
-            key: user.subscription?.key || null
+      const token = getToken();
+      if (!token) return null;
+      
+      const getApiBaseUrl = () => {
+        if (typeof window !== 'undefined') {
+          const hostname = window.location.hostname;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3001/api/auth';
           }
-        }));
+          const backendUrl = import.meta.env.VITE_API_BASE_URL;
+          if (backendUrl) {
+            return `${backendUrl}/api/auth`;
+          }
+          return '/api/auth';
+        }
+        return 'http://localhost:3001/api/auth';
+      };
+      
+      const response = await fetch(`${getApiBaseUrl()}/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user && data.user.subscription) {
+          return data.user.subscription;
+        }
       }
     } catch (error) {
-      console.error('Errore caricamento abbonamento:', error);
-    } finally {
-      isLoadingSubscription = false;
+      console.error('Errore recupero abbonamento:', error);
     }
+    
+    return null;
   }
   
   function formatDate(dateString) {
@@ -727,13 +703,20 @@
     isSettingsOpen.set(false);
   }
   
-  $: subscription = $userStore.subscription;
-  $: isActive = subscription?.active && hasActiveSubscription();
-  $: planName = getPlanName(subscription?.plan);
+  // Ottieni abbonamento dal database
+  let subscription = null;
+  
+  $: if ($isAuthenticatedStore) {
+    getSubscription().then(sub => {
+      subscription = sub;
+    });
+  }
+  
+  $: planName = subscription?.plan ? getPlanName(subscription.plan) : get(t)('free');
+  $: isActive = subscription?.active || false;
   
   onMount(() => {
     if ($isAuthenticatedStore) {
-      loadSubscription();
       // Carica i dati se la sezione profilo è già attiva
       if (activeSection === 'profilo') {
         loadUsername();
@@ -843,13 +826,16 @@
                 <button 
                   class="theme-button" 
                   class:active={uiStyle === 'liquid'}
-                  on:click={() => handleUIStyleChange('liquid')}
+                  class:disabled={true}
+                  disabled={true}
+                  on:click={() => {}}
+                  title="Presto in arrivo"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
                     <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
                   </svg>
-                  <span>Liquid Glass</span>
+                  <span>Liquid Glass <span class="coming-soon-badge">Presto in arrivo</span></span>
                 </button>
               </div>
             </div>
@@ -899,16 +885,12 @@
             {/if}
           {/if}
           
-          <!-- Abbonamento -->
+          <!-- Abbonamento - Database Neon -->
           {#if activeSection === 'abbonamento'}
-            {#if isLoadingSubscription}
-              <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
-                <div class="loading-state">{$t('loadingSubscription')}</div>
-              </div>
-            {:else}
-              <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
-                <h3 class="setting-title">{$t('subscriptionStatus')}</h3>
-                
+            <div class="setting-section" class:section-visible={activeSection === 'abbonamento'}>
+              <h3 class="setting-title">{$t('subscriptionStatus')}</h3>
+              
+              {#if $isAuthenticatedStore && $authUser}
                 <div class="subscription-status">
                   <div class="subscription-badge" class:active={isActive} class:premium={subscription?.plan === 'premium'} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
                     <span class="badge-label">{planName}</span>
@@ -932,14 +914,7 @@
                   </div>
                 {/if}
                 
-                {#if subscription?.startedAt}
-                  <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
-                    <div class="setting-label">{$t('activationDate')}</div>
-                    <div class="setting-value">{formatDate(subscription.startedAt)}</div>
-                  </div>
-                {/if}
-                
-                {#if !isActive || subscription?.plan === 'free'}
+                {#if !isActive || !subscription || subscription?.plan === 'free'}
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                     <div class="setting-info">
                       <div class="setting-label">{$t('upgradePlan')}</div>
@@ -1007,7 +982,6 @@
                         <div class="setting-description">Hai accesso all'API per integrare Nebula AI nelle tue applicazioni.</div>
                       </div>
                       <button class="manage-button" on:click={() => {
-                        // Mostra modal o sezione API keys
                         showAlert('L\'accesso API è incluso nel tuo piano Max. Le API keys possono essere generate dalla sezione API nelle impostazioni avanzate.', 'API Access', 'OK', 'info');
                       }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1019,10 +993,11 @@
                       </button>
                     </div>
                   {/if}
+                  
                   <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                     <div class="setting-info">
                       <div class="setting-label">{$t('manageSubscription')}</div>
-                      <div class="setting-description">{$t('manageDescription')}</div>
+                      <div class="setting-description">Gestisci il tuo abbonamento dal database.</div>
                     </div>
                     <button class="manage-button" on:click={handleUpgrade}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1032,8 +1007,15 @@
                     </button>
                   </div>
                 {/if}
-              </div>
-            {/if}
+              {:else}
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">Autenticazione richiesta</div>
+                    <div class="setting-description">Accedi per visualizzare e gestire il tuo abbonamento.</div>
+                  </div>
+                </div>
+              {/if}
+            </div>
           {/if}
           
           <!-- Profilo -->
@@ -1096,65 +1078,7 @@
               </div>
             </div>
             
-            <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
-              <div class="setting-label">Password</div>
-              <div class="setting-value">
-                {#if isEditingPassword}
-                  <div class="phone-edit-container">
-                    <input 
-                      type="password" 
-                      class="phone-input" 
-                      bind:value={currentPassword} 
-                      placeholder="Password attuale"
-                      disabled={isSavingPassword}
-                    />
-                    <input 
-                      type="password" 
-                      class="phone-input" 
-                      bind:value={newPassword} 
-                      placeholder="Nuova password"
-                      disabled={isSavingPassword}
-                    />
-                    <input 
-                      type="password" 
-                      class="phone-input" 
-                      bind:value={confirmPassword} 
-                      placeholder="Conferma nuova password"
-                      disabled={isSavingPassword}
-                    />
-                    <div class="phone-edit-actions">
-                      <button 
-                        class="phone-save-button" 
-                        on:click={savePassword} 
-                        disabled={isSavingPassword}
-                      >
-                        {isSavingPassword ? get(t)('save') + '...' : get(t)('save')}
-                      </button>
-                      <button 
-                        class="phone-cancel-button" 
-                        on:click={cancelEditingPassword}
-                        disabled={isSavingPassword}
-                      >
-                        {$t('cancel')}
-                      </button>
-                    </div>
-                  </div>
-                {:else}
-                  <div class="phone-display-container">
-                    <span>••••••••</span>
-                    <button 
-                      class="phone-edit-button" 
-                      on:click={startEditingPassword}
-                      title="Modifica password"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                      </svg>
-                    </button>
-                  </div>
-                {/if}
-              </div>
-            </div>
+            <!-- Password gestita da Supabase - sezione rimossa -->
             
             <div class="setting-row" class:row-visible={activeSection === 'profilo'}>
               <div class="setting-label">{$t('deleteAccount')}</div>
@@ -1732,6 +1656,30 @@
     background-color: var(--bg-tertiary);
     border-color: var(--text-primary);
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .theme-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    position: relative;
+  }
+
+  .theme-button:disabled:hover {
+    transform: none;
+    background-color: var(--bg-tertiary);
+    box-shadow: none;
+  }
+
+  .coming-soon-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 6px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-left: 4px;
   }
 
   .theme-button svg {

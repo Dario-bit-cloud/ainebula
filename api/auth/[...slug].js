@@ -1,5 +1,6 @@
 // API Route dinamica consolidata per gestire TUTTE le operazioni di autenticazione su Vercel
-// Gestisce: /api/auth, /api/auth/login, /api/auth/register, /api/auth/passkey, /api/auth/2fa, /api/auth/me, ecc.
+// Gestisce: /api/auth/login, /api/auth/register, /api/auth/passkey, /api/auth/2fa, /api/auth/me, ecc.
+// Autenticazione completa con Neon Database (username/password)
 
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
@@ -9,6 +10,7 @@ import * as SimpleWebAuthnServer from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
+import { setAuthCookie, clearAuthCookie } from '../utils/cookies.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
@@ -22,9 +24,12 @@ const origin = process.env.WEBAUTHN_ORIGIN || 'https://ainebula.vercel.app';
 const challenges = new Map();
 
 function getDatabaseConnection() {
-  const connectionString = process.env.DATABASE_URL;
+  // Connessione al database PostgreSQL Neon
+  // Priorità: DATABASE_URL (con pooling) > DATABASE_URL_UNPOOLED (senza pooling)
+  const connectionString = process.env.DATABASE_URL ||
+    process.env.DATABASE_URL_UNPOOLED;
   if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is not set');
+    throw new Error('Connection string PostgreSQL non trovata. Configura DATABASE_URL (Neon)');
   }
   return neon(connectionString);
 }
@@ -74,7 +79,7 @@ async function authenticateUser(req, sql) {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     const sessions = await sql`
-      SELECT s.*, u.id as user_id, u.email, u.username, u.phone_number, u.is_active
+      SELECT s.*, u.id as user_id, u.username, u.phone_number, u.is_active
       FROM sessions s
       JOIN users u ON s.user_id = u.id
       WHERE s.token = ${token}
@@ -95,14 +100,12 @@ async function authenticateUser(req, sql) {
   }
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+import { setCorsHeaders, handleCorsPreflight } from '../utils/cors.js';
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
+export default async function handler(req, res) {
+  setCorsHeaders(req, res);
+  
+  if (handleCorsPreflight(req, res)) {
     return;
   }
 
@@ -199,7 +202,6 @@ export default async function handler(req, res) {
         success: true,
         user: {
           id: userId,
-          email: auth.user.email,
           username: auth.user.username,
           phone_number: auth.user.phone_number || null,
           subscription: subscription
@@ -209,11 +211,12 @@ export default async function handler(req, res) {
       return;
     }
     
-    // POST /api/auth/login - Login
-    if (req.method === 'POST' && (endpoint === 'login' || action === 'login')) {
+    // POST /api/auth/register - Registrazione con Neon Database
+    if (req.method === 'POST' && (endpoint === 'register' || action === 'register')) {
       const body = parsedBody || req.body;
       const { username, password } = body;
       
+      // Validazione
       if (!username || !password) {
         return res.status(400).json({
           success: false,
@@ -221,92 +224,7 @@ export default async function handler(req, res) {
         });
       }
       
-      const usernameLower = username.toLowerCase();
-      const users = await sql`
-        SELECT id, email, username, password_hash, is_active
-        FROM users
-        WHERE username = ${usernameLower}
-      `;
-      
-      if (users.length === 0) {
-        return res.status(401).json({
-          success: false,
-          message: 'Credenziali non valide'
-        });
-      }
-      
-      const user = users[0];
-      
-      if (!user.is_active) {
-        return res.status(403).json({
-          success: false,
-          message: 'Account disattivato'
-        });
-      }
-      
-      const isValidPassword = await bcrypt.compare(password, user.password_hash);
-      
-      if (!isValidPassword) {
-        return res.status(401).json({
-          success: false,
-          message: 'Credenziali non valide'
-        });
-      }
-      
-      const sessionToken = jwt.sign(
-        { userId: user.id, email: user.email, username: user.username },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-      const sessionId = randomBytes(16).toString('hex');
-      const expiresAt = new Date(Date.now() + SESSION_DURATION);
-      
-      await sql`
-        INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
-        VALUES (${sessionId}, ${user.id}, ${sessionToken}, ${expiresAt}, ${req.headers['x-forwarded-for'] || req.socket.remoteAddress}, ${req.headers['user-agent']})
-      `;
-      
-      await sql`
-        UPDATE users SET last_login = NOW() WHERE id = ${user.id}
-      `;
-      
-      const maxAge = SESSION_DURATION / 1000;
-      const isProduction = process.env.NODE_ENV === 'production';
-      const cookieParts = [
-        `auth_token=${sessionToken}`,
-        `Max-Age=${maxAge}`,
-        `Path=/`,
-        `SameSite=Lax`,
-        isProduction ? 'Secure' : '',
-        'HttpOnly'
-      ].filter(Boolean);
-      
-      res.setHeader('Set-Cookie', cookieParts.join('; '));
-      
-      res.json({
-        success: true,
-        message: 'Login completato con successo',
-        user: {
-          id: user.id,
-          username: user.username
-        },
-        token: sessionToken
-      });
-      return;
-    }
-    
-    // POST /api/auth/register - Registrazione
-    if (req.method === 'POST' && (endpoint === 'register' || action === 'register')) {
-      const body = parsedBody || req.body;
-      const { username, password, referralCode } = body;
-      
-      if (!username || !password) {
-        return res.status(400).json({
-          success: false,
-          message: 'Username e password sono obbligatori'
-        });
-      }
-      
+      // Validazione username
       if (username.length < 3) {
         return res.status(400).json({
           success: false,
@@ -314,6 +232,16 @@ export default async function handler(req, res) {
         });
       }
       
+      // Validazione caratteri username
+      const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+      if (!usernameRegex.test(username)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Lo username può contenere solo lettere, numeri, underscore e trattini'
+        });
+      }
+      
+      // Validazione password
       if (password.length < 6) {
         return res.status(400).json({
           success: false,
@@ -321,119 +249,233 @@ export default async function handler(req, res) {
         });
       }
       
-      const existing = await sql`
-        SELECT id FROM users 
-        WHERE username = ${username.toLowerCase()}
-      `;
+      try {
+        // Verifica se lo username esiste già
+        const existingUsers = await sql`
+          SELECT id FROM users WHERE username = ${username.toLowerCase()}
+        `;
+        
+        if (existingUsers.length > 0) {
+          return res.status(409).json({
+            success: false,
+            message: 'Username già utilizzato'
+          });
+        }
+        
+        // Hash della password
+        const passwordHash = await bcrypt.hash(password, 10);
+        
+        // Genera ID utente
+        const userId = randomBytes(16).toString('hex');
+        
+        // Crea l'utente (email può essere NULL o un placeholder)
+        await sql`
+          INSERT INTO users (id, email, username, password_hash, created_at, updated_at, is_active)
+          VALUES (
+            ${userId},
+            ${`${username}@nebula.local`}, -- Placeholder email per compatibilità schema
+            ${username.toLowerCase()},
+            ${passwordHash},
+            NOW(),
+            NOW(),
+            true
+          )
+        `;
+        
+        // Crea sessione JWT
+        const sessionToken = jwt.sign(
+          { userId, username: username.toLowerCase() },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        
+        const sessionId = randomBytes(16).toString('hex');
+        const expiresAt = new Date(Date.now() + SESSION_DURATION);
+        
+        // Salva la sessione nel database
+        await sql`
+          INSERT INTO sessions (id, user_id, token, expires_at, created_at, ip_address, user_agent)
+          VALUES (
+            ${sessionId},
+            ${userId},
+            ${sessionToken},
+            ${expiresAt.toISOString()},
+            NOW(),
+            ${req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown'},
+            ${req.headers['user-agent'] || 'unknown'}
+          )
+        `;
+        
+        // Crea impostazioni utente di default
+        const settingsId = randomBytes(16).toString('hex');
+        await sql`
+          INSERT INTO user_settings (id, user_id, created_at, updated_at)
+          VALUES (${settingsId}, ${userId}, NOW(), NOW())
+        `;
+        
+        // Crea abbonamento gratuito di default
+        const subscriptionId = randomBytes(16).toString('hex');
+        await sql`
+          INSERT INTO subscriptions (id, user_id, plan, status, started_at, auto_renew)
+          VALUES (${subscriptionId}, ${userId}, 'free', 'active', NOW(), false)
+        `;
+        
+        console.log('✅ [AUTH] Utente registrato:', userId);
+        
+        // Imposta cookie
+        setAuthCookie(res, sessionToken);
+        
+        return res.status(201).json({
+          success: true,
+          user: {
+            id: userId,
+            username: username.toLowerCase()
+          },
+          token: sessionToken
+        });
+      } catch (error) {
+        console.error('❌ [AUTH] Errore registrazione:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Errore durante la registrazione',
+          error: error.message
+        });
+      }
+    }
+    
+    // POST /api/auth/login - Login con Neon Database
+    if (req.method === 'POST' && (endpoint === 'login' || action === 'login')) {
+      const body = parsedBody || req.body;
+      const { username, password } = body;
       
-      if (existing.length > 0) {
+      // Validazione
+      if (!username || !password) {
         return res.status(400).json({
           success: false,
-          message: 'Username già in uso'
+          message: 'Username e password sono obbligatori'
         });
       }
       
-      const passwordHash = await bcrypt.hash(password, 10);
-      const userId = randomBytes(16).toString('hex');
-      const email = `${username.toLowerCase()}@nebula.local`;
-      
-      function generateReferralCode() {
-        return randomBytes(8).toString('hex');
-      }
-      
-      let userReferralCode = generateReferralCode();
-      let codeExists = true;
-      while (codeExists) {
-        const existing = await sql`
-          SELECT id FROM users WHERE referral_code = ${userReferralCode}
+      try {
+        // Trova l'utente per username
+        const users = await sql`
+          SELECT id, username, password_hash, is_active
+          FROM users
+          WHERE username = ${username.toLowerCase()}
         `;
-        if (existing.length === 0) {
-          codeExists = false;
+        
+        if (users.length === 0) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenziali non valide'
+          });
+        }
+        
+        const user = users[0];
+        
+        // Verifica se l'account è attivo
+        if (!user.is_active) {
+          return res.status(403).json({
+            success: false,
+            message: 'Account disattivato'
+          });
+        }
+        
+        // Verifica password
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+        
+        if (!passwordMatch) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenziali non valide'
+          });
+        }
+        
+        // Elimina sessioni scadute
+        await sql`
+          DELETE FROM sessions
+          WHERE user_id = ${user.id} AND expires_at < NOW()
+        `;
+        
+        // Crea nuova sessione JWT
+        const sessionToken = jwt.sign(
+          { userId: user.id, username: user.username },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        
+        const sessionId = randomBytes(16).toString('hex');
+        const expiresAt = new Date(Date.now() + SESSION_DURATION);
+        
+        // Salva la sessione nel database
+        await sql`
+          INSERT INTO sessions (id, user_id, token, expires_at, created_at, ip_address, user_agent)
+          VALUES (
+            ${sessionId},
+            ${user.id},
+            ${sessionToken},
+            ${expiresAt.toISOString()},
+            NOW(),
+            ${req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown'},
+            ${req.headers['user-agent'] || 'unknown'}
+          )
+        `;
+        
+        // Aggiorna last_login
+        await sql`
+          UPDATE users
+          SET last_login = NOW()
+          WHERE id = ${user.id}
+        `;
+        
+        console.log('✅ [AUTH] Login riuscito:', user.id);
+        
+        // Imposta cookie
+        setAuthCookie(res, sessionToken);
+        
+        // Ottieni abbonamento
+        const subscriptions = await sql`
+          SELECT * FROM subscriptions 
+          WHERE user_id = ${user.id} 
+            AND status = 'active'
+            AND (expires_at IS NULL OR expires_at > NOW())
+          ORDER BY started_at DESC
+          LIMIT 1
+        `;
+        
+        let subscription = null;
+        if (subscriptions.length > 0) {
+          const sub = subscriptions[0];
+          subscription = {
+            active: true,
+            plan: sub.plan,
+            expiresAt: sub.expires_at ? sub.expires_at.toISOString() : null
+          };
         } else {
-          userReferralCode = generateReferralCode();
+          subscription = {
+            active: false,
+            plan: null,
+            expiresAt: null
+          };
         }
+        
+        return res.json({
+          success: true,
+          user: {
+            id: user.id,
+            username: user.username,
+            subscription: subscription
+          },
+          token: sessionToken
+        });
+      } catch (error) {
+        console.error('❌ [AUTH] Errore login:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Errore durante il login',
+          error: error.message
+        });
       }
-      
-      await sql`
-        INSERT INTO users (id, email, username, password_hash, referral_code)
-        VALUES (${userId}, ${email}, ${username.toLowerCase()}, ${passwordHash}, ${userReferralCode})
-      `;
-      
-      if (referralCode) {
-        try {
-          const [referrer] = await sql`
-            SELECT id FROM users WHERE referral_code = ${referralCode}
-          `;
-          
-          if (referrer && referrer.id !== userId) {
-            const referralId = randomBytes(16).toString('hex');
-            await sql`
-              INSERT INTO referrals (id, referrer_id, referred_id, referral_code, status)
-              VALUES (${referralId}, ${referrer.id}, ${userId}, ${referralCode}, 'completed')
-            `;
-            
-            const [earningsCheck] = await sql`
-              SELECT 
-                COALESCE(SUM(CASE WHEN re.status IN ('available', 'withdrawn') THEN re.amount ELSE 0 END), 0) as total_earnings
-              FROM referral_earnings re
-              WHERE re.user_id = ${referrer.id}
-            `;
-            
-            const totalEarnings = parseFloat(earningsCheck?.total_earnings || 0);
-            const REFERRAL_REWARD = 20.00;
-            const MAX_EARNINGS = 500.00;
-            
-            if (totalEarnings < MAX_EARNINGS) {
-              const earningId = randomBytes(16).toString('hex');
-              const rewardAmount = Math.min(REFERRAL_REWARD, MAX_EARNINGS - totalEarnings);
-              
-              await sql`
-                INSERT INTO referral_earnings (id, user_id, referral_id, amount, status)
-                VALUES (${earningId}, ${referrer.id}, ${referralId}, ${rewardAmount}, 'available')
-              `;
-            }
-          }
-        } catch (refError) {
-          console.error('Errore referral:', refError);
-        }
-      }
-      
-      const sessionToken = jwt.sign({ userId, email, username: username.toLowerCase() }, JWT_SECRET, { expiresIn: '7d' });
-      const sessionId = randomBytes(16).toString('hex');
-      const expiresAt = new Date(Date.now() + SESSION_DURATION);
-      
-      await sql`
-        INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
-        VALUES (${sessionId}, ${userId}, ${sessionToken}, ${expiresAt}, ${req.headers['x-forwarded-for'] || req.socket.remoteAddress}, ${req.headers['user-agent']})
-      `;
-      
-      await sql`
-        UPDATE users SET last_login = NOW() WHERE id = ${userId}
-      `;
-      
-      const maxAge = SESSION_DURATION / 1000;
-      const isProduction = process.env.NODE_ENV === 'production';
-      const cookieParts = [
-        `auth_token=${sessionToken}`,
-        `Max-Age=${maxAge}`,
-        `Path=/`,
-        `SameSite=Lax`,
-        isProduction ? 'Secure' : '',
-        'HttpOnly'
-      ].filter(Boolean);
-      
-      res.setHeader('Set-Cookie', cookieParts.join('; '));
-      
-      res.json({
-        success: true,
-        message: 'Registrazione completata con successo',
-        user: {
-          id: userId,
-          username: username.toLowerCase()
-        },
-        token: sessionToken
-      });
-      return;
     }
     
     // POST /api/auth/passkey - Passkey operations
@@ -597,18 +639,8 @@ export default async function handler(req, res) {
           UPDATE users SET last_login = NOW() WHERE id = ${user.id}
         `;
         
-        const maxAge = SESSION_DURATION / 1000;
-        const isProduction = process.env.NODE_ENV === 'production';
-        const cookieParts = [
-          `auth_token=${sessionToken}`,
-          `Max-Age=${maxAge}`,
-          `Path=/`,
-          `SameSite=Lax`,
-          isProduction ? 'Secure' : '',
-          'HttpOnly'
-        ].filter(Boolean);
-        
-        res.setHeader('Set-Cookie', cookieParts.join('; '));
+        // Imposta cookie
+        setAuthCookie(res, sessionToken);
         
         res.json({
           success: true,
@@ -969,16 +1001,8 @@ export default async function handler(req, res) {
         `;
       }
       
-      const isProduction = process.env.NODE_ENV === 'production';
-      const cookieParts = [
-        'auth_token=',
-        'Max-Age=0',
-        'Path=/',
-        'SameSite=Lax',
-        isProduction ? 'Secure' : '',
-        'HttpOnly'
-      ].filter(Boolean);
-      res.setHeader('Set-Cookie', cookieParts.join('; '));
+      // Rimuovi cookie
+      clearAuthCookie(res);
 
       res.json({
         success: true,

@@ -27,10 +27,7 @@
   let aiSearchTerm = '';
   let expandedCategories = new Set();
   
-  // Expand all categories by default when switching to library tab
-  $: if (activeTab === 'library' && expandedCategories.size === 0 && aiLibraryCategories && aiLibraryCategories.length > 0) {
-    expandedCategories = new Set(aiLibraryCategories.map(cat => cat.id));
-  }
+  // Categories are collapsed by default
   
   $: allNebulini = [...$nebulini, ...$savedNebulini];
   
@@ -350,7 +347,7 @@
                               class="pricing-badge" 
                               style="background-color: {getPricingColor(ai.pricing)}20; color: {getPricingColor(ai.pricing)}"
                             >
-                              {ai.pricing}
+                              {ai.pricing === 'FREE' ? 'Gratis' : ai.pricing === 'FREEMIUM' ? 'Freemium' : ai.pricing === 'PAID' ? 'A pagamento' : ai.pricing}
                             </span>
                           </div>
                           <p class="ai-description">{ai.description}</p>

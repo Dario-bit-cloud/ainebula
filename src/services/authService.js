@@ -35,271 +35,6 @@ const API_BASE_URL = getApiBaseUrl();
 console.log('🔧 [AUTH SERVICE] API Base URL configurato:', API_BASE_URL);
 
 /**
- * Registra un nuovo utente
- */
-export async function register(username, password, referralCode = null) {
-  const url = `${API_BASE_URL}/register`;
-  const requestBody = { username, password };
-  if (referralCode) {
-    requestBody.referralCode = referralCode;
-  }
-  
-  console.log('📝 [REGISTER] Inizio registrazione:', {
-    url,
-    username,
-    timestamp: new Date().toISOString()
-  });
-  
-  try {
-    console.log('📤 [REGISTER] Invio richiesta:', {
-      method: 'POST',
-      url,
-      headers: { 'Content-Type': 'application/json' },
-      body: { username, password: '***' }
-    });
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include', // Importante: include i cookie nella richiesta
-      body: JSON.stringify(requestBody)
-    });
-    
-    console.log('📥 [REGISTER] Risposta ricevuta:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
-    });
-    
-    let data;
-    const responseText = await response.text();
-    console.log('📄 [REGISTER] Body risposta (raw):', responseText);
-    
-    try {
-      data = JSON.parse(responseText);
-      console.log('✅ [REGISTER] Body risposta (parsed):', data);
-    } catch (parseError) {
-      console.error('❌ [REGISTER] Errore parsing JSON:', parseError);
-      return {
-        success: false,
-        message: 'Errore nel formato della risposta del server',
-        error: `Errore parsing: ${parseError.message}`,
-        rawResponse: responseText
-      };
-    }
-    
-    if (data.success && data.token) {
-      console.log('✅ [REGISTER] Registrazione riuscita, salvataggio token');
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Carica l'abbonamento dal database (dovrebbe essere free di default)
-      if (data.user && data.user.id) {
-        try {
-          const { verifySession } = await import('./authService.js');
-          const sessionResult = await verifySession();
-          if (sessionResult.success && sessionResult.user?.subscription) {
-            // Sincronizza l'abbonamento con lo store utente
-            import('../stores/user.js').then(module => {
-              module.user.update(user => ({
-                ...user,
-                subscription: {
-                  active: sessionResult.user.subscription.active,
-                  plan: sessionResult.user.subscription.plan,
-                  expiresAt: sessionResult.user.subscription.expiresAt,
-                  key: user.subscription?.key || null // Mantieni la chiave locale se presente
-                }
-              }));
-            });
-          }
-        } catch (error) {
-          console.error('❌ [REGISTER] Errore caricamento abbonamento:', error);
-          // Non bloccare la registrazione se il caricamento abbonamento fallisce
-        }
-      }
-      
-      // Inizializza la crittografia end-to-end per i messaggi
-      if (data.user && data.user.id) {
-        try {
-          console.log('🔒 [REGISTER] Inizializzazione crittografia end-to-end...');
-          await initializeEncryption(password, data.user.id);
-          console.log('✅ [REGISTER] Crittografia inizializzata con successo');
-        } catch (error) {
-          console.error('❌ [REGISTER] Errore inizializzazione crittografia:', error);
-          // Non bloccare la registrazione se la crittografia fallisce
-        }
-      }
-      
-      // Salva l'account nel sistema account multipli
-      if (typeof window !== 'undefined' && data.user) {
-        import('../stores/accounts.js').then(module => {
-          module.addAccount({
-            username: data.user.username,
-            email: data.user.email || '',
-            token: data.token,
-            userId: data.user.id
-          });
-        });
-      }
-    } else {
-      console.warn('⚠️ [REGISTER] Registrazione fallita:', data);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('❌ [REGISTER] Errore durante la richiesta:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      url,
-      timestamp: new Date().toISOString()
-    });
-    
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message,
-      errorType: error.name,
-      url
-    };
-  }
-}
-
-/**
- * Effettua il login
- */
-export async function login(username, password) {
-  const url = `${API_BASE_URL}/login`;
-  const requestBody = { username, password };
-  
-  console.log('🔐 [LOGIN] Inizio login:', {
-    url,
-    username,
-    timestamp: new Date().toISOString()
-  });
-  
-  try {
-    console.log('📤 [LOGIN] Invio richiesta:', {
-      method: 'POST',
-      url,
-      headers: { 'Content-Type': 'application/json' },
-      body: { username, password: '***' } // Non loggare la password reale
-    });
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-    
-    console.log('📥 [LOGIN] Risposta ricevuta:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-    
-    let data;
-    const responseText = await response.text();
-    console.log('📄 [LOGIN] Body risposta (raw):', responseText);
-    
-    try {
-      data = JSON.parse(responseText);
-      console.log('✅ [LOGIN] Body risposta (parsed):', data);
-    } catch (parseError) {
-      console.error('❌ [LOGIN] Errore parsing JSON:', parseError);
-      console.error('📄 [LOGIN] Testo ricevuto:', responseText);
-      return {
-        success: false,
-        message: 'Errore nel formato della risposta del server',
-        error: `Errore parsing: ${parseError.message}`,
-        rawResponse: responseText
-      };
-    }
-    
-    if (data.success && data.token) {
-      console.log('✅ [LOGIN] Login riuscito, salvataggio token');
-      // Salva il token nel localStorage
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Carica l'abbonamento dal database
-      if (data.user && data.user.id) {
-        try {
-          const { verifySession } = await import('./authService.js');
-          const sessionResult = await verifySession();
-          if (sessionResult.success && sessionResult.user?.subscription) {
-            // Sincronizza l'abbonamento con lo store utente
-            import('../stores/user.js').then(module => {
-              module.user.update(user => ({
-                ...user,
-                subscription: {
-                  active: sessionResult.user.subscription.active,
-                  plan: sessionResult.user.subscription.plan,
-                  expiresAt: sessionResult.user.subscription.expiresAt,
-                  key: user.subscription?.key || null // Mantieni la chiave locale se presente
-                }
-              }));
-            });
-          }
-        } catch (error) {
-          console.error('❌ [LOGIN] Errore caricamento abbonamento:', error);
-          // Non bloccare il login se il caricamento abbonamento fallisce
-        }
-      }
-      
-      // Inizializza la crittografia end-to-end per i messaggi
-      if (data.user && data.user.id) {
-        try {
-          console.log('🔒 [LOGIN] Inizializzazione crittografia end-to-end...');
-          await initializeEncryption(password, data.user.id);
-          console.log('✅ [LOGIN] Crittografia inizializzata con successo');
-        } catch (error) {
-          console.error('❌ [LOGIN] Errore inizializzazione crittografia:', error);
-          // Non bloccare il login se la crittografia fallisce
-        }
-      }
-      
-      // Salva l'account nel sistema account multipli
-      if (typeof window !== 'undefined' && data.user) {
-        import('../stores/accounts.js').then(module => {
-          module.addAccount({
-            username: data.user.username,
-            email: data.user.email || '',
-            token: data.token,
-            userId: data.user.id
-          });
-        });
-      }
-    } else {
-      console.warn('⚠️ [LOGIN] Login fallito:', data);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('❌ [LOGIN] Errore durante la richiesta:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      url,
-      timestamp: new Date().toISOString()
-    });
-    
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message,
-      errorType: error.name,
-      url
-    };
-  }
-}
-
-/**
  * Verifica la sessione corrente
  */
 export async function verifySession() {
@@ -308,12 +43,19 @@ export async function verifySession() {
     
     console.log('🔍 [VERIFY SESSION] Verifica sessione:', {
       hasToken: !!token,
-      tokenPreview: token ? token.substring(0, 20) + '...' : null
+      tokenPreview: token ? token.substring(0, 20) + '...' : null,
+      apiUrl: API_BASE_URL
     });
     
-    // Se non c'è token nel localStorage, prova a recuperarlo dal cookie
-    // (il cookie viene inviato automaticamente dal browser)
-    // Se il token è nel localStorage, usalo; altrimenti il server controllerà il cookie
+    // Se non c'è token, non c'è sessione da verificare
+    if (!token) {
+      console.log('ℹ️ [VERIFY SESSION] Nessun token trovato');
+      return {
+        success: false,
+        message: 'Nessun token trovato',
+        user: null
+      };
+    }
     
     const headers = {
       'Content-Type': 'application/json'
@@ -323,71 +65,131 @@ export async function verifySession() {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const response = await fetch(`${API_BASE_URL}/me`, {
-      method: 'GET',
-      headers,
-      credentials: 'include' // Importante: include i cookie nella richiesta
-    });
-    
-    console.log('📥 [VERIFY SESSION] Risposta:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ [VERIFY SESSION] Errore risposta:', errorText);
-      try {
-        const errorData = JSON.parse(errorText);
-        return errorData;
-      } catch {
+    try {
+      const response = await fetch(`${API_BASE_URL}/me`, {
+        method: 'GET',
+        headers,
+        credentials: 'include', // Importante: include i cookie nella richiesta
+        // Timeout per evitare attese infinite
+        signal: AbortSignal.timeout(5000) // 5 secondi
+      });
+      
+      console.log('📥 [VERIFY SESSION] Risposta:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+      
+      if (!response.ok) {
+        // Se la risposta non è ok, la sessione non è valida
+        const errorText = await response.text();
+        console.log('⚠️ [VERIFY SESSION] Sessione non valida:', response.status);
+        
+        // Pulisci i dati locali
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('nebula-ai-user');
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          return {
+            success: false,
+            message: errorData.message || `Errore ${response.status}`,
+            user: null
+          };
+        } catch {
+          return {
+            success: false,
+            message: `Errore ${response.status}: ${response.statusText}`,
+            user: null
+          };
+        }
+      }
+      
+      const data = await response.json();
+      
+      // Verifica che la risposta sia valida e contenga un utente con ID
+      if (data && data.success && data.user && data.user.id) {
+        // Se il server ha restituito un token (potrebbe essere dal cookie), salviamolo
+        if (data.token && !token) {
+          token = data.token;
+          localStorage.setItem('auth_token', token);
+        }
+        
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // Sincronizza l'abbonamento con lo store utente
+        if (data.user.subscription) {
+          import('../stores/user.js').then(module => {
+            module.user.update(user => ({
+              ...user,
+              subscription: {
+                active: data.user.subscription.active,
+                plan: data.user.subscription.plan,
+                expiresAt: data.user.subscription.expiresAt,
+                key: user.subscription?.key || null
+              }
+            }));
+          }).catch(() => {
+            // Ignora errori se il modulo non è disponibile
+          });
+        }
+        
+        return data;
+      } else {
+        // Risposta non valida
+        console.log('⚠️ [VERIFY SESSION] Risposta non valida, pulizia dati');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('nebula-ai-user');
+        
         return {
           success: false,
-          message: `Errore ${response.status}: ${response.statusText}`,
-          error: errorText
+          message: 'Nessuna sessione valida',
+          user: null
         };
       }
-    }
-    
-    const data = await response.json();
-    
-    if (data.success && data.user) {
-      // Se il server ha restituito un token (potrebbe essere dal cookie), salviamolo
-      if (data.token && !token) {
-        token = data.token;
-        localStorage.setItem('auth_token', token);
-      }
-      
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Sincronizza l'abbonamento con lo store utente
-      if (data.user.subscription) {
-        import('../stores/user.js').then(module => {
-          module.user.update(user => ({
-            ...user,
-            subscription: {
-              active: data.user.subscription.active,
-              plan: data.user.subscription.plan,
-              expiresAt: data.user.subscription.expiresAt,
-              key: user.subscription?.key || null // Mantieni la chiave locale se presente
+    } catch (fetchError) {
+      // Gestisci errori di rete (server non disponibile, timeout, etc.)
+      if (fetchError.name === 'AbortError' || fetchError.name === 'TypeError') {
+        console.log('⚠️ [VERIFY SESSION] Server non disponibile o timeout:', fetchError.message);
+        
+        // Se c'è un token ma il server non risponde, mantieni i dati locali
+        // ma segna che la verifica non è riuscita
+        const localUser = localStorage.getItem('user');
+        if (localUser && token) {
+          try {
+            const userData = JSON.parse(localUser);
+            if (userData && userData.id) {
+              console.log('ℹ️ [VERIFY SESSION] Usando dati locali (server non disponibile)');
+              return {
+                success: true,
+                user: userData,
+                token: token,
+                offline: true // Flag per indicare che è in modalità offline
+              };
             }
-          }));
-        });
+          } catch (e) {
+            // Ignora errori di parsing
+          }
+        }
       }
-    } else {
-      // Token non valido, rimuovilo e tutti i dati utente
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('nebula-ai-user');
+      
+      // Se non ci sono dati locali validi, restituisci errore
+      return {
+        success: false,
+        message: 'Errore nella comunicazione con il server',
+        error: fetchError.message,
+        offline: true
+      };
     }
-    
-    return data;
   } catch (error) {
+    console.error('❌ [VERIFY SESSION] Errore generale:', error);
     return {
       success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message
+      message: 'Errore durante la verifica della sessione',
+      error: error.message,
+      user: null
     };
   }
 }
@@ -483,83 +285,6 @@ export async function updateUsername(username) {
     return data;
   } catch (error) {
     console.error('Errore durante aggiornamento username:', error);
-    return {
-      success: false,
-      message: 'Errore nella comunicazione con il server',
-      error: error.message
-    };
-  }
-}
-
-/**
- * Aggiorna la password dell'utente corrente
- * Gestisce anche le chiavi di recupero per i messaggi crittografati
- */
-export async function updatePassword(currentPassword, newPassword) {
-  const url = `${API_BASE_URL}/update-password`;
-  const token = getToken();
-  
-  if (!token) {
-    return {
-      success: false,
-      message: 'Nessun token di autenticazione trovato'
-    };
-  }
-  
-  try {
-    const user = getCurrentUser();
-    if (!user || !user.id) {
-      return {
-        success: false,
-        message: 'Utente non trovato'
-      };
-    }
-    
-    // Crea una chiave di recupero per i messaggi vecchi
-    let recoveryKey = null;
-    try {
-      const { createRecoveryKey } = await import('./encryptionService.js');
-      recoveryKey = await createRecoveryKey(currentPassword, newPassword, user.id);
-      console.log('✅ [UPDATE PASSWORD] Chiave di recupero creata');
-    } catch (error) {
-      console.error('❌ [UPDATE PASSWORD] Errore creazione chiave di recupero:', error);
-      // Non bloccare il cambio password se la chiave di recupero fallisce
-    }
-    
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include', // Importante: include i cookie nella richiesta
-      body: JSON.stringify({
-        current_password: currentPassword,
-        new_password: newPassword,
-        recovery_key: recoveryKey ? recoveryKey.encryptedOldKey : null
-      })
-    });
-    
-    const data = await response.json();
-    
-    // Se il cambio password è riuscito, aggiorna la cache
-    if (data.success) {
-      // Aggiorna la password in cache
-      const { cachePassword } = await import('./encryptionService.js');
-      cachePassword(user.id, newPassword);
-      
-      // Salva la chiave di recupero in localStorage (per decrittografare messaggi vecchi)
-      if (recoveryKey) {
-        const recoveryKeyStorage = JSON.parse(localStorage.getItem('recovery_keys') || '{}');
-        recoveryKeyStorage[user.id] = recoveryKey.encryptedOldKey;
-        localStorage.setItem('recovery_keys', JSON.stringify(recoveryKeyStorage));
-        console.log('✅ [UPDATE PASSWORD] Chiave di recupero salvata');
-      }
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Errore durante aggiornamento password:', error);
     return {
       success: false,
       message: 'Errore nella comunicazione con il server',

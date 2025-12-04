@@ -1,10 +1,9 @@
 <script>
-  import { user as authUser } from '../stores/auth.js';
+  import { user as authUser, setUser, isAuthenticatedStore } from '../stores/auth.js';
   import { isUserMenuOpen, isSidebarOpen, isMobile, isIncognitoMode } from '../stores/app.js';
-  import { logout } from '../services/authService.js';
-  import { clearUser, setUser as setAuthUser } from '../stores/auth.js';
-  import { accounts, currentAccountId, getCurrentAccount, getOtherAccounts, switchAccount, removeAccount } from '../stores/accounts.js';
-  import { isAuthModalOpen } from '../stores/app.js';
+  import { signOut } from '../services/neonAuthService.js';
+  import { clearUser } from '../stores/auth.js';
+  import { accounts, currentAccountId, currentAccount, otherAccounts, switchAccount, removeAccount } from '../stores/accounts.js';
   import { showConfirm, showAlert } from '../services/dialogService.js';
   import { get } from 'svelte/store';
   import { createNewChat } from '../stores/chat.js';
@@ -12,9 +11,6 @@
   let hoveredItem = null;
   let activeSubmenu = null;
   let showAccountList = false;
-  
-  $: currentAccount = getCurrentAccount();
-  $: otherAccounts = getOtherAccounts();
   
   const menuItems = [
     {
@@ -61,9 +57,20 @@
   async function handleLogout() {
     const confirmed = await showConfirm('Sei sicuro di voler uscire?', 'Esci', 'Esci', 'Annulla');
     if (confirmed) {
-      await logout();
-      clearUser();
-      isUserMenuOpen.set(false);
+      try {
+        // Logout da Neon Auth
+        await signOut();
+        // Pulisci lo store locale
+        clearUser();
+        isUserMenuOpen.set(false);
+        // Ricarica la pagina per resettare tutto
+        window.location.reload();
+      } catch (error) {
+        console.error('Errore durante il logout:', error);
+        // Fallback: pulisci comunque e ricarica
+        clearUser();
+        window.location.reload();
+      }
     }
   }
   
@@ -165,26 +172,31 @@
   }
   
   async function handleAddAccount() {
-    // Apri modal di login/registrazione
+    // Per aggiungere un account, l'utente deve fare logout e login con un altro account
+    // Oppure può aprire il modal di autenticazione
+    const { isAuthModalOpen } = await import('../stores/app.js');
     isAuthModalOpen.set(true);
     isUserMenuOpen.set(false);
   }
   
   async function handleSwitchAccount(account) {
+    if (!account) return;
+    
     // Disattiva modalità incognito quando si cambia account
     isIncognitoMode.set(false);
     
-    // Cambia account
+    // Cambia account nel sistema
     switchAccount(account.id);
     
-    // Imposta il token nel localStorage
-    localStorage.setItem('auth_token', account.token);
+    // Se l'account ha un token, impostalo
+    if (account.token) {
+      localStorage.setItem('auth_token', account.token);
+    }
     
-    // Aggiorna lo store auth
-    setAuthUser({
-      id: account.userId,
-      username: account.username,
-      email: account.email
+    // Aggiorna lo store auth con i dati dell'account
+    await setUser({
+      id: account.id,
+      username: account.username
     });
     
     // Ricarica la pagina per applicare il cambio account
@@ -297,7 +309,6 @@
                 </div>
                 <div class="account-details">
                   <div class="account-username">{account.username}</div>
-                  <div class="account-email">{account.email}</div>
                 </div>
                 {#if account.id === $currentAccountId && !$isIncognitoMode}
                   <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

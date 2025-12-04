@@ -32,93 +32,211 @@
       
       <div class="modal-body">
         <div class="privacy-header">
-          <h1 id="privacy-modal-title" class="privacy-title">L'AI che rispetta la tua privacy</h1>
+          <h1 id="privacy-modal-title" class="privacy-title">Informativa sulla Privacy</h1>
           <p class="privacy-intro">
-            Un assistente AI dovrebbe renderti più efficiente, non sfruttarti per i tuoi dati. 
-            Ecco perché abbiamo creato Nebula AI: per offrirti tutti i vantaggi dell'intelligenza artificiale, 
-            senza compromettere la tua privacy e la sicurezza dei dati.
+            Ultimo aggiornamento: 27 Gennaio 2025
           </p>
         </div>
         
-        <div class="privacy-section">
-          <h2 class="section-title">Creato dal team che conosce la privacy</h2>
-          <p class="section-description">
-            I modelli AI delle Big Tech sono basati sulla raccolta dei tuoi dati. Ma Nebula AI è diverso. 
-            È stato sviluppato con un focus prioritario sulla privacy e sulla sicurezza dei dati degli utenti. 
-            La nostra missione è promuovere un'AI etica e rispettosa della privacy, senza mai lucrare sui dati degli utenti.
-          </p>
-        </div>
-        
-        <div class="privacy-section">
-          <h2 class="section-title">Come fa Nebula AI a mantenere riservate le nostre conversazioni?</h2>
+        <div class="privacy-content">
+          <section class="privacy-section">
+            <h2 class="section-title">1. Introduzione</h2>
+            <p class="section-text">
+              Nebula AI rispetta la tua privacy e si impegna a proteggere i tuoi dati personali. Questa Informativa sulla Privacy spiega come raccogliamo, utilizziamo, condividiamo e proteggiamo le tue informazioni personali quando utilizzi il nostro servizio.
+            </p>
+            <p class="section-text">
+              Questa informativa è conforme al Regolamento Generale sulla Protezione dei Dati (GDPR) dell'Unione Europea e alle leggi italiane sulla protezione dei dati personali.
+            </p>
+          </section>
           
-          <div class="privacy-features-grid">
-            <div class="privacy-feature-card">
-              <div class="feature-icon">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  <circle cx="9" cy="10" r="1" fill="currentColor"/>
-                  <circle cx="15" cy="10" r="1" fill="currentColor"/>
-                  <circle cx="12" cy="10" r="1" fill="currentColor"/>
-                </svg>
-              </div>
-              <h3 class="feature-title">Le tue chat sono solo tue</h3>
-              <p class="feature-description">
-                Non conserviamo registri di ciò che chiedi o di ciò che Nebula AI risponde. 
-                Le tue chat non possono essere viste, condivise o utilizzate per profilarti. 
-                Nebula AI non salva nulla sui nostri server senza il tuo consenso esplicito.
-              </p>
-            </div>
-            
-            <div class="privacy-feature-card">
-              <div class="feature-icon">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  <circle cx="12" cy="16" r="1" fill="currentColor"/>
-                </svg>
-              </div>
-              <h3 class="feature-title">Solo tu hai accesso</h3>
-              <p class="feature-description">
-                Grazie alla crittografia end-to-end, le tue conversazioni salvate possono essere decodificate 
-                e lette solo sul tuo dispositivo. Né il nostro team né terze parti possono accedervi.
-              </p>
-            </div>
-            
-            <div class="privacy-feature-card">
-              <div class="feature-icon">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <path d="M21 15l-5-5L5 21"/>
-                  <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                </svg>
-              </div>
-              <h3 class="feature-title">Tecnologia di cui ti puoi fidare</h3>
-              <p class="feature-description">
-                Il codice di Nebula AI è progettato con standard di sicurezza elevati, 
-                garantendo che sia privato e sicuro. Non utilizziamo mai i tuoi dati per addestrare i modelli 
-                senza il tuo consenso esplicito e informato.
-              </p>
-            </div>
-            
-            <div class="privacy-feature-card">
-              <div class="feature-icon">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  <path d="M12 16v4"/>
-                  <path d="M8 20h8"/>
-                </svg>
-              </div>
-              <h3 class="feature-title">Hai il controllo</h3>
-              <p class="feature-description">
-                I tuoi dati non vengono condivisi con inserzionisti, governi o chiunque altro. 
-                Nebula AI rispetta il GDPR e le normative sulla privacy, quindi puoi eliminare 
-                i tuoi dati in qualsiasi momento.
-              </p>
-            </div>
-          </div>
+          <section class="privacy-section">
+            <h2 class="section-title">2. Titolare del Trattamento</h2>
+            <p class="section-text">
+              Il titolare del trattamento dei dati personali è Nebula AI.
+            </p>
+            <p class="section-text">
+              <strong>Email:</strong> <a href="mailto:privacy@nebula-ai.com" class="link">privacy@nebula-ai.com</a>
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">3. Dati Personali Raccolti</h2>
+            <p class="section-text">
+              <strong>3.1 Dati Forniti Direttamente dall'Utente:</strong>
+            </p>
+            <ul class="section-list">
+              <li>Informazioni di registrazione (username, email, password crittografata)</li>
+              <li>Informazioni di profilo e preferenze</li>
+              <li>Contenuti utente (messaggi, chat, file caricati)</li>
+              <li>Informazioni di pagamento (per piani a pagamento)</li>
+            </ul>
+            <p class="section-text">
+              <strong>3.2 Dati Raccolti Automaticamente:</strong>
+            </p>
+            <ul class="section-list">
+              <li>Dati tecnici (indirizzo IP, tipo di browser, sistema operativo)</li>
+              <li>Dati di utilizzo (pagine visitate, funzionalità utilizzate)</li>
+              <li>Dati di sessione (token di autenticazione, timestamp)</li>
+              <li>Dati di dispositivo</li>
+            </ul>
+            <p class="section-text">
+              <strong>3.3 Dati da Terze Parti:</strong>
+            </p>
+            <p class="section-text">
+              Potremmo ricevere informazioni da fornitori di autenticazione, pagamento o servizi AI.
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">4. Base Giuridica del Trattamento</h2>
+            <p class="section-text">
+              Trattiamo i tuoi dati personali sulla base di:
+            </p>
+            <ul class="section-list">
+              <li><strong>Consenso:</strong> Quando hai fornito il consenso esplicito</li>
+              <li><strong>Esecuzione del Contratto:</strong> Per fornire il Servizio</li>
+              <li><strong>Interesse Legittimo:</strong> Per migliorare il Servizio e garantire la sicurezza</li>
+              <li><strong>Obbligo Legale:</strong> Per adempiere a obblighi legali</li>
+            </ul>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">5. Finalità del Trattamento</h2>
+            <p class="section-text">
+              Utilizziamo i tuoi dati personali per:
+            </p>
+            <ul class="section-list">
+              <li>Fornire e gestire il Servizio</li>
+              <li>Migliorare funzionalità e prestazioni</li>
+              <li>Comunicare con te riguardo al Servizio</li>
+              <li>Proteggere il Servizio da accessi non autorizzati</li>
+              <li>Adempiere a obblighi legali</li>
+            </ul>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">6. Condivisione dei Dati</h2>
+            <p class="section-text">
+              <strong>Non vendiamo i tuoi dati personali.</strong> Condividiamo i tuoi dati solo nelle seguenti circostanze:
+            </p>
+            <ul class="section-list">
+              <li><strong>Fornitori di Servizi:</strong> Con fornitori che ci assistono nell'erogazione del Servizio (hosting, servizi AI, pagamenti), tutti vincolati da accordi di riservatezza</li>
+              <li><strong>Obblighi Legali:</strong> Se richiesto dalla legge o da autorità competenti</li>
+              <li><strong>Trasferimenti Aziendali:</strong> In caso di fusione o acquisizione</li>
+              <li><strong>Con il Tuo Consenso:</strong> Quando hai fornito il consenso esplicito</li>
+            </ul>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">7. Trasferimento Dati Oltre l'UE</h2>
+            <p class="section-text">
+              I tuoi dati possono essere trasferiti in paesi al di fuori dell'UE. In tali casi, adottiamo misure appropriate per garantire un livello adeguato di protezione, inclusi clausole contrattuali standard approvate dalla Commissione Europea.
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">8. Conservazione dei Dati</h2>
+            <p class="section-text">
+              Conserviamo i tuoi dati solo per il tempo necessario:
+            </p>
+            <ul class="section-list">
+              <li><strong>Dati dell'Account:</strong> Fino a quando il tuo account è attivo o fino a cancellazione</li>
+              <li><strong>Dati delle Chat:</strong> Fino a quando non elimini le chat o il tuo account</li>
+              <li><strong>Dati di Sessione:</strong> Massimo 7 giorni dopo la scadenza</li>
+              <li><strong>Dati di Log:</strong> Massimo 12 mesi</li>
+            </ul>
+            <p class="section-text">
+              Dopo il periodo di conservazione, i dati vengono eliminati in modo sicuro o anonimizzati.
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">9. Sicurezza dei Dati</h2>
+            <p class="section-text">
+              Implementiamo misure tecniche e organizzative appropriate per proteggere i tuoi dati:
+            </p>
+            <ul class="section-list">
+              <li>Crittografia end-to-end per i messaggi (quando abilitata)</li>
+              <li>Crittografia in transito (HTTPS/TLS)</li>
+              <li>Crittografia a riposo nel database</li>
+              <li>Controlli di accesso limitati</li>
+              <li>Autenticazione forte (passkeys, 2FA)</li>
+              <li>Monitoraggio continuo della sicurezza</li>
+            </ul>
+            <p class="section-text">
+              Nonostante queste misure, nessun sistema è completamente sicuro. Ti incoraggiamo a utilizzare password forti.
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">10. I Tuoi Diritti</h2>
+            <p class="section-text">
+              In conformità con il GDPR, hai i seguenti diritti:
+            </p>
+            <ul class="section-list">
+              <li><strong>Diritto di Accesso:</strong> Ottenere una copia dei tuoi dati personali</li>
+              <li><strong>Diritto di Rettifica:</strong> Correggere dati inesatti o incompleti</li>
+              <li><strong>Diritto alla Cancellazione:</strong> Richiedere la cancellazione dei tuoi dati</li>
+              <li><strong>Diritto di Limitazione:</strong> Limitare il trattamento in determinate circostanze</li>
+              <li><strong>Diritto alla Portabilità:</strong> Ricevere i tuoi dati in formato strutturato</li>
+              <li><strong>Diritto di Opposizione:</strong> Opporti al trattamento per motivi legittimi</li>
+              <li><strong>Diritto di Revoca del Consenso:</strong> Revocare il consenso in qualsiasi momento</li>
+              <li><strong>Diritto di Reclamo:</strong> Presentare un reclamo all'autorità di controllo</li>
+            </ul>
+            <p class="section-text">
+              Per esercitare i tuoi diritti, contattaci a: <a href="mailto:privacy@nebula-ai.com" class="link">privacy@nebula-ai.com</a>
+            </p>
+            <p class="section-text">
+              Risponderemo entro un mese (può essere esteso di due mesi per richieste complesse).
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">11. Cookie e Tecnologie Simili</h2>
+            <p class="section-text">
+              Utilizziamo cookie essenziali per il funzionamento del Servizio, cookie di autenticazione per mantenere la sessione attiva e cookie di preferenze per ricordare le tue impostazioni.
+            </p>
+            <p class="section-text">
+              Puoi gestire le preferenze dei cookie attraverso le impostazioni del tuo browser.
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">12. Minori</h2>
+            <p class="section-text">
+              Il Servizio non è destinato a minori di 13 anni. Non raccogliamo consapevolmente dati personali da minori senza il consenso del genitore o tutore legale. Se veniamo a conoscenza di aver raccolto dati da un minore senza consenso appropriato, elimineremo tali dati immediatamente.
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">13. Modifiche a Questa Informativa</h2>
+            <p class="section-text">
+              Possiamo aggiornare questa Informativa periodicamente. Ti notificheremo le modifiche sostanziali tramite notifica sul Servizio o email. Ti incoraggiamo a rivedere periodicamente questa informativa.
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">14. Contatti</h2>
+            <p class="section-text">
+              Per domande, richieste o reclami riguardo a questa Informativa sulla Privacy, puoi contattarci:
+            </p>
+            <p class="section-text">
+              <strong>Email:</strong> <a href="mailto:privacy@nebula-ai.com" class="link">privacy@nebula-ai.com</a>
+            </p>
+          </section>
+          
+          <section class="privacy-section">
+            <h2 class="section-title">15. Autorità di Controllo</h2>
+            <p class="section-text">
+              Hai il diritto di presentare un reclamo all'autorità di controllo competente:
+            </p>
+            <p class="section-text">
+              <strong>Garante per la Protezione dei Dati Personali</strong><br>
+              Piazza di Monte Citorio, 121 - 00186 Roma<br>
+              <strong>Sito web:</strong> <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener noreferrer" class="link">www.garanteprivacy.it</a><br>
+              <strong>Email:</strong> garante@gpdp.it
+            </p>
+          </section>
         </div>
       </div>
     </div>
@@ -152,7 +270,7 @@
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 16px;
-    max-width: 1000px;
+    max-width: 900px;
     width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -206,6 +324,8 @@
 
   .privacy-header {
     margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
     animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -230,141 +350,61 @@
   }
 
   .privacy-intro {
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: 14px;
     color: var(--text-secondary);
     margin: 0;
-    max-width: 800px;
+  }
+
+  .privacy-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
   }
 
   .privacy-section {
-    margin-bottom: 32px;
-    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    animation-fill-mode: both;
-  }
-
-  .privacy-section:nth-child(2) {
-    animation-delay: 0.1s;
-  }
-
-  .privacy-section:nth-child(3) {
-    animation-delay: 0.2s;
+    animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .section-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0 0 12px 0;
     line-height: 1.3;
   }
 
-  .section-description {
+  .section-text {
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.7;
     color: var(--text-secondary);
-    margin: 0;
-    max-width: 900px;
+    margin: 0 0 12px 0;
   }
 
-  .privacy-features-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-    margin-top: 20px;
-  }
-
-  .privacy-feature-card {
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 16px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: cardFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    animation-fill-mode: both;
-  }
-
-  .privacy-feature-card:nth-child(1) {
-    animation-delay: 0.1s;
-  }
-
-  .privacy-feature-card:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-
-  .privacy-feature-card:nth-child(3) {
-    animation-delay: 0.3s;
-  }
-
-  .privacy-feature-card:nth-child(4) {
-    animation-delay: 0.4s;
-  }
-
-  @keyframes cardFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(15px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .privacy-feature-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    border-color: var(--accent-blue);
-  }
-
-  .feature-icon {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #ff6b35;
-    margin-bottom: 12px;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .privacy-feature-card:hover .feature-icon {
-    transform: scale(1.1);
-  }
-
-  .feature-title {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0 0 8px 0;
-    line-height: 1.3;
-  }
-
-  .feature-description {
-    font-size: 13px;
-    line-height: 1.5;
+  .section-list {
+    margin: 12px 0 0 20px;
+    padding: 0;
     color: var(--text-secondary);
-    margin: 0;
+    font-size: 14px;
+    line-height: 1.8;
   }
+
+  .section-list li {
+    margin-bottom: 8px;
+  }
+
+  .link {
+    color: var(--accent-blue);
+    text-decoration: none;
+    transition: opacity 0.2s;
+  }
+
+  .link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+  }
+
 
   /* Responsive Design */
-  @media (max-width: 1024px) {
-    .modal-body {
-      padding: 40px 32px;
-    }
-
-    .privacy-title {
-      font-size: 32px;
-    }
-
-    .privacy-intro {
-      font-size: 17px;
-    }
-
-    .privacy-features-grid {
-      gap: 20px;
-    }
-  }
 
   @media (max-width: 768px) {
     .modal-backdrop {
@@ -401,66 +441,11 @@
       font-size: 16px;
     }
 
-    .privacy-section {
-      margin-bottom: 32px;
-    }
-
-    .section-title {
-      font-size: 20px;
-      margin-bottom: 12px;
-    }
-
-    .section-description {
-      font-size: 15px;
-    }
-
-    .privacy-features-grid {
-      grid-template-columns: 1fr;
-      gap: 16px;
-      margin-top: 24px;
-    }
-
-    .privacy-feature-card {
-      padding: 20px;
-    }
-
-    .feature-icon {
-      width: 48px;
-      height: 48px;
-      margin-bottom: 12px;
-    }
-
-    .feature-title {
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
-
-    .feature-description {
-      font-size: 14px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .modal-body {
-      padding: 24px 20px;
-    }
-
     .privacy-title {
       font-size: 24px;
     }
-
-    .privacy-intro {
-      font-size: 15px;
-    }
-
-    .section-title {
-      font-size: 18px;
-    }
-
-    .privacy-feature-card {
-      padding: 16px;
-    }
   }
+
 </style>
 
 

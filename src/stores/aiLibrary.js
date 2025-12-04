@@ -3,112 +3,112 @@
 export const aiLibraryCategories = [
   {
     id: 'image-drawings',
-    name: 'Image & Drawings',
+    name: 'Immagini e Disegni',
     icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
     color: '#ec4899',
     emoji: '🎨'
   },
   {
     id: 'chat-assistants',
-    name: 'AI Chat & Assistants',
+    name: 'Chat AI e Assistenti',
     icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
     color: '#3b82f6',
     emoji: '💻'
   },
   {
     id: 'writing-seo',
-    name: 'Writing & Web SEO',
+    name: 'Scrittura e SEO Web',
     icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
     color: '#10b981',
     emoji: '📝'
   },
   {
     id: 'image-editing',
-    name: 'Image Editing',
+    name: 'Modifica Immagini',
     icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
     color: '#f59e0b',
     emoji: '📸'
   },
   {
     id: 'video-generators',
-    name: 'Video Generators',
+    name: 'Generatori di Video',
     icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
     color: '#ef4444',
     emoji: '📽️'
   },
   {
     id: 'audio-editing',
-    name: 'Audio Editing',
+    name: 'Modifica Audio',
     icon: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3',
     color: '#8b5cf6',
     emoji: '📣'
   },
   {
     id: 'music-creation',
-    name: 'Music Creation',
+    name: 'Creazione Musicale',
     icon: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3',
     color: '#ec4899',
     emoji: '🎶'
   },
   {
     id: 'voice-reading',
-    name: 'Voice Reading',
+    name: 'Lettura Vocale',
     icon: 'M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z',
     color: '#06b6d4',
     emoji: '🎙️'
   },
   {
     id: 'logo-creation',
-    name: 'Logo Creation',
+    name: 'Creazione Logo',
     icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01',
     color: '#f97316',
     emoji: '🖼️'
   },
   {
     id: 'storytelling',
-    name: 'Storytelling Generators',
+    name: 'Generatori di Storie',
     icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
     color: '#14b8a6',
     emoji: '📖'
   },
   {
     id: 'code-assistants',
-    name: 'Code Assistants',
+    name: 'Assistenti per Codice',
     icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
     color: '#6366f1',
     emoji: '🖥️'
   },
   {
     id: 'education',
-    name: 'Education',
+    name: 'Educazione',
     icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
     color: '#10b981',
     emoji: '📚'
   },
   {
     id: 'developer-tools',
-    name: 'Developer Tools',
+    name: 'Strumenti per Sviluppatori',
     icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
     color: '#6366f1',
     emoji: '🛠️'
   },
   {
     id: 'healthcare',
-    name: 'Healthcare',
+    name: 'Assistenza Sanitaria',
     icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z',
     color: '#ef4444',
     emoji: '🩺'
   },
   {
     id: 'memory',
-    name: 'Memory',
+    name: 'Memoria',
     icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
     color: '#8b5cf6',
     emoji: '🧠'
   },
   {
     id: 'social-networks',
-    name: 'Social Networks',
+    name: 'Social Network',
     icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
     color: '#3b82f6',
     emoji: '🌐'
@@ -123,48 +123,48 @@ function generateSearchUrl(name) {
 // Mappa delle AI per categoria
 export const aiLibrary = {
   'image-drawings': [
-    { name: 'MidJourney', description: 'Strong image generation based on text description.', pricing: 'FREEMIUM', url: generateSearchUrl('MidJourney') },
-    { name: 'Stable Diffusion', description: 'An open-source, free image generator that supports templates.', pricing: 'FREE', url: generateSearchUrl('Stable Diffusion') },
-    { name: 'Adobe Firefly', description: 'A large selection of high-quality templates and tools for editing or generating images.', pricing: 'FREE', url: generateSearchUrl('Adobe Firefly') },
-    { name: 'DALL·E 3', description: 'A generator of images that works with the ChatGPT interface.', pricing: 'FREE', url: generateSearchUrl('DALL-E 3') },
-    { name: 'Lexica.art', description: 'An amazing quantity of ideas to generate high quality images on Stable Diffusion.', pricing: 'FREE', url: generateSearchUrl('Lexica.art') },
-    { name: 'Bing Image Creator', description: 'The new AI image generator from Bing that turns words into illustrations.', pricing: 'FREE', url: generateSearchUrl('Bing Image Creator') },
-    { name: 'Leonardo AI', description: 'AI-generated images, 3D models, and creative material for your projects.', pricing: 'FREEMIUM', url: generateSearchUrl('Leonardo AI') },
-    { name: 'Playground AI', description: 'An really popular generator that generates pertinent images.', pricing: 'FREEMIUM', url: generateSearchUrl('Playground AI') },
-    { name: 'Neural Canvas', description: 'This Comic Book generator can be used to create your own Comic Book.', pricing: 'PAID', url: generateSearchUrl('Neural Canvas') },
-    { name: 'Microsoft Designer', description: 'AI-generated marketing graphics for polished, high-end visuals.', pricing: 'FREEMIUM', url: generateSearchUrl('Microsoft Designer') },
-    { name: 'Skybox Lab', description: 'Generate 1536 x 3278 pixel prototypes for panoramic skyboxes.', pricing: 'FREE', url: generateSearchUrl('Skybox Lab') },
-    { name: 'Deep AI', description: 'A straightforward, free image generator with lots of modification possibilities.', pricing: 'FREE', url: generateSearchUrl('Deep AI') },
-    { name: 'RocketAI', description: 'Create and edit images for your e-commerce sites.', pricing: 'FREE', url: generateSearchUrl('RocketAI') },
-    { name: 'Image To Meme', description: 'Transform an image into a timely meme right away.', pricing: 'FREEMIUM', url: generateSearchUrl('Image To Meme') },
-    { name: 'AI Emojis Generator', description: 'Generate your own custom emoji from a prompt.', pricing: 'FREE', url: generateSearchUrl('AI Emojis Generator') },
-    { name: 'Artificial Art', description: 'An AI-powered artistic images and illustration generator with multiple settings.', pricing: 'FREE', url: generateSearchUrl('Artificial Art') },
-    { name: 'Stock AI', description: 'Create images for all of your needs quickly and easily.', pricing: 'FREEMIUM', url: generateSearchUrl('Stock AI') },
-    { name: 'IconLab AI', description: 'An AI generator for the automated and personalized production of application icons.', pricing: 'PAID', url: generateSearchUrl('IconLab AI') },
-    { name: 'AnimeAI App', description: 'Generate anime-style avatars from one of your images, with a variety of custom styles.', pricing: 'PAID', url: generateSearchUrl('AnimeAI App') },
-    { name: 'Image Mixer', description: 'Combine different images to create a completely new illustration.', pricing: 'FREE', url: generateSearchUrl('Image Mixer') }
+    { name: 'MidJourney', description: 'Generazione di immagini potente basata su descrizioni testuali.', pricing: 'FREEMIUM', url: generateSearchUrl('MidJourney') },
+    { name: 'Stable Diffusion', description: 'Un generatore di immagini open-source e gratuito che supporta template.', pricing: 'FREE', url: generateSearchUrl('Stable Diffusion') },
+    { name: 'Adobe Firefly', description: 'Una vasta selezione di template di alta qualità e strumenti per modificare o generare immagini.', pricing: 'FREE', url: generateSearchUrl('Adobe Firefly') },
+    { name: 'DALL·E 3', description: 'Un generatore di immagini che funziona con l\'interfaccia di ChatGPT.', pricing: 'FREE', url: generateSearchUrl('DALL-E 3') },
+    { name: 'Lexica.art', description: 'Una quantità incredibile di idee per generare immagini di alta qualità su Stable Diffusion.', pricing: 'FREE', url: generateSearchUrl('Lexica.art') },
+    { name: 'Bing Image Creator', description: 'Il nuovo generatore di immagini AI di Bing che trasforma le parole in illustrazioni.', pricing: 'FREE', url: generateSearchUrl('Bing Image Creator') },
+    { name: 'Leonardo AI', description: 'Immagini generate da AI, modelli 3D e materiale creativo per i tuoi progetti.', pricing: 'FREEMIUM', url: generateSearchUrl('Leonardo AI') },
+    { name: 'Playground AI', description: 'Un generatore molto popolare che genera immagini pertinenti.', pricing: 'FREEMIUM', url: generateSearchUrl('Playground AI') },
+    { name: 'Neural Canvas', description: 'Questo generatore di fumetti può essere usato per creare il tuo fumetto personalizzato.', pricing: 'PAID', url: generateSearchUrl('Neural Canvas') },
+    { name: 'Microsoft Designer', description: 'Grafica di marketing generata da AI per visuali raffinate e di alta qualità.', pricing: 'FREEMIUM', url: generateSearchUrl('Microsoft Designer') },
+    { name: 'Skybox Lab', description: 'Genera prototipi di 1536 x 3278 pixel per skybox panoramiche.', pricing: 'FREE', url: generateSearchUrl('Skybox Lab') },
+    { name: 'Deep AI', description: 'Un generatore di immagini semplice e gratuito con molte possibilità di modifica.', pricing: 'FREE', url: generateSearchUrl('Deep AI') },
+    { name: 'RocketAI', description: 'Crea e modifica immagini per i tuoi siti e-commerce.', pricing: 'FREE', url: generateSearchUrl('RocketAI') },
+    { name: 'Image To Meme', description: 'Trasforma un\'immagine in un meme tempestivo all\'istante.', pricing: 'FREEMIUM', url: generateSearchUrl('Image To Meme') },
+    { name: 'AI Emojis Generator', description: 'Genera i tuoi emoji personalizzati da un prompt.', pricing: 'FREE', url: generateSearchUrl('AI Emojis Generator') },
+    { name: 'Artificial Art', description: 'Un generatore di immagini artistiche e illustrazioni alimentato da AI con molteplici impostazioni.', pricing: 'FREE', url: generateSearchUrl('Artificial Art') },
+    { name: 'Stock AI', description: 'Crea immagini per tutte le tue esigenze in modo rapido e semplice.', pricing: 'FREEMIUM', url: generateSearchUrl('Stock AI') },
+    { name: 'IconLab AI', description: 'Un generatore AI per la produzione automatizzata e personalizzata di icone per applicazioni.', pricing: 'PAID', url: generateSearchUrl('IconLab AI') },
+    { name: 'AnimeAI App', description: 'Genera avatar in stile anime da una delle tue immagini, con una varietà di stili personalizzati.', pricing: 'PAID', url: generateSearchUrl('AnimeAI App') },
+    { name: 'Image Mixer', description: 'Combina diverse immagini per creare un\'illustrazione completamente nuova.', pricing: 'FREE', url: generateSearchUrl('Image Mixer') }
   ],
   'chat-assistants': [
-    { name: 'ChatGPT', description: 'The most popular conversational assistant in the world.', pricing: 'FREE', url: generateSearchUrl('ChatGPT') },
-    { name: 'Bard AI', description: 'A potential competitor for the AI ChatGPT.', pricing: 'FREE', url: generateSearchUrl('Bard AI') },
-    { name: 'Microsoft Bing', description: 'ChatGPT AI-powered the new Bing search engine.', pricing: 'FREE', url: generateSearchUrl('Microsoft Bing AI') },
-    { name: 'Poe', description: 'A Quora-powered AI that can answer any question you may have.', pricing: 'PAID', url: generateSearchUrl('Poe AI') },
-    { name: 'ChatSonic', description: 'A chatbot attempting to compete with ChatGPT.', pricing: 'FREE', url: generateSearchUrl('ChatSonic') },
-    { name: 'Microsoft Copilot', description: 'A chatbot attempting to compete with ChatGPT.', pricing: 'FREE', url: generateSearchUrl('Microsoft Copilot') },
-    { name: 'MemoryGPT', description: 'An AI that is similar to ChatGPT but has a much longer memory.', pricing: 'FREE', url: generateSearchUrl('MemoryGPT') },
-    { name: 'Guanaco AI', description: 'A multilingual conversational chatbot trained on a 7B parameter model.', pricing: 'FREE', url: generateSearchUrl('Guanaco AI') },
-    { name: 'StupidGPT', description: 'An AI who is always up for a conversation but speaks nonsense.', pricing: 'FREE', url: generateSearchUrl('StupidGPT') },
-    { name: 'Open Assistant', description: 'An open source AI chat bot capable of answering a wide range of questions.', pricing: 'FREE', url: generateSearchUrl('Open Assistant') },
-    { name: 'Claude AI', description: 'Anthropic, with support from Google, developed a substitute AI assistant to ChatGPT.', pricing: 'FREE', url: generateSearchUrl('Claude AI') },
-    { name: 'Grok', description: 'It provides you with responses based on data collected in real time from X users.', pricing: 'FREEMIUM', url: generateSearchUrl('Grok AI') },
-    { name: 'YouChat', description: 'A chatbot to help you with text, image, video, and news searches.', pricing: 'FREE', url: generateSearchUrl('YouChat') },
-    { name: 'Mistral AI', description: 'An open-source generating text AI model.', pricing: 'FREE', url: generateSearchUrl('Mistral AI') },
-    { name: 'Amazon Q', description: 'An AI assistant designed specifically to support you in your work or professional duties.', pricing: 'PAID', url: generateSearchUrl('Amazon Q') },
-    { name: 'Andi', description: 'The assistant who acts as a search engine and responds to all of your inquiries.', pricing: 'FREE', url: generateSearchUrl('Andi AI') },
-    { name: 'Jeeves', description: 'An AI platform that functions to a search engine and lets you produce various content.', pricing: 'FREE', url: generateSearchUrl('Jeeves AI') },
-    { name: 'Gemini', description: 'Google\'s AI is capable of surpassing OpenAI\'s ChatGPT-4.', pricing: 'FREE', url: generateSearchUrl('Gemini AI') },
-    { name: 'StableLM', description: 'Potential AI replacement for ChatGPT that is available for free.', pricing: 'FREE', url: generateSearchUrl('StableLM') },
-    { name: 'HeyPi', description: 'You can engage in free discussion with a chatbot that sounds like ChatGPT.', pricing: 'FREE', url: generateSearchUrl('HeyPi') }
+    { name: 'ChatGPT', description: 'L\'assistente conversazionale più popolare al mondo.', pricing: 'FREE', url: generateSearchUrl('ChatGPT') },
+    { name: 'Bard AI', description: 'Un potenziale concorrente per l\'AI ChatGPT.', pricing: 'FREE', url: generateSearchUrl('Bard AI') },
+    { name: 'Microsoft Bing', description: 'Il nuovo motore di ricerca Bing alimentato da ChatGPT AI.', pricing: 'FREE', url: generateSearchUrl('Microsoft Bing AI') },
+    { name: 'Poe', description: 'Un\'AI alimentata da Quora che può rispondere a qualsiasi domanda tu possa avere.', pricing: 'PAID', url: generateSearchUrl('Poe AI') },
+    { name: 'ChatSonic', description: 'Un chatbot che cerca di competere con ChatGPT.', pricing: 'FREE', url: generateSearchUrl('ChatSonic') },
+    { name: 'Microsoft Copilot', description: 'Un chatbot che cerca di competere con ChatGPT.', pricing: 'FREE', url: generateSearchUrl('Microsoft Copilot') },
+    { name: 'MemoryGPT', description: 'Un\'AI simile a ChatGPT ma con una memoria molto più lunga.', pricing: 'FREE', url: generateSearchUrl('MemoryGPT') },
+    { name: 'Guanaco AI', description: 'Un chatbot conversazionale multilingue addestrato su un modello a 7B parametri.', pricing: 'FREE', url: generateSearchUrl('Guanaco AI') },
+    { name: 'StupidGPT', description: 'Un\'AI sempre disponibile per una conversazione ma che dice sciocchezze.', pricing: 'FREE', url: generateSearchUrl('StupidGPT') },
+    { name: 'Open Assistant', description: 'Un chatbot AI open source capace di rispondere a un\'ampia gamma di domande.', pricing: 'FREE', url: generateSearchUrl('Open Assistant') },
+    { name: 'Claude AI', description: 'Anthropic, con il supporto di Google, ha sviluppato un assistente AI alternativo a ChatGPT.', pricing: 'FREE', url: generateSearchUrl('Claude AI') },
+    { name: 'Grok', description: 'Ti fornisce risposte basate su dati raccolti in tempo reale dagli utenti di X.', pricing: 'FREEMIUM', url: generateSearchUrl('Grok AI') },
+    { name: 'YouChat', description: 'Un chatbot per aiutarti con ricerche di testo, immagini, video e notizie.', pricing: 'FREE', url: generateSearchUrl('YouChat') },
+    { name: 'Mistral AI', description: 'Un modello AI open source per la generazione di testo.', pricing: 'FREE', url: generateSearchUrl('Mistral AI') },
+    { name: 'Amazon Q', description: 'Un assistente AI progettato specificamente per supportarti nel tuo lavoro o doveri professionali.', pricing: 'PAID', url: generateSearchUrl('Amazon Q') },
+    { name: 'Andi', description: 'L\'assistente che funge da motore di ricerca e risponde a tutte le tue richieste.', pricing: 'FREE', url: generateSearchUrl('Andi AI') },
+    { name: 'Jeeves', description: 'Una piattaforma AI che funziona come motore di ricerca e ti permette di produrre vari contenuti.', pricing: 'FREE', url: generateSearchUrl('Jeeves AI') },
+    { name: 'Gemini', description: 'L\'AI di Google è capace di superare ChatGPT-4 di OpenAI.', pricing: 'FREE', url: generateSearchUrl('Gemini AI') },
+    { name: 'StableLM', description: 'Potenziale sostituto AI per ChatGPT disponibile gratuitamente.', pricing: 'FREE', url: generateSearchUrl('StableLM') },
+    { name: 'HeyPi', description: 'Puoi intrattenere discussioni gratuite con un chatbot che suona come ChatGPT.', pricing: 'FREE', url: generateSearchUrl('HeyPi') }
   ],
   'writing-seo': [
     { name: 'WriteSonic', description: 'Writing assistant and text content generator for SEO.', pricing: 'FREEMIUM', url: generateSearchUrl('WriteSonic') },
@@ -499,6 +499,8 @@ export function filterAIs(ais, searchTerm, selectedCategory, selectedPricing) {
     return matchesSearch && matchesCategory && matchesPricing;
   });
 }
+
+
 
 
 

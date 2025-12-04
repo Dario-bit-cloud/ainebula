@@ -11,6 +11,47 @@ export const isInviteModalOpen = writable(false);
 export const isUserMenuOpen = writable(false);
 export const isSidebarOpen = writable(false);
 export const isSidebarCollapsed = writable(false);
+
+// Store per la larghezza della sidebar (ridimensionabile)
+function createSidebarWidth() {
+  const defaultWidth = 260;
+  const minWidth = 200;
+  const maxWidth = 500;
+  
+  // Carica la larghezza salvata da localStorage
+  let savedWidth = defaultWidth;
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('sidebarWidth');
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) {
+        savedWidth = parsed;
+      }
+    }
+  }
+  
+  const { set, subscribe } = writable(savedWidth);
+  
+  return {
+    subscribe,
+    set: (width) => {
+      const clamped = Math.max(minWidth, Math.min(maxWidth, width));
+      set(clamped);
+      // Salva in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sidebarWidth', clamped.toString());
+      }
+    },
+    reset: () => {
+      set(defaultWidth);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sidebarWidth', defaultWidth.toString());
+      }
+    }
+  };
+}
+
+export const sidebarWidth = createSidebarWidth();
 export const isPremiumModalOpen = writable(false);
 export const isAISettingsModalOpen = writable(false);
 export const isPromptLibraryModalOpen = writable(false);
