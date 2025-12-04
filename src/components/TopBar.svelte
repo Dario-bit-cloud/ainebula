@@ -208,14 +208,6 @@
               <img src={selected.logo} alt="{selected.name} logo" class="model-logo-small" />
             {/if}
             {selected.name}
-            {#if selected.limitedTimeFree}
-              <span class="limited-time-badge-small" title="Gratuito per tempo limitato">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <polyline points="12 6 12 12 16 14"/>
-                </svg>
-              </span>
-            {/if}
           {:else}
             Flash Thinking
           {/if}
@@ -257,15 +249,6 @@
                     {#if model.premium}
                       <span class="premium-badge" class:premium={model.requiredPlan === 'premium'} class:pro={model.requiredPlan === 'pro'} class:max={model.requiredPlan === 'max'}>
                         {model.requiredPlan === 'premium' ? 'PREMIUM' : (model.requiredPlan === 'pro' ? 'PRO' : 'MAX')}
-                      </span>
-                    {/if}
-                    {#if model.limitedTimeFree}
-                      <span class="limited-time-badge" title="Gratuito per tempo limitato">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <circle cx="12" cy="12" r="10"/>
-                          <polyline points="12 6 12 12 16 14"/>
-                        </svg>
-                        Gratuito
                       </span>
                     {/if}
                   </div>
@@ -931,59 +914,6 @@
     height: 9px;
   }
   
-  .limited-time-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 6px;
-    border-radius: var(--md-sys-shape-corner-extra-small);
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    line-height: 1.1;
-    margin-left: 4px;
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
-    border: 1px solid rgba(251, 191, 36, 0.4);
-    color: #fbbf24;
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-  
-  .limited-time-badge svg {
-    width: 9px;
-    height: 9px;
-  }
-  
-  .limited-time-badge svg {
-    width: 12px;
-    height: 12px;
-  }
-  
-  .limited-time-badge-small {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 6px;
-    padding: 2px 4px;
-    border-radius: 3px;
-    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-    color: #8b4513;
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-  
-  .limited-time-badge-small svg {
-    width: 10px;
-    height: 10px;
-  }
-  
-  @keyframes pulse-glow {
-    0%, 100% {
-      opacity: 1;
-      box-shadow: 0 0 0 0 rgba(253, 160, 133, 0.7);
-    }
-    50% {
-      opacity: 0.9;
-      box-shadow: 0 0 0 3px rgba(253, 160, 133, 0.3);
-    }
-  }
   
   .feature-badge {
     display: inline-flex;
