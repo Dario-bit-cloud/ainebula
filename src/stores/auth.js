@@ -34,36 +34,7 @@ export async function initAuth() {
       clearUser();
     }
     
-    // Fallback a Supabase Auth (se configurato)
-    try {
-      const { getCurrentUser, getSession, syncUserToDatabase } = await import('../services/supabaseAuthService.js');
-      const supabaseUser = await getCurrentUser();
-      const session = await getSession();
-      
-      if (supabaseUser && session) {
-        console.log('✅ [AUTH STORE] Sessione Supabase trovata');
-        
-        // Sincronizza l'utente con il database
-        const syncResult = await syncUserToDatabase(supabaseUser);
-        
-        if (syncResult.success && syncResult.token) {
-          localStorage.setItem('auth_token', syncResult.token);
-        }
-        
-        // Aggiorna lo stato utente
-        const formattedUser = {
-          id: supabaseUser.id,
-          email: supabaseUser.email,
-          username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0]
-        };
-        
-        await setUser(formattedUser);
-        isLoading.set(false);
-        return;
-      }
-    } catch (supabaseError) {
-      console.log('ℹ️ [AUTH STORE] Supabase non disponibile:', supabaseError.message);
-    }
+    // Supabase rimosso - ora usiamo solo Neon Database
     
     // Nessuna sessione trovata
     console.log('ℹ️ [AUTH STORE] Nessuna sessione trovata, utente non autenticato');
