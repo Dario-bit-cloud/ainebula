@@ -10,7 +10,7 @@
   import { createDataExport, downloadDataExport } from '../services/dataExportService.js';
   import { deleteAllChatsFromDatabase } from '../services/chatService.js';
   import { loadChatsBackup, exportChatsBackup, importChatsBackup } from '../services/backupChatService.js';
-  import { chats, loadChats } from '../stores/chat.js';
+  import { loadChats } from '../stores/chat.js';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { showConfirm, showAlert, showPrompt } from '../services/dialogService.js';
