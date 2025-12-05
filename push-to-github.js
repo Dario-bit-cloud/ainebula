@@ -27,9 +27,14 @@ try {
   const status = execSync('git status --porcelain', { encoding: 'utf-8' });
   
   if (status.trim()) {
-    console.log('\n⚠️  Ci sono modifiche non committate!');
-    console.log('Eseguire prima: git add . && git commit -m "messaggio"');
-    process.exit(1);
+    console.log('\n📝 Trovate modifiche non committate!');
+    console.log('📦 Aggiunta di tutti i file modificati...');
+    execSync('git add -A', { stdio: 'inherit' });
+    
+    console.log('\n💾 Creazione commit...');
+    const commitMessage = process.argv[2] || 'Update: Multiple improvements and new features';
+    execSync(`git commit -m "${commitMessage}"`, { stdio: 'inherit' });
+    console.log('✅ Commit creato con successo!');
   }
   
   // Verifica se ci sono commit da pushare
@@ -45,7 +50,7 @@ try {
   
   // Esegui il push
   console.log('\n🚀 Esecuzione push...\n');
-  execSync('git push origin main', { stdio: 'inherit' });
+  execSync('git push origin main -v', { stdio: 'inherit' });
   
   console.log('\n✅ Push completato con successo!');
   

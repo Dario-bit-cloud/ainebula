@@ -62,10 +62,26 @@
   let intersectionObserver = null;
   const MESSAGE_VIEWPORT_MARGIN = 5; // Carica 5 messaggi prima e dopo la viewport
   
+  // Variabili per il modello corrente
+  let currentModel = null;
+  let hasWebSearch = false;
+  let allowsPremiumFeatures = false;
+  
   // Verifica se il modello selezionato supporta web search
-  $: currentModel = $availableModels.find(m => m.id === $selectedModel);
-  $: hasWebSearch = currentModel?.webSearch || false;
-  $: allowsPremiumFeatures = currentModel?.allowsPremiumFeatures || false;
+  $: {
+    try {
+      const models = $availableModels || [];
+      const selected = $selectedModel;
+      currentModel = models.find(m => m.id === selected) || null;
+      hasWebSearch = currentModel?.webSearch || false;
+      allowsPremiumFeatures = currentModel?.allowsPremiumFeatures || false;
+    } catch (error) {
+      logError('Error accessing models store:', error);
+      currentModel = null;
+      hasWebSearch = false;
+      allowsPremiumFeatures = false;
+    }
+  }
   
   // Verifica se il modello corrente supporta thinking mode (solo Flash normale)
   $: supportsThinkingMode = $selectedModel === 'gemini-2.5-flash-preview-09-2025';

@@ -14,18 +14,24 @@ $status = git status --short
 if ($status) {
     Write-Host "File da committare:" -ForegroundColor Green
     Write-Host $status
+    Write-Host ""
+    
+    Write-Host "3. Commit..." -ForegroundColor Yellow
+    $commitMessage = if ($args[0]) { $args[0] } else { "Update: Multiple improvements and new features" }
+    $commitOutput = git commit -m $commitMessage 2>&1
+    Write-Host $commitOutput
+    Write-Host ""
 } else {
     Write-Host "Nessun file da committare" -ForegroundColor Gray
+    Write-Host ""
+    
+    Write-Host "3. Commit..." -ForegroundColor Yellow
+    Write-Host "Nessun commit necessario" -ForegroundColor Gray
+    Write-Host ""
 }
-Write-Host ""
-
-Write-Host "3. Commit..." -ForegroundColor Yellow
-$commitOutput = git commit -m "Fix: Sidebar responsive mobile e personalizzazione popup - miglioramenti UX" 2>&1
-Write-Host $commitOutput
-Write-Host ""
 
 Write-Host "4. Push su GitHub..." -ForegroundColor Yellow
-$pushOutput = git push origin main 2>&1
+$pushOutput = git push origin main -v 2>&1
 Write-Host $pushOutput
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

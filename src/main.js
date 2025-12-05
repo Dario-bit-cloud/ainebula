@@ -177,9 +177,66 @@ if (typeof window !== 'undefined') {
   document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 }
 
-const app = mount(App, {
-  target: document.getElementById('app')
-});
+// Assicurati che il DOM sia pronto prima di montare l'app
+let appInstance = null;
 
-export default app;
+function initApp() {
+  const appElement = document.getElementById('app');
+  
+  if (!appElement) {
+    console.error('❌ [MAIN] Elemento #app non trovato nel DOM');
+    // Riprova dopo un breve delay
+    setTimeout(initApp, 100);
+    return;
+  }
+  
+  try {
+    // Usa requestAnimationFrame per assicurarsi che il DOM sia completamente pronto
+    // e che tutti gli script siano stati eseguiti
+    requestAnimationFrame(() => {
+      try {
+        appInstance = mount(App, {
+          target: appElement
+        });
+      } catch (error) {
+        console.error('❌ [MAIN] Errore durante il mount dell\'app:', error);
+        console.error('Stack trace:', error.stack);
+        // Mostra un messaggio di errore all'utente
+        appElement.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
+            <h1 style="color: #ff4444; margin-bottom: 20px;">Errore di caricamento</h1>
+            <p style="color: #888; margin-bottom: 20px;">Si è verificato un errore durante il caricamento dell'applicazione.</p>
+            <p style="color: #666; font-size: 12px; margin-bottom: 20px;">${error.message}</p>
+            <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+              Ricarica pagina
+            </button>
+          </div>
+        `;
+      }
+    });
+  } catch (error) {
+    console.error('❌ [MAIN] Errore durante inizializzazione:', error);
+    appElement.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
+        <h1 style="color: #ff4444; margin-bottom: 20px;">Errore di caricamento</h1>
+        <p style="color: #888; margin-bottom: 20px;">Si è verificato un errore durante il caricamento dell'applicazione.</p>
+        <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+          Ricarica pagina
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Inizializza l'app quando il DOM è pronto
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+  } else {
+    // DOM già pronto, usa requestAnimationFrame per assicurarsi che tutto sia inizializzato
+    requestAnimationFrame(initApp);
+  }
+}
+
+export default appInstance;
 
