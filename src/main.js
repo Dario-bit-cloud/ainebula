@@ -177,10 +177,42 @@ if (typeof window !== 'undefined') {
   document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 }
 
+// Funzione per inizializzare tutti gli store prima del mount
+async function initializeStores() {
+  // Importa e inizializza tutti gli store principali
+  // Questo forza l'inizializzazione degli store prima che i componenti li usino
+  try {
+    await Promise.all([
+      import('./stores/app.js'),
+      import('./stores/auth.js'),
+      import('./stores/chat.js'),
+      import('./stores/user.js'),
+      import('./stores/models.js'),
+      import('./stores/payment.js'),
+      import('./stores/thinkingMode.js'),
+      import('./stores/abortController.js'),
+      import('./stores/devMode.js'),
+      import('./stores/tokenInfo.js'),
+      import('./stores/language.js'),
+      import('./stores/sidebarLayout.js'),
+      import('./stores/projects.js'),
+      import('./stores/accounts.js')
+    ]);
+    
+    // Aspetta un tick per assicurarsi che tutti gli store siano completamente inizializzati
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
+    return true;
+  } catch (error) {
+    console.error('❌ [MAIN] Errore durante inizializzazione store:', error);
+    return false;
+  }
+}
+
 // Assicurati che il DOM sia pronto prima di montare l'app
 let appInstance = null;
 
-function initApp() {
+async function initApp() {
   const appElement = document.getElementById('app');
   
   if (!appElement) {
@@ -191,35 +223,40 @@ function initApp() {
   }
   
   try {
-    // Usa requestAnimationFrame per assicurarsi che il DOM sia completamente pronto
-    // e che tutti gli script siano stati eseguiti
-    requestAnimationFrame(() => {
-      try {
-        appInstance = mount(App, {
-          target: appElement
-        });
-      } catch (error) {
-        console.error('❌ [MAIN] Errore durante il mount dell\'app:', error);
-        console.error('Stack trace:', error.stack);
-        // Mostra un messaggio di errore all'utente
-        appElement.innerHTML = `
-          <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
-            <h1 style="color: #ff4444; margin-bottom: 20px;">Errore di caricamento</h1>
-            <p style="color: #888; margin-bottom: 20px;">Si è verificato un errore durante il caricamento dell'applicazione.</p>
-            <p style="color: #666; font-size: 12px; margin-bottom: 20px;">${error.message}</p>
-            <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
-              Ricarica pagina
-            </button>
-          </div>
-        `;
-      }
+    // STEP 1: Inizializza tutti gli store PRIMA del mount
+    console.log('🔧 [MAIN] Inizializzazione store...');
+    const storesInitialized = await initializeStores();
+    
+    if (!storesInitialized) {
+      throw new Error('Impossibile inizializzare gli store');
+    }
+    
+    console.log('✅ [MAIN] Store inizializzati');
+    
+    // STEP 2: Aspetta che il DOM sia completamente pronto
+    // Usa un doppio requestAnimationFrame per assicurarsi che tutto sia inizializzato
+    await new Promise(resolve => requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    }));
+    
+    // STEP 3: Monta l'app solo quando tutto è pronto
+    console.log('🚀 [MAIN] Montaggio app...');
+    appInstance = mount(App, {
+      target: appElement
     });
+    
+    console.log('✅ [MAIN] App montata con successo');
   } catch (error) {
-    console.error('❌ [MAIN] Errore durante inizializzazione:', error);
+    console.error('❌ [MAIN] Errore durante il mount dell\'app:', error);
+    console.error('Stack trace:', error.stack);
+    // Mostra un messaggio di errore all'utente
     appElement.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
         <h1 style="color: #ff4444; margin-bottom: 20px;">Errore di caricamento</h1>
         <p style="color: #888; margin-bottom: 20px;">Si è verificato un errore durante il caricamento dell'applicazione.</p>
+        <p style="color: #666; font-size: 12px; margin-bottom: 20px;">${error.message}</p>
         <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
           Ricarica pagina
         </button>
@@ -233,7 +270,7 @@ if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);
   } else {
-    // DOM già pronto, usa requestAnimationFrame per assicurarsi che tutto sia inizializzato
+    // DOM già pronto, aspetta comunque un frame per assicurarsi che tutto sia inizializzato
     requestAnimationFrame(initApp);
   }
 }

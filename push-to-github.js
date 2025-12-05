@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 // Script per fare push al repository GitHub corretto
-import { execSync } from 'child_process';
+import { execSync, execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 const REPO_URL = 'https://github.com/Dario-bit-cloud/ainebula.git';
 
 console.log('🔍 Verifica configurazione repository...\n');
 
+(async () => {
 try {
   // Verifica il remote
   const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
@@ -32,7 +36,7 @@ try {
     execSync('git add -A', { stdio: 'inherit' });
     
     console.log('\n💾 Creazione commit...');
-    // Bug 1 Fix: Usa spawn con argomenti separati invece di interpolare stringhe
+    // Bug 1 Fix: Usa execFile con argomenti separati invece di interpolare stringhe
     // Questo previene command injection attraverso process.argv[2]
     const commitMessage = process.argv[2] || 'Update: Multiple improvements and new features';
     
@@ -43,35 +47,18 @@ try {
       .trim()
       .substring(0, 500); // Limita la lunghezza
     
-    // Usa spawn con argomenti separati per evitare command injection
-    return new Promise((resolve, reject) => {
-      const gitCommit = spawn('git', ['commit', '-m', sanitizedMessage], {
-        stdio: 'inherit',
-        shell: false // Non usare shell per evitare injection
+    // Usa execFile con argomenti separati per evitare command injection
+    // execFile non usa shell, quindi è più sicuro
+    try {
+      await execFileAsync('git', ['commit', '-m', sanitizedMessage], {
+        stdio: 'inherit'
       });
-      
-      gitCommit.on('close', (code) => {
-        if (code === 0) {
-          console.log('✅ Commit creato con successo!');
-          resolve();
-        } else {
-          reject(new Error(`Git commit failed with code ${code}`));
-        }
-      });
-      
-      gitCommit.on('error', (error) => {
-        reject(error);
-      });
-    }).then(() => {
-      // Continua con il resto dello script
-      return continuePush();
-    }).catch((error) => {
-      throw error;
-    });
+      console.log('✅ Commit creato con successo!');
+    } catch (error) {
+      console.error('❌ Errore durante la creazione del commit:', error.message);
+      process.exit(1);
+    }
   }
-  
-  // Funzione helper per continuare il push dopo il commit
-  function continuePush() {
   
   // Verifica se ci sono commit da pushare
   const unpushedCommits = execSync('git log origin/main..HEAD --oneline', { encoding: 'utf-8' });
@@ -98,3 +85,4 @@ try {
   console.error('   3. Verifica di avere i permessi sul repository');
   process.exit(1);
 }
+})();
