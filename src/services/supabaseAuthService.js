@@ -188,9 +188,14 @@ export async function getSession() {
 /**
  * Verifica se l'utente è autenticato
  */
-export function isAuthenticated() {
-  const session = supabase.auth.getSession();
-  return !!session;
+export async function isAuthenticated() {
+  try {
+    const session = await getSession();
+    return !!session;
+  } catch (error) {
+    logError('❌ [SUPABASE AUTH] Errore isAuthenticated:', error);
+    return false;
+  }
 }
 
 

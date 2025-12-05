@@ -84,16 +84,52 @@ export function hasActiveSubscription() {
 }
 
 // Funzione per verificare se l'utente ha un piano specifico o superiore
+// Gerarchia piani: pro (30€/mese) < max (300€/mese)
 export function hasPlanOrHigher(requiredPlan) {
   const userData = get(user);
   if (!hasActiveSubscription()) return false;
   
-  const planHierarchy = { 'premium': 1, 'pro': 2, 'max': 3 };
+  const planHierarchy = { 'pro': 1, 'max': 2 };
   const userPlan = userData.subscription?.plan;
   
   if (!userPlan || !planHierarchy[userPlan]) return false;
   
   return planHierarchy[userPlan] >= planHierarchy[requiredPlan];
+}
+
+// Funzione per ottenere i limiti del piano corrente
+export function getPlanLimits() {
+  const userData = get(user);
+  const plan = userData.subscription?.plan;
+  
+  const limits = {
+    free: {
+      messagesPerDay: 50,
+      maxFileSize: 10, // MB
+      historyDays: 7,
+      premiumModels: false,
+      apiAccess: false,
+      prioritySupport: false
+    },
+    pro: {
+      messagesPerDay: 500,
+      maxFileSize: 100, // MB
+      historyDays: -1, // illimitato
+      premiumModels: ['gpt-4.1'],
+      apiAccess: false,
+      prioritySupport: true
+    },
+    max: {
+      messagesPerDay: -1, // illimitato
+      maxFileSize: 500, // MB
+      historyDays: -1, // illimitato
+      premiumModels: ['gpt-4.1', 'o3'],
+      apiAccess: true,
+      prioritySupport: true
+    }
+  };
+  
+  return limits[plan] || limits.free;
 }
 
 // Funzione helper per aggiornare i dati utente (da chiamare dopo il login)

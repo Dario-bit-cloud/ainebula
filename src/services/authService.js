@@ -70,14 +70,19 @@ export async function verifySession() {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    try {
+      // Crea un AbortController per gestire il timeout in modo compatibile
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 secondi
+      
+      try {
       const response = await fetch(`${API_BASE_URL}/me`, {
         method: 'GET',
         headers,
         credentials: 'include', // Importante: include i cookie nella richiesta
-        // Timeout per evitare attese infinite
-        signal: AbortSignal.timeout(5000) // 5 secondi
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       console.log('📥 [VERIFY SESSION] Risposta:', {
         status: response.status,
@@ -115,10 +120,14 @@ export async function verifySession() {
       
       // Verifica che la risposta sia valida e contenga un utente con ID
       if (data && data.success && data.user && data.user.id) {
-        // Se il server ha restituito un token (potrebbe essere dal cookie), salviamolo
-        if (data.token && !token) {
-          token = data.token;
-          localStorage.setItem('auth_token', token);
+        // Se il server ha restituito un token (potrebbe essere dal cookie o rinnovato), aggiorniamolo
+        if (data.token) {
+          // Aggiorna il token se è stato rinnovato o se non c'era prima
+          if (data.token !== token) {
+            token = data.token;
+            localStorage.setItem('auth_token', token);
+            console.log('🔄 [VERIFY SESSION] Token aggiornato nel localStorage');
+          }
         }
         
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -155,8 +164,9 @@ export async function verifySession() {
         };
       }
     } catch (fetchError) {
+      clearTimeout(timeoutId);
       // Gestisci errori di rete (server non disponibile, timeout, etc.)
-      if (fetchError.name === 'AbortError' || fetchError.name === 'TypeError') {
+      if (fetchError.name === 'AbortError' || fetchError.name === 'TypeError' || fetchError.message?.includes('aborted')) {
         console.log('⚠️ [VERIFY SESSION] Server non disponibile o timeout:', fetchError.message);
         
         // Se c'è un token ma il server non risponde, mantieni i dati locali

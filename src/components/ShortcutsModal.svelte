@@ -1,6 +1,7 @@
 <script>
-  import { isShortcutsModalOpen } from '../stores/app.js';
+  import { isShortcutsModalOpen, isMobile } from '../stores/app.js';
   import { onMount } from 'svelte';
+  import { t } from '../stores/language.js';
   
   function closeModal() {
     isShortcutsModalOpen.set(false);
@@ -76,7 +77,7 @@
 
 {#if $isShortcutsModalOpen}
   <div class="modal-backdrop" on:click={handleBackdropClick}>
-    <div class="modal-content">
+    <div class="modal-content" class:mobile={$isMobile}>
       <div class="modal-header">
         <h2 class="modal-title">Tasti di scelta rapida</h2>
         <button class="close-button" on:click={closeModal}>
@@ -88,26 +89,53 @@
       </div>
       
       <div class="modal-body">
-        {#each shortcuts as category}
-          <div class="shortcut-category">
-            <h3 class="category-title">{category.category}</h3>
-            <div class="shortcut-list">
-              {#each category.items as item}
-                <div class="shortcut-item">
-                  <span class="shortcut-action">{item.action}</span>
-                  <div class="shortcut-keys">
-                    {#each item.keys as key, index}
-                      <kbd class="key">{formatKey(key)}</kbd>
-                      {#if index < item.keys.length - 1}
-                        <span class="key-separator">+</span>
-                      {/if}
-                    {/each}
-                  </div>
-                </div>
-              {/each}
+        {#if $isMobile}
+          <!-- Mobile: mostra messaggio informativo invece delle shortcuts -->
+          <div class="mobile-message">
+            <div class="mobile-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                <line x1="12" y1="18" x2="12.01" y2="18"/>
+              </svg>
+            </div>
+            <h3 class="mobile-title">Stai usando un dispositivo mobile</h3>
+            <p class="mobile-description">
+              Le scorciatoie da tastiera non sono disponibili su dispositivi mobili. 
+              Puoi usare i pulsanti e i gesti touch per navigare nell'app.
+            </p>
+            <div class="mobile-tips">
+              <h4>Suggerimenti:</h4>
+              <ul>
+                <li>Tocca il menu hamburger per aprire la sidebar</li>
+                <li>Scorri verso il basso per vedere la cronologia</li>
+                <li>Tieni premuto un messaggio per copiarlo</li>
+                <li>Usa il pulsante + per allegare file</li>
+              </ul>
             </div>
           </div>
-        {/each}
+        {:else}
+          <!-- Desktop: mostra le shortcuts normali -->
+          {#each shortcuts as category}
+            <div class="shortcut-category">
+              <h3 class="category-title">{category.category}</h3>
+              <div class="shortcut-list">
+                {#each category.items as item}
+                  <div class="shortcut-item">
+                    <span class="shortcut-action">{item.action}</span>
+                    <div class="shortcut-keys">
+                      {#each item.keys as key, index}
+                        <kbd class="key">{formatKey(key)}</kbd>
+                        {#if index < item.keys.length - 1}
+                          <span class="key-separator">+</span>
+                        {/if}
+                      {/each}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/each}
+        {/if}
       </div>
     </div>
   </div>
@@ -275,20 +303,83 @@
 
   @media (max-width: 768px) {
     .modal-backdrop {
-      align-items: center;
+      align-items: flex-end;
       justify-content: center;
       padding: 0;
     }
 
     .modal-content {
-      max-width: 90vw;
-      max-height: 85vh;
-      border-radius: 12px;
+      max-width: 100%;
+      width: 100%;
+      max-height: 70vh;
+      border-radius: 16px 16px 0 0;
     }
 
     .modal-body {
       padding: 20px 16px;
     }
+  }
+  
+  /* Stili per il messaggio mobile */
+  .mobile-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+    gap: 16px;
+  }
+  
+  .mobile-icon {
+    color: var(--md-sys-color-primary, #667eea);
+    opacity: 0.8;
+  }
+  
+  .mobile-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+  }
+  
+  .mobile-description {
+    font-size: 14px;
+    color: #a0a0a0;
+    line-height: 1.6;
+    margin: 0;
+    max-width: 300px;
+  }
+  
+  .mobile-tips {
+    width: 100%;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 8px;
+  }
+  
+  .mobile-tips h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0 12px 0;
+  }
+  
+  .mobile-tips ul {
+    margin: 0;
+    padding: 0 0 0 20px;
+    font-size: 13px;
+    color: #a0a0a0;
+    line-height: 1.8;
+  }
+  
+  .mobile-tips li {
+    margin-bottom: 4px;
+  }
+  
+  .modal-content.mobile {
+    max-height: 80vh;
   }
 </style>
 

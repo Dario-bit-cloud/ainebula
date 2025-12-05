@@ -694,9 +694,21 @@
     
     // Ottieni o crea chatId - createNewChat è veloce (solo store update)
     let chatId = $currentChatId;
-    if (!chatId) {
-      // Crea chat immediatamente (è veloce, non fa chiamate API sincrone)
+    let currentChatData = get(currentChat);
+    
+    // Se non c'è chatId o la chat corrente non esiste nello store, crea una nuova chat
+    if (!chatId || !currentChatData) {
+      // Crea una nuova chat immediatamente (è veloce, non fa chiamate API sincrone)
       chatId = await createNewChat();
+      // Attendi un momento per assicurarsi che la chat sia stata creata nello store
+      await tick();
+      currentChatData = get(currentChat);
+      
+      // Se ancora non esiste dopo il tick, aspetta un po' di più
+      if (!currentChatData) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        currentChatData = get(currentChat);
+      }
     }
     
     // Crea AbortController per poter fermare la generazione (prima di tutto)
@@ -735,14 +747,17 @@
     // Non aspettare setTimeout - procedi direttamente
     
     try {
-      // Ottieni i dati della chat - usa un piccolo timeout solo se necessario
-      let currentChatData = get(currentChat);
+      // Verifica che la chat esista ancora (potrebbe essere stata eliminata nel frattempo)
       if (!currentChatData) {
-        // Prova una volta con un micro-delay
-        await new Promise(resolve => setTimeout(resolve, 10));
         currentChatData = get(currentChat);
         if (!currentChatData) {
-          throw new Error('Chat corrente non disponibile');
+          // Se ancora non esiste, prova a creare una nuova chat
+          chatId = await createNewChat();
+          await tick();
+          currentChatData = get(currentChat);
+          if (!currentChatData) {
+            throw new Error('Impossibile creare o trovare una chat valida');
+          }
         }
       }
       

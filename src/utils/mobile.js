@@ -129,16 +129,62 @@ export function preventPullToRefresh() {
 export function handleVirtualKeyboard() {
   if (typeof window === 'undefined' || !isTouchDevice()) return;
   
-  const inputElements = document.querySelectorAll('input, textarea');
-  
-  inputElements.forEach(input => {
+  // Gestione iniziale per elementi esistenti
+  const setupInputHandler = (input) => {
     input.addEventListener('focus', () => {
+      // Aggiungi classe al body per indicare che la tastiera è aperta
+      document.body.classList.add('keyboard-open');
+      
       // Scrolla l'input in vista quando riceve focus
       setTimeout(() => {
         input.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 300);
     });
+    
+    input.addEventListener('blur', () => {
+      // Rimuovi classe quando la tastiera si chiude
+      document.body.classList.remove('keyboard-open');
+    });
+  };
+  
+  // Applica a elementi esistenti
+  document.querySelectorAll('input, textarea').forEach(setupInputHandler);
+  
+  // Osserva nuovi elementi aggiunti al DOM
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+            setupInputHandler(node);
+          }
+          // Cerca anche all'interno di elementi aggiunti
+          node.querySelectorAll?.('input, textarea').forEach(setupInputHandler);
+        }
+      });
+    });
   });
+  
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Usa Visual Viewport API se disponibile per gestione più precisa
+  if ('visualViewport' in window) {
+    window.visualViewport.addEventListener('resize', () => {
+      // Quando la viewport cambia (tastiera aperta/chiusa)
+      const viewportHeight = window.visualViewport.height;
+      const windowHeight = window.innerHeight;
+      
+      if (viewportHeight < windowHeight * 0.75) {
+        // Tastiera probabilmente aperta
+        document.body.classList.add('keyboard-open');
+        document.documentElement.style.setProperty('--keyboard-height', `${windowHeight - viewportHeight}px`);
+      } else {
+        // Tastiera probabilmente chiusa
+        document.body.classList.remove('keyboard-open');
+        document.documentElement.style.setProperty('--keyboard-height', '0px');
+      }
+    });
+  }
 }
 
 /**

@@ -75,14 +75,14 @@ export const translations = {
     'active': 'Attivo',
     'inactive': 'Non attivo',
     'upgradePlan': 'Aggiorna piano',
-    'upgradeDescription': 'Sblocca funzionalità premium con un abbonamento Pro o Massimo',
+    'upgradeDescription': 'Passa a Nebula Pro (30€/mese) o Nebula Max (300€/mese)',
     'upgrade': 'Aggiorna',
     'manageSubscription': 'Gestisci abbonamento',
-    'manageDescription': 'Modifica o cancella il tuo abbonamento premium',
+    'manageDescription': 'Modifica o cancella il tuo abbonamento',
     'manage': 'Gestisci',
     'free': 'Gratuito',
-    'pro': 'Pro',
-    'max': 'Massimo',
+    'pro': 'Nebula Pro',
+    'max': 'Nebula Max',
     'loadingSubscription': 'Caricamento informazioni abbonamento...',
     'sharedLinks': 'Link condivisi',
     'exportData': 'Esporta dati',
@@ -163,9 +163,9 @@ export const translations = {
     'logout': 'Esci',
     
     // Premium
-    'premiumFeatures': 'Funzionalità Premium',
-    'upgradeToPro': 'Passa a Pro',
-    'upgradeToMax': 'Passa a Massimo',
+    'premiumFeatures': 'Funzionalità Pro e Max',
+    'upgradeToPro': 'Passa a Nebula Pro',
+    'upgradeToMax': 'Passa a Nebula Max',
     
     // Errors
     'error': 'Errore',
@@ -292,14 +292,14 @@ export const translations = {
     'active': 'Active',
     'inactive': 'Inactive',
     'upgradePlan': 'Upgrade plan',
-    'upgradeDescription': 'Unlock premium features with a Pro or Max subscription',
+    'upgradeDescription': 'Upgrade to Nebula Pro (€30/month) or Nebula Max (€300/month)',
     'upgrade': 'Upgrade',
     'manageSubscription': 'Manage subscription',
-    'manageDescription': 'Modify or cancel your premium subscription',
+    'manageDescription': 'Modify or cancel your subscription',
     'manage': 'Manage',
     'free': 'Free',
-    'pro': 'Pro',
-    'max': 'Max',
+    'pro': 'Nebula Pro',
+    'max': 'Nebula Max',
     'loadingSubscription': 'Loading subscription information...',
     'sharedLinks': 'Shared links',
     'exportData': 'Export data',
@@ -380,9 +380,9 @@ export const translations = {
     'logout': 'Log out',
     
     // Premium
-    'premiumFeatures': 'Premium Features',
-    'upgradeToPro': 'Upgrade to Pro',
-    'upgradeToMax': 'Upgrade to Max',
+    'premiumFeatures': 'Pro and Max Features',
+    'upgradeToPro': 'Upgrade to Nebula Pro',
+    'upgradeToMax': 'Upgrade to Nebula Max',
     
     // Errors
     'error': 'Error',

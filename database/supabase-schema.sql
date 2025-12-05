@@ -86,11 +86,12 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabella per gli abbonamenti (deprecata - ora usa Clerk Billing)
+-- Tabella per gli abbonamenti
+-- Piani disponibili: 'free', 'pro' (30€/mese), 'max' (300€/mese)
 CREATE TABLE IF NOT EXISTS subscriptions (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan VARCHAR(50) NOT NULL, -- 'free', 'premium', 'pro', 'max'
+    plan VARCHAR(50) NOT NULL, -- 'free', 'pro', 'max'
     status VARCHAR(20) NOT NULL DEFAULT 'active', -- 'active', 'cancelled', 'expired', 'pending'
     started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP WITH TIME ZONE,
@@ -279,6 +280,8 @@ CREATE TRIGGER update_shared_links_updated_at BEFORE UPDATE ON shared_links
 -- Dopo aver eseguito questo script, verifica le tabelle create:
 -- SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;
 -- ============================================
+
+
 
 
 

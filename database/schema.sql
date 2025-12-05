@@ -81,10 +81,11 @@ CREATE TABLE IF NOT EXISTS user_settings (
 );
 
 -- Tabella per gli abbonamenti
+-- Piani disponibili: 'free', 'pro' (30€/mese), 'max' (300€/mese)
 CREATE TABLE IF NOT EXISTS subscriptions (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan VARCHAR(50) NOT NULL, -- 'free', 'premium', 'pro', 'max'
+    plan VARCHAR(50) NOT NULL, -- 'free', 'pro', 'max'
     status VARCHAR(20) NOT NULL DEFAULT 'active', -- 'active', 'cancelled', 'expired', 'pending'
     started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP WITH TIME ZONE,

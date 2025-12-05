@@ -13,7 +13,75 @@ import QRCode from 'qrcode';
 import { setAuthCookie, clearAuthCookie } from '../utils/cookies.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// Valida che JWT_SECRET sia configurato in produzione
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'your-secret-key-change-in-production') {
+  console.error('❌ [AUTH] JWT_SECRET non configurato! Configurare JWT_SECRET in produzione.');
+}
+
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 giorni
+const TOKEN_REFRESH_THRESHOLD = 24 * 60 * 60 * 1000; // 1 giorno prima della scadenza
+
+// Store per rate limiting (in produzione usare Redis o database)
+const rateLimitStore = new Map();
+
+/**
+ * Pulizia automatica delle sessioni scadute
+ * Viene eseguita periodicamente per mantenere il database pulito
+ * @param {Function} sql - Funzione SQL per eseguire query
+ */
+async function cleanupExpiredSessions(sql) {
+  try {
+    const result = await sql`
+      DELETE FROM sessions
+      WHERE expires_at < NOW()
+    `;
+    console.log(`🧹 [AUTH] Pulizia sessioni scadute completata`);
+    return { success: true, deleted: result.rowCount || 0 };
+  } catch (error) {
+    console.error('❌ [AUTH] Errore durante pulizia sessioni:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Nota: La pulizia delle sessioni scadute dovrebbe essere gestita tramite:
+// 1. Vercel Cron Jobs (per ambienti serverless)
+// 2. Un job periodico nel server.js (per ambienti tradizionali)
+// 3. Un trigger database (se supportato)
+// Questa funzione è esportata per essere chiamata manualmente o da cron job
+export { cleanupExpiredSessions };
+
+/**
+ * Rate limiting per prevenire brute force attacks
+ */
+function checkRateLimit(identifier, maxAttempts = 5, windowMs = 15 * 60 * 1000) {
+  const now = Date.now();
+  const key = `rate_limit:${identifier}`;
+  const attempts = rateLimitStore.get(key) || { count: 0, resetAt: now + windowMs };
+  
+  if (now > attempts.resetAt) {
+    attempts.count = 0;
+    attempts.resetAt = now + windowMs;
+  }
+  
+  attempts.count++;
+  rateLimitStore.set(key, attempts);
+  
+  // Pulisci vecchie entry ogni 100 richieste (ottimizzazione)
+  if (rateLimitStore.size > 1000) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (now > v.resetAt) {
+        rateLimitStore.delete(k);
+      }
+    }
+  }
+  
+  return {
+    allowed: attempts.count <= maxAttempts,
+    remaining: Math.max(0, maxAttempts - attempts.count),
+    resetAt: attempts.resetAt
+  };
+}
 
 // Configurazione WebAuthn
 const rpId = process.env.WEBAUTHN_RP_ID || 'ainebula.vercel.app';
@@ -92,11 +160,43 @@ async function authenticateUser(req, sql) {
       return { error: 'Sessione non valida', status: 401 };
     }
 
-    console.log('✅ [AUTH] Sessione valida per user:', sessions[0].user_id);
-    return { user: sessions[0], token };
+    const session = sessions[0];
+    const expiresAt = new Date(session.expires_at);
+    const now = new Date();
+    const timeUntilExpiry = expiresAt.getTime() - now.getTime();
+    
+    // Se il token scade tra meno di 1 giorno, rinnova automaticamente
+    let refreshedToken = token;
+    if (timeUntilExpiry < TOKEN_REFRESH_THRESHOLD && timeUntilExpiry > 0) {
+      console.log('🔄 [AUTH] Token in scadenza, rinnovo automatico...');
+      refreshedToken = jwt.sign(
+        { userId: session.user_id, username: session.username },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      
+      const newExpiresAt = new Date(Date.now() + SESSION_DURATION);
+      await sql`
+        UPDATE sessions
+        SET token = ${refreshedToken}, expires_at = ${newExpiresAt.toISOString()}, updated_at = NOW()
+        WHERE id = ${session.id}
+      `;
+      
+      console.log('✅ [AUTH] Token rinnovato automaticamente');
+    }
+
+    console.log('✅ [AUTH] Sessione valida per user:', session.user_id);
+    return { user: session, token: refreshedToken };
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      console.log('⚠️ [AUTH] Token scaduto');
+      return { error: 'Token scaduto', status: 401 };
+    } else if (error.name === 'JsonWebTokenError') {
+      console.error('❌ [AUTH] Token non valido:', error.message);
+      return { error: 'Token non valido', status: 403 };
+    }
     console.error('❌ [AUTH] Errore verifica token:', error.message);
-    return { error: 'Token non valido', status: 403 };
+    return { error: 'Errore durante la verifica del token', status: 500 };
   }
 }
 
@@ -111,6 +211,14 @@ export default async function handler(req, res) {
 
   try {
     const sql = getDatabaseConnection();
+    
+    // Esegui pulizia sessioni scadute periodicamente (ogni 100 richieste circa)
+    // In produzione, questo dovrebbe essere gestito da un cron job separato
+    if (Math.random() < 0.01) { // 1% di probabilità per ogni richiesta
+      cleanupExpiredSessions(sql).catch(err => {
+        console.error('❌ [AUTH] Errore pulizia sessioni automatica:', err);
+      });
+    }
     
     // Determina l'endpoint dal slug (per route dinamiche) o query parameter
     const slug = req.query.slug;
@@ -160,9 +268,15 @@ export default async function handler(req, res) {
     
     // GET /api/auth/me - Verifica sessione
     if (req.method === 'GET' && (endpoint === 'me' || action === 'me' || !endpoint)) {
+      const originalToken = req.headers['authorization']?.split(' ')[1] || parseCookies(req.headers.cookie).auth_token;
       const auth = await authenticateUser(req, sql);
       if (auth.error) {
         return res.status(auth.status).json({ success: false, message: auth.error });
+      }
+      
+      // Se il token è stato rinnovato, aggiorna il cookie
+      if (auth.token && auth.token !== originalToken) {
+        setAuthCookie(res, auth.token);
       }
 
       const userId = auth.user.user_id;
@@ -198,6 +312,11 @@ export default async function handler(req, res) {
         };
       }
 
+      // Se il token è stato rinnovato, aggiorna il cookie
+      if (auth.token && auth.token !== token) {
+        setAuthCookie(res, auth.token);
+      }
+      
       res.json({
         success: true,
         user: {
@@ -225,34 +344,69 @@ export default async function handler(req, res) {
       }
       
       // Validazione username
-      if (username.length < 3) {
+      const trimmedUsername = username.trim();
+      if (trimmedUsername.length < 3) {
         return res.status(400).json({
           success: false,
           message: 'Lo username deve essere di almeno 3 caratteri'
         });
       }
       
+      if (trimmedUsername.length > 50) {
+        return res.status(400).json({
+          success: false,
+          message: 'Lo username non può superare i 50 caratteri'
+        });
+      }
+      
       // Validazione caratteri username
       const usernameRegex = /^[a-zA-Z0-9_-]+$/;
-      if (!usernameRegex.test(username)) {
+      if (!usernameRegex.test(trimmedUsername)) {
         return res.status(400).json({
           success: false,
           message: 'Lo username può contenere solo lettere, numeri, underscore e trattini'
         });
       }
       
-      // Validazione password
-      if (password.length < 6) {
+      // Rate limiting per registrazione
+      const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
+      const rateLimit = checkRateLimit(`register:${ip}`, 3, 60 * 60 * 1000); // 3 registrazioni per ora per IP
+      if (!rateLimit.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: 'Troppi tentativi di registrazione. Riprova più tardi.',
+          retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+        });
+      }
+      
+      // Validazione password più robusta
+      if (password.length < 8) {
         return res.status(400).json({
           success: false,
-          message: 'La password deve essere di almeno 6 caratteri'
+          message: 'La password deve essere di almeno 8 caratteri'
+        });
+      }
+      
+      if (password.length > 128) {
+        return res.status(400).json({
+          success: false,
+          message: 'La password non può superare i 128 caratteri'
+        });
+      }
+      
+      // Verifica complessità password (almeno una lettera e un numero)
+      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({
+          success: false,
+          message: 'La password deve contenere almeno una lettera e un numero'
         });
       }
       
       try {
         // Verifica se lo username esiste già
         const existingUsers = await sql`
-          SELECT id FROM users WHERE username = ${username.toLowerCase()}
+          SELECT id FROM users WHERE username = ${trimmedUsername.toLowerCase()}
         `;
         
         if (existingUsers.length > 0) {
@@ -262,8 +416,8 @@ export default async function handler(req, res) {
           });
         }
         
-        // Hash della password
-        const passwordHash = await bcrypt.hash(password, 10);
+        // Hash della password con salt rounds aumentati per maggiore sicurezza
+        const passwordHash = await bcrypt.hash(password, 12);
         
         // Genera ID utente
         const userId = randomBytes(16).toString('hex');
@@ -273,8 +427,8 @@ export default async function handler(req, res) {
           INSERT INTO users (id, email, username, password_hash, created_at, updated_at, is_active)
           VALUES (
             ${userId},
-            ${`${username}@nebula.local`}, -- Placeholder email per compatibilità schema
-            ${username.toLowerCase()},
+            ${`${trimmedUsername}@nebula.local`}, -- Placeholder email per compatibilità schema
+            ${trimmedUsername.toLowerCase()},
             ${passwordHash},
             NOW(),
             NOW(),
@@ -325,20 +479,32 @@ export default async function handler(req, res) {
         // Imposta cookie
         setAuthCookie(res, sessionToken);
         
+        // Reset rate limit su registrazione riuscita
+        rateLimitStore.delete(`rate_limit:register:${ip}`);
+        
         return res.status(201).json({
           success: true,
           user: {
             id: userId,
-            username: username.toLowerCase()
+            username: trimmedUsername.toLowerCase()
           },
           token: sessionToken
         });
       } catch (error) {
         console.error('❌ [AUTH] Errore registrazione:', error);
+        
+        // Se è un errore di constraint (username duplicato), restituisci messaggio più chiaro
+        if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
+          return res.status(409).json({
+            success: false,
+            message: 'Username già utilizzato'
+          });
+        }
+        
         return res.status(500).json({
           success: false,
           message: 'Errore durante la registrazione',
-          error: error.message
+          error: process.env.NODE_ENV === 'development' ? error.message : 'Errore interno del server'
         });
       }
     }
@@ -353,6 +519,16 @@ export default async function handler(req, res) {
         return res.status(400).json({
           success: false,
           message: 'Username e password sono obbligatori'
+        });
+      }
+      
+      // Rate limiting per prevenire brute force
+      const rateLimit = checkRateLimit(`login:${username.toLowerCase()}`, 5, 15 * 60 * 1000);
+      if (!rateLimit.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: 'Troppi tentativi di login. Riprova più tardi.',
+          retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
         });
       }
       
@@ -385,17 +561,36 @@ export default async function handler(req, res) {
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
         
         if (!passwordMatch) {
+          // Incrementa il rate limit anche per password errate
+          checkRateLimit(`login:${username.toLowerCase()}`, 5, 15 * 60 * 1000);
           return res.status(401).json({
             success: false,
             message: 'Credenziali non valide'
           });
         }
         
+        // Reset rate limit su login riuscito
+        rateLimitStore.delete(`rate_limit:login:${username.toLowerCase()}`);
+        
         // Elimina sessioni scadute
         await sql`
           DELETE FROM sessions
           WHERE user_id = ${user.id} AND expires_at < NOW()
         `;
+        
+        // Elimina sessioni vecchie per questo utente (mantieni solo le ultime 10)
+        const existingSessions = await sql`
+          SELECT id FROM sessions 
+          WHERE user_id = ${user.id} 
+          ORDER BY created_at DESC
+        `;
+        
+        if (existingSessions.length >= 10) {
+          const sessionsToDelete = existingSessions.slice(9);
+          for (const session of sessionsToDelete) {
+            await sql`DELETE FROM sessions WHERE id = ${session.id}`;
+          }
+        }
         
         // Crea nuova sessione JWT
         const sessionToken = jwt.sign(
@@ -1130,8 +1325,21 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: 'La nuova password è obbligatoria' });
       }
 
-      if (new_password.length < 6) {
-        return res.status(400).json({ success: false, message: 'La nuova password deve essere di almeno 6 caratteri' });
+      if (new_password.length < 8) {
+        return res.status(400).json({ success: false, message: 'La nuova password deve essere di almeno 8 caratteri' });
+      }
+      
+      if (new_password.length > 128) {
+        return res.status(400).json({ success: false, message: 'La nuova password non può superare i 128 caratteri' });
+      }
+      
+      // Verifica complessità password
+      const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+      if (!passwordRegex.test(new_password)) {
+        return res.status(400).json({
+          success: false,
+          message: 'La nuova password deve contenere almeno una lettera e un numero'
+        });
       }
 
       const [user] = await sql`
@@ -1147,8 +1355,15 @@ export default async function handler(req, res) {
       if (!isValidPassword) {
         return res.status(400).json({ success: false, message: 'Password attuale non corretta' });
       }
+      
+      // Verifica che la nuova password sia diversa dalla vecchia
+      const isSamePassword = await bcrypt.compare(new_password, user.password_hash);
+      if (isSamePassword) {
+        return res.status(400).json({ success: false, message: 'La nuova password deve essere diversa dalla password attuale' });
+      }
 
-      const passwordHash = await bcrypt.hash(new_password, 10);
+      // Hash della password con salt rounds aumentati per maggiore sicurezza
+      const passwordHash = await bcrypt.hash(new_password, 12);
 
       await sql`
         UPDATE users 
@@ -1161,6 +1376,126 @@ export default async function handler(req, res) {
         message: 'Password aggiornata con successo'
       });
       return;
+    }
+
+    // POST /api/auth/process-payment - Processa un pagamento per abbonamento
+    if (req.method === 'POST' && (endpoint === 'process-payment' || action === 'process-payment')) {
+      const auth = await authenticateUser(req, sql);
+      if (auth.error) {
+        return res.status(auth.status).json({ success: false, message: auth.error });
+      }
+
+      const userId = auth.user.user_id;
+      const body = parsedBody || req.body;
+      const { planKey, billingType, amount, currency, encryptedCard, timestamp } = body;
+
+      // Validazioni
+      if (!planKey || !['pro', 'max'].includes(planKey)) {
+        return res.status(400).json({ success: false, message: 'Piano non valido' });
+      }
+
+      if (!billingType || !['monthly', 'annual'].includes(billingType)) {
+        return res.status(400).json({ success: false, message: 'Tipo di fatturazione non valido' });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, message: 'Importo non valido' });
+      }
+
+      if (!encryptedCard || !encryptedCard.encryptedPayload) {
+        return res.status(400).json({ success: false, message: 'Dati carta non validi' });
+      }
+
+      // Verifica che il timestamp sia recente (entro 5 minuti)
+      const paymentTimestamp = new Date(timestamp);
+      const now = new Date();
+      const timeDiff = now - paymentTimestamp;
+      if (timeDiff > 5 * 60 * 1000 || timeDiff < 0) {
+        return res.status(400).json({ success: false, message: 'Richiesta scaduta, riprova' });
+      }
+
+      // Calcola la data di scadenza
+      const expiresAt = new Date();
+      if (billingType === 'annual') {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      } else {
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+      }
+
+      // Genera ID univoci
+      const subscriptionId = randomBytes(16).toString('hex');
+      const paymentId = randomBytes(16).toString('hex');
+      const transactionId = `TXN-${Date.now()}-${randomBytes(8).toString('hex').toUpperCase()}`;
+
+      try {
+        // Inizia transazione per creare abbonamento e registrare pagamento
+        
+        // 1. Disattiva eventuali abbonamenti attivi precedenti
+        await sql`
+          UPDATE subscriptions 
+          SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = ${userId} AND status = 'active'
+        `;
+
+        // 2. Crea nuovo abbonamento
+        await sql`
+          INSERT INTO subscriptions (
+            id, user_id, plan, status, started_at, expires_at, 
+            auto_renew, billing_cycle, amount, currency, payment_id
+          ) VALUES (
+            ${subscriptionId}, ${userId}, ${planKey}, 'active', 
+            CURRENT_TIMESTAMP, ${expiresAt.toISOString()}, 
+            true, ${billingType}, ${amount}, ${currency || 'EUR'}, ${paymentId}
+          )
+        `;
+
+        // 3. Registra il pagamento
+        await sql`
+          INSERT INTO payments (
+            id, subscription_id, user_id, amount, currency, status,
+            payment_method, payment_provider, transaction_id, paid_at
+          ) VALUES (
+            ${paymentId}, ${subscriptionId}, ${userId}, ${amount}, ${currency || 'EUR'},
+            'completed', 'credit_card', 'nebula_internal', ${transactionId}, CURRENT_TIMESTAMP
+          )
+        `;
+
+        console.log(`✅ [PAYMENT] Pagamento completato: ${transactionId} - Piano: ${planKey} - Utente: ${userId}`);
+
+        // Nota: In produzione, qui si dovrebbe:
+        // 1. Integrare con un processore di pagamento reale (Stripe, PayPal, etc.)
+        // 2. NON decrittare i dati della carta sul server, ma inviarli direttamente al processore
+        // 3. Gestire webhook per confermare il pagamento
+        // Per ora, confermiamo il pagamento direttamente (simulazione)
+
+        res.json({
+          success: true,
+          message: 'Pagamento completato con successo',
+          subscription: {
+            id: subscriptionId,
+            plan: planKey,
+            status: 'active',
+            billingType,
+            expiresAt: expiresAt.toISOString(),
+            amount,
+            currency: currency || 'EUR'
+          },
+          payment: {
+            id: paymentId,
+            transactionId,
+            status: 'completed',
+            paidAt: new Date().toISOString()
+          }
+        });
+        return;
+
+      } catch (dbError) {
+        console.error('❌ [PAYMENT] Errore database durante pagamento:', dbError);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Errore durante l\'elaborazione del pagamento' 
+        });
+      }
     }
     
     // Endpoint non trovato

@@ -223,12 +223,6 @@
         </svg>
       </button>
     {/if}
-    <div class="logo-icon">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <circle cx="12" cy="12" r="3"/>
-      </svg>
-    </div>
     <div class="model-selector-wrapper">
       <button 
         class="model-selector" 
@@ -276,7 +270,7 @@
                 class:premium={model.premium}
                 class:disabled={model.premium && !hasPlanOrHigher(model.requiredPlan)}
                 on:click={() => selectModel(model.id)}
-                title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? $t('requiresSubscription', { plan: model.requiredPlan === 'premium' ? 'Premium' : (model.requiredPlan === 'pro' ? $t('pro') : $t('max')) }) : ''}
+                title={model.premium && !hasPlanOrHigher(model.requiredPlan) ? $t('requiresSubscription', { plan: model.requiredPlan === 'pro' ? 'Pro' : 'Max' }) : ''}
                 role="option"
                 aria-selected={model.id === $selectedModel}
                 aria-disabled={model.premium && !hasPlanOrHigher(model.requiredPlan)}
@@ -285,8 +279,8 @@
                   <div class="model-name">
                     {model.name}
                     {#if model.premium}
-                      <span class="premium-badge" class:premium={model.requiredPlan === 'premium'} class:pro={model.requiredPlan === 'pro'} class:max={model.requiredPlan === 'max'}>
-                        {model.requiredPlan === 'premium' ? 'PREMIUM' : (model.requiredPlan === 'pro' ? 'PRO' : 'MAX')}
+                      <span class="premium-badge" class:pro={model.requiredPlan === 'pro'} class:max={model.requiredPlan === 'max'}>
+                        {model.requiredPlan === 'pro' ? 'PRO' : 'MAX'}
                       </span>
                     {/if}
                   </div>

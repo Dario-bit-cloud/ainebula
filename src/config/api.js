@@ -19,6 +19,7 @@ export const MODEL_MAPPING = {
   'gpt-4.1': { model: 'gpt-4.1', provider: 'electronhub' },
   'gpt-4o': { model: 'gpt-4o', provider: 'electronhub' },
   'o3': { model: 'o3', provider: 'electronhub' },
+  'o3-high': { model: 'o3-high', provider: 'electronhub' },
   'o4-mini': { model: 'o4-mini', provider: 'electronhub' },
   
   // OpenAI - Mini Models

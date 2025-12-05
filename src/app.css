@@ -444,6 +444,119 @@ button, a, input, select, textarea {
   }
 }
 
+/* ================================
+   MOBILE KEYBOARD OPTIMIZATIONS
+   ================================ */
+
+/* Variabile CSS per altezza tastiera (impostata via JS) */
+:root {
+  --keyboard-height: 0px;
+}
+
+/* Quando la tastiera virtuale è aperta */
+body.keyboard-open {
+  /* Previeni scroll del body quando la tastiera è aperta */
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Adatta l'area input quando la tastiera è aperta */
+@media (max-width: 768px) {
+  body.keyboard-open .input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    background: var(--bg-primary) !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+  }
+  
+  body.keyboard-open .messages-container {
+    padding-bottom: 120px !important;
+  }
+  
+  /* Assicura che i modali non vengano coperti dalla tastiera */
+  body.keyboard-open .modal-content {
+    max-height: calc(100vh - var(--keyboard-height) - 50px) !important;
+  }
+}
+
+/* ================================
+   MOBILE TOUCH OPTIMIZATIONS
+   ================================ */
+
+@media (max-width: 768px) {
+  /* Migliora il feedback visivo sui touch */
+  button:active,
+  a:active,
+  .clickable:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+  
+  /* Rimuovi delay di 300ms per click su mobile */
+  * {
+    touch-action: manipulation;
+  }
+  
+  /* Previeni selezione accidentale durante scroll */
+  .messages-container,
+  .chat-list,
+  .sidebar-nav {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Permetti selezione solo sui contenuti dei messaggi */
+  .message-content {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  
+  /* Ottimizza scroll momentum su iOS */
+  .scrollable,
+  [class*="scroll"],
+  [class*="overflow"] {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+  
+  /* Disabilita effetto hover su mobile (causa problemi) */
+  @media (hover: none) {
+    button:hover,
+    a:hover,
+    .clickable:hover {
+      background-color: inherit;
+      transform: none;
+      box-shadow: inherit;
+    }
+  }
+  
+  /* Migliora la visibilità degli elementi interattivi */
+  button,
+  a,
+  input[type="button"],
+  input[type="submit"],
+  .clickable {
+    position: relative;
+    isolation: isolate;
+  }
+  
+  /* Previeni zoom indesiderato sui tap doppi */
+  * {
+    touch-action: pan-x pan-y;
+  }
+  
+  /* Eccezione per aree che necessitano pinch-to-zoom */
+  .message-content img,
+  .image-preview {
+    touch-action: pinch-zoom;
+  }
+}
+
 /* Accessibility improvements */
 /* Focus visible - migliorato per accessibilità */
 *:focus-visible {

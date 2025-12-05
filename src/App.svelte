@@ -4,7 +4,8 @@
   import MainArea from './components/MainArea.svelte';
   import UserMenu from './components/UserMenu.svelte';
   // Lazy load modals per ridurre il bundle iniziale
-  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen, isHelpCenterModalOpen, isReleaseNotesModalOpen, isTermsModalOpen, isDownloadAppModalOpen, isWorkspaceSettingsModalOpen, isNebuliniModalOpen, isImageGeneratorOpen } from './stores/app.js';
+  import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen, isHelpCenterModalOpen, isReleaseNotesModalOpen, isTermsModalOpen, isDownloadAppModalOpen, isNebuliniModalOpen, isImageGeneratorOpen } from './stores/app.js';
+  import { isPaymentModalOpen } from './stores/payment.js';
   import { initAuth, user, isAuthenticatedStore, isLoading } from './stores/auth.js';
   import { logout } from './services/authService.js';
   import { clearUser } from './stores/auth.js';
@@ -21,7 +22,8 @@
   // Lazy load modals
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
   let PromptLibraryModal, ShortcutsModal, ReportBugModal, PersonalizationModal, AuthModal, SharedLinksModal;
-  let HelpCenterModal, ReleaseNotesModal, TermsModal, DownloadAppModal, WorkspaceSettingsModal, NebuliniModal, ImageGeneratorModal;
+  let HelpCenterModal, ReleaseNotesModal, TermsModal, DownloadAppModal, NebuliniModal, ImageGeneratorModal;
+  let PaymentModal;
   // Toast container (always loaded)
   import ToastContainer from './components/ToastContainer.svelte';
   // Dialog components (always loaded)
@@ -139,13 +141,6 @@
     }
   }
   
-  async function loadWorkspaceSettingsModal() {
-    if (!WorkspaceSettingsModal) {
-      const module = await import('./components/WorkspaceSettingsModal.svelte');
-      WorkspaceSettingsModal = module.default;
-    }
-  }
-  
   async function loadNebuliniModal() {
     if (!NebuliniModal) {
       const module = await import('./components/NebuliniModal.svelte');
@@ -157,6 +152,13 @@
     if (!ImageGeneratorModal) {
       const module = await import('./components/ImageGeneratorModal.svelte');
       ImageGeneratorModal = module.default;
+    }
+  }
+  
+  async function loadPaymentModal() {
+    if (!PaymentModal) {
+      const module = await import('./components/PaymentModal.svelte');
+      PaymentModal = module.default;
     }
   }
   
@@ -206,14 +208,14 @@
   $: if ($isDownloadAppModalOpen && !DownloadAppModal) {
     loadDownloadAppModal();
   }
-  $: if ($isWorkspaceSettingsModalOpen && !WorkspaceSettingsModal) {
-    loadWorkspaceSettingsModal();
-  }
   $: if ($isNebuliniModalOpen && !NebuliniModal) {
     loadNebuliniModal();
   }
   $: if ($isImageGeneratorOpen && !ImageGeneratorModal) {
     loadImageGeneratorModal();
+  }
+  $: if ($isPaymentModalOpen && !PaymentModal) {
+    loadPaymentModal();
   }
   
   function handlePromptSelect(event) {
@@ -498,14 +500,14 @@
   {#if $isDownloadAppModalOpen && DownloadAppModal}
     <svelte:component this={DownloadAppModal} bind:isOpen={$isDownloadAppModalOpen} />
   {/if}
-  {#if $isWorkspaceSettingsModalOpen && WorkspaceSettingsModal}
-    <svelte:component this={WorkspaceSettingsModal} />
-  {/if}
   {#if $isNebuliniModalOpen && NebuliniModal}
     <svelte:component this={NebuliniModal} on:select={handleNebulinoSelect} />
   {/if}
   {#if $isImageGeneratorOpen && ImageGeneratorModal}
     <svelte:component this={ImageGeneratorModal} />
+  {/if}
+  {#if $isPaymentModalOpen && PaymentModal}
+    <svelte:component this={PaymentModal} />
   {/if}
   
   <!-- Dialog components -->

@@ -18,7 +18,7 @@ export const availableModels = writable([
     contextLength: 200000
   },
   {
-    id: 'gemini-2.5-flash-preview-09-2025',
+    id: 'o3-high',
     name: 'Flash',
     description: 'Conversazioni rapide e analisi immagini.',
     group: 'Nebula AI',
@@ -42,27 +42,31 @@ export const availableModels = writable([
     contextLength: 400000
   },
   
-  // ========== NEBULA - PREMIUM ==========
+  // ========== NEBULA PRO (30€/mese) ==========
   {
     id: 'gpt-4.1',
     name: '4.1',
-    description: 'Modello avanzato per compiti complessi.',
-    group: 'Nebula Premium',
+    description: 'Modello avanzato con 1M di contesto per compiti complessi.',
+    group: 'Nebula Pro',
     premium: true,
     requiredPlan: 'pro',
+    planBadge: 'PRO',
     webSearch: false,
     vision: true,
     functionCall: true,
     reasoning: false,
     contextLength: 1000000
   },
+  
+  // ========== NEBULA MAX (300€/mese) ==========
   {
     id: 'o3',
     name: 'o3',
-    description: 'Modello potente per matematica e ragionamento.',
-    group: 'Nebula Premium',
+    description: 'Il più potente per matematica, coding e ragionamento avanzato.',
+    group: 'Nebula Max',
     premium: true,
     requiredPlan: 'max',
+    planBadge: 'MAX',
     webSearch: false,
     vision: true,
     functionCall: true,
@@ -125,7 +129,7 @@ export const availableModels = writable([
   }
 ]);
 
-export const selectedModel = writable('gemini-2.5-flash-preview-09-2025');
+export const selectedModel = writable('o3-high');
 
 export function setModel(modelId) {
   selectedModel.set(modelId);

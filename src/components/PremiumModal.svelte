@@ -4,6 +4,7 @@
   import { isMobile } from '../stores/app.js';
   import { showAlert } from '../services/dialogService.js';
   import { isAuthenticatedStore } from '../stores/auth.js';
+  import { openPaymentModal } from '../stores/payment.js';
   
   // Supabase Auth - billing gestito dal database
   let isLoading = false;
@@ -12,19 +13,39 @@
   // Piani disponibili
   const plans = [
     {
-      key: 'nebula_max',
+      key: 'pro',
+      name: 'Nebula Pro',
+      description: 'Il piano ideale per professionisti e power user',
+      monthlyPrice: 30,
+      annualPrice: 300,
+      popular: true,
+      features: [
+        'Accesso a GPT-4.1 (1M di contesto)',
+        '500 messaggi premium al giorno',
+        'Risposte prioritarie (nessuna coda)',
+        'Cronologia chat illimitata',
+        'Caricamento file fino a 100MB',
+        'Supporto email prioritario',
+        'Esportazione dati avanzata'
+      ]
+    },
+    {
+      key: 'max',
       name: 'Nebula Max',
-      description: 'Il piano completo con accesso a tutti i modelli premium',
+      description: 'Il piano completo per aziende e sviluppatori',
       monthlyPrice: 300,
       annualPrice: 3000,
+      popular: false,
       features: [
+        'Tutto quello di Pro, più:',
         'Accesso esclusivo a o3 (ragionamento avanzato)',
-        'Accesso a 4.1 incluso (1M di contesto)',
-        'Accesso a tutti i modelli gratuiti',
-        'Chat illimitate',
-        'Caricamenti illimitati',
-        'Supporto prioritario',
-        'API access incluso'
+        'Messaggi premium illimitati',
+        'Caricamento file fino a 500MB',
+        'API access incluso',
+        'Supporto prioritario 24/7',
+        'Accesso anticipato nuove funzionalità',
+        'Badge esclusivo nel profilo',
+        'Workspace condivisi (team)'
       ]
     }
   ];
@@ -98,51 +119,16 @@
       return;
     }
     
-    isLoading = true;
-    
-    try {
-      // Determina l'URL base dell'API
-      const apiBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:3001'
-        : '';
-
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Token di autenticazione non trovato');
-      }
-
-      // Chiama l'API per creare la sessione di checkout
-      const response = await fetch(`${apiBaseUrl}/api/subscriptions/checkout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          planKey: planKey
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Errore durante la creazione della sessione di checkout');
-      }
-
-      // Reindirizza all'URL di checkout se disponibile
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-      } else {
-        await showAlert(
-          'Sistema di pagamento non ancora configurato. Contatta il supporto per attivare il tuo abbonamento.',
-          'Errore',
-          'OK',
-          'error'
-        );
-      }
-    } finally {
-      isLoading = false;
+    // Trova il piano selezionato
+    const selectedPlan = plans.find(p => p.key === planKey);
+    if (!selectedPlan) {
+      await showAlert('Piano non trovato', 'Errore', 'OK', 'error');
+      return;
     }
+    
+    // Chiudi il modal premium e apri il modal di pagamento
+    isPremiumModalOpen.set(false);
+    openPaymentModal(selectedPlan);
   }
   
   function closeModal() {
@@ -189,7 +175,10 @@
           
           <div class="plans-container">
             {#each plans as plan}
-              <div class="plan-card" class:active={currentSubscription?.plan === plan.key}>
+              <div class="plan-card" class:active={currentSubscription?.plan === plan.key} class:popular={plan.popular}>
+                {#if plan.popular}
+                  <div class="popular-badge">Più Popolare</div>
+                {/if}
                 <div class="plan-header">
                   <h3 class="plan-name">{plan.name}</h3>
                   {#if currentSubscription?.plan === plan.key && currentSubscription?.active}
@@ -200,14 +189,14 @@
                 <p class="plan-description">{plan.description}</p>
                 
                 <div class="plan-pricing">
-                  <div class="price-row">
-                    <span class="price-label">Mensile:</span>
-                    <span class="price-amount">${plan.monthlyPrice}/mese</span>
+                  <div class="price-row main-price">
+                    <span class="price-amount large">€{plan.monthlyPrice}</span>
+                    <span class="price-period">/mese</span>
                   </div>
                   <div class="price-row annual">
                     <span class="price-label">Annuale:</span>
-                    <span class="price-amount">${plan.annualPrice}/anno</span>
-                    <span class="price-savings">Risparmia ${(plan.monthlyPrice * 12) - plan.annualPrice}/anno</span>
+                    <span class="price-amount">€{plan.annualPrice}/anno</span>
+                    <span class="price-savings">Risparmia €{(plan.monthlyPrice * 12) - plan.annualPrice}</span>
                   </div>
                 </div>
                 
@@ -466,6 +455,7 @@
     border-radius: 12px;
     padding: 24px;
     transition: all 0.3s;
+    position: relative;
   }
 
   .plan-card:hover {
@@ -475,8 +465,34 @@
   }
 
   .plan-card.active {
-    border-color: #fbbf24;
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%);
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+  }
+
+  .plan-card.popular {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+  }
+
+  .plan-card.popular:hover {
+    border-color: #7c3aed;
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+  }
+
+  .popular-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
   }
 
   .plan-header {
@@ -525,10 +541,19 @@
     margin-bottom: 8px;
   }
 
+  .price-row.main-price {
+    justify-content: flex-start;
+    gap: 4px;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+
   .price-row.annual {
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .price-label {
@@ -537,15 +562,31 @@
   }
 
   .price-amount {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 600;
     color: var(--text-primary);
+  }
+
+  .price-amount.large {
+    font-size: 40px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .price-period {
+    font-size: 16px;
+    color: var(--text-secondary);
+    font-weight: 400;
   }
 
   .price-savings {
     font-size: 12px;
     color: #10b981;
-    margin-top: 4px;
+    background: rgba(16, 185, 129, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
   }
 
   .plan-features {

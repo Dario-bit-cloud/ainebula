@@ -845,9 +845,8 @@
   
   function getPlanName(plan) {
     if (!plan || plan === 'free') return get(t)('free');
-    if (plan === 'premium') return 'Premium';
-    if (plan === 'pro') return get(t)('pro');
-    if (plan === 'max') return get(t)('max');
+    if (plan === 'pro') return 'Nebula Pro';
+    if (plan === 'max') return 'Nebula Max';
     return plan;
   }
   
@@ -1573,7 +1572,7 @@
               
               {#if $isAuthenticatedStore && $authUser}
                 <div class="subscription-status">
-                  <div class="subscription-badge" class:active={isActive} class:premium={subscription?.plan === 'premium'} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
+                  <div class="subscription-badge" class:active={isActive} class:pro={subscription?.plan === 'pro'} class:max={subscription?.plan === 'max'}>
                     <span class="badge-label">{planName}</span>
                     {#if isActive}
                       <span class="badge-status">{$t('active')}</span>
@@ -1609,7 +1608,7 @@
                     </button>
                   </div>
                 {:else}
-                  {#if subscription?.plan === 'premium' || subscription?.plan === 'pro' || subscription?.plan === 'max'}
+                  {#if subscription?.plan === 'pro' || subscription?.plan === 'max'}
                     <div class="setting-row" class:row-visible={activeSection === 'abbonamento'}>
                       <div class="setting-info">
                         <div class="setting-label">Supporto Prioritario</div>
