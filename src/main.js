@@ -238,4 +238,11 @@ if (typeof document !== 'undefined') {
   }
 }
 
-export default appInstance;
+// Export una funzione getter invece di esportare direttamente null
+// Questo risolve il problema del Bug 2: appInstance viene popolato asincronamente
+export default function getAppInstance() {
+  return appInstance;
+}
+
+// Export anche come valore per retrocompatibilità (ma sarà null inizialmente)
+export { appInstance };

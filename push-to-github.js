@@ -32,10 +32,46 @@ try {
     execSync('git add -A', { stdio: 'inherit' });
     
     console.log('\n💾 Creazione commit...');
+    // Bug 1 Fix: Usa spawn con argomenti separati invece di interpolare stringhe
+    // Questo previene command injection attraverso process.argv[2]
     const commitMessage = process.argv[2] || 'Update: Multiple improvements and new features';
-    execSync(`git commit -m "${commitMessage}"`, { stdio: 'inherit' });
-    console.log('✅ Commit creato con successo!');
+    
+    // Sanitizza il messaggio di commit rimuovendo caratteri pericolosi
+    const sanitizedMessage = commitMessage
+      .replace(/[;&|`$(){}[\]]/g, '') // Rimuove caratteri shell pericolosi
+      .replace(/\n/g, ' ') // Sostituisce newline con spazi
+      .trim()
+      .substring(0, 500); // Limita la lunghezza
+    
+    // Usa spawn con argomenti separati per evitare command injection
+    return new Promise((resolve, reject) => {
+      const gitCommit = spawn('git', ['commit', '-m', sanitizedMessage], {
+        stdio: 'inherit',
+        shell: false // Non usare shell per evitare injection
+      });
+      
+      gitCommit.on('close', (code) => {
+        if (code === 0) {
+          console.log('✅ Commit creato con successo!');
+          resolve();
+        } else {
+          reject(new Error(`Git commit failed with code ${code}`));
+        }
+      });
+      
+      gitCommit.on('error', (error) => {
+        reject(error);
+      });
+    }).then(() => {
+      // Continua con il resto dello script
+      return continuePush();
+    }).catch((error) => {
+      throw error;
+    });
   }
+  
+  // Funzione helper per continuare il push dopo il commit
+  function continuePush() {
   
   // Verifica se ci sono commit da pushare
   const unpushedCommits = execSync('git log origin/main..HEAD --oneline', { encoding: 'utf-8' });
@@ -50,7 +86,7 @@ try {
   
   // Esegui il push
   console.log('\n🚀 Esecuzione push...\n');
-  execSync('git push origin main -v', { stdio: 'inherit' });
+  execSync('git push origin main', { stdio: 'inherit' });
   
   console.log('\n✅ Push completato con successo!');
   
@@ -62,4 +98,3 @@ try {
   console.error('   3. Verifica di avere i permessi sul repository');
   process.exit(1);
 }
-
