@@ -5,7 +5,6 @@
   import UserMenu from './components/UserMenu.svelte';
   // Lazy load modals per ridurre il bundle iniziale
   import { selectedPrompt, isSettingsOpen, isShortcutsModalOpen, isAISettingsModalOpen, sidebarView, isSearchOpen, isSidebarOpen, isMobile, isAuthModalOpen, isInviteModalOpen, isProjectModalOpen, isPremiumModalOpen, isPromptLibraryModalOpen, isReportBugModalOpen, isPersonalizationModalOpen, isSharedLinksModalOpen, isHelpCenterModalOpen, isReleaseNotesModalOpen, isTermsModalOpen, isDownloadAppModalOpen, isNebuliniModalOpen, isImageGeneratorOpen } from './stores/app.js';
-  import { isPaymentModalOpen } from './stores/payment.js';
   import { initAuth, user, isAuthenticatedStore, isLoading } from './stores/auth.js';
   import { logout } from './services/authService.js';
   import { clearUser } from './stores/auth.js';
@@ -23,7 +22,6 @@
   let SettingsModal, InviteModal, ProjectModal, PremiumModal, AISettingsModal;
   let PromptLibraryModal, ShortcutsModal, ReportBugModal, PersonalizationModal, AuthModal, SharedLinksModal;
   let HelpCenterModal, ReleaseNotesModal, TermsModal, DownloadAppModal, NebuliniModal, ImageGeneratorModal;
-  let PaymentModal;
   // Toast container (always loaded)
   import ToastContainer from './components/ToastContainer.svelte';
   // Dialog components (always loaded)
@@ -155,75 +153,57 @@
     }
   }
   
-  async function loadPaymentModal() {
-    if (!PaymentModal) {
-      const module = await import('./components/PaymentModal.svelte');
-      PaymentModal = module.default;
-    }
-  }
-  
   // Precarica modals quando vengono aperti
-  // Usa get() per evitare errori durante l'inizializzazione
-  $: {
-    try {
-      if (get(isSettingsOpen) && !SettingsModal) {
-        loadSettingsModal();
-      }
-      if (get(isInviteModalOpen) && !InviteModal) {
-        loadInviteModal();
-      }
-      if (get(isSharedLinksModalOpen) && !SharedLinksModal) {
-        loadSharedLinksModal();
-      }
-      if (get(isProjectModalOpen) && !ProjectModal) {
-        loadProjectModal();
-      }
-      if (get(isPremiumModalOpen) && !PremiumModal) {
-        loadPremiumModal();
-      }
-      if (get(isShortcutsModalOpen) && !ShortcutsModal) {
-        loadShortcutsModal();
-      }
-      if (get(isAISettingsModalOpen) && !AISettingsModal) {
-        loadAISettingsModal();
-      }
-      if (get(isPromptLibraryModalOpen) && !PromptLibraryModal) {
-        loadPromptLibraryModal();
-      }
-      if (get(isReportBugModalOpen) && !ReportBugModal) {
-        loadReportBugModal();
-      }
-      if (get(isPersonalizationModalOpen) && !PersonalizationModal) {
-        loadPersonalizationModal();
-      }
-      if (get(isAuthModalOpen) && !AuthModal) {
-        loadAuthModal();
-      }
-      if (get(isHelpCenterModalOpen) && !HelpCenterModal) {
-        loadHelpCenterModal();
-      }
-      if (get(isReleaseNotesModalOpen) && !ReleaseNotesModal) {
-        loadReleaseNotesModal();
-      }
-      if (get(isTermsModalOpen) && !TermsModal) {
-        loadTermsModal();
-      }
-      if (get(isDownloadAppModalOpen) && !DownloadAppModal) {
-        loadDownloadAppModal();
-      }
-      if (get(isNebuliniModalOpen) && !NebuliniModal) {
-        loadNebuliniModal();
-      }
-      if (get(isImageGeneratorOpen) && !ImageGeneratorModal) {
-        loadImageGeneratorModal();
-      }
-      if (get(isPaymentModalOpen) && !PaymentModal) {
-        loadPaymentModal();
-      }
-    } catch (error) {
-      // Ignora errori durante l'inizializzazione
-      console.warn('⚠️ [APP] Errore durante caricamento modals:', error);
-    }
+  $: if ($isSettingsOpen && !SettingsModal) {
+    loadSettingsModal();
+  }
+  $: if ($isInviteModalOpen && !InviteModal) {
+    loadInviteModal();
+  }
+  $: if ($isSharedLinksModalOpen && !SharedLinksModal) {
+    loadSharedLinksModal();
+  }
+  $: if ($isProjectModalOpen && !ProjectModal) {
+    loadProjectModal();
+  }
+  $: if ($isPremiumModalOpen && !PremiumModal) {
+    loadPremiumModal();
+  }
+  $: if ($isShortcutsModalOpen && !ShortcutsModal) {
+    loadShortcutsModal();
+  }
+  $: if ($isAISettingsModalOpen && !AISettingsModal) {
+    loadAISettingsModal();
+  }
+  $: if ($isPromptLibraryModalOpen && !PromptLibraryModal) {
+    loadPromptLibraryModal();
+  }
+  $: if ($isReportBugModalOpen && !ReportBugModal) {
+    loadReportBugModal();
+  }
+  $: if ($isPersonalizationModalOpen && !PersonalizationModal) {
+    loadPersonalizationModal();
+  }
+  $: if ($isAuthModalOpen && !AuthModal) {
+    loadAuthModal();
+  }
+  $: if ($isHelpCenterModalOpen && !HelpCenterModal) {
+    loadHelpCenterModal();
+  }
+  $: if ($isReleaseNotesModalOpen && !ReleaseNotesModal) {
+    loadReleaseNotesModal();
+  }
+  $: if ($isTermsModalOpen && !TermsModal) {
+    loadTermsModal();
+  }
+  $: if ($isDownloadAppModalOpen && !DownloadAppModal) {
+    loadDownloadAppModal();
+  }
+  $: if ($isNebuliniModalOpen && !NebuliniModal) {
+    loadNebuliniModal();
+  }
+  $: if ($isImageGeneratorOpen && !ImageGeneratorModal) {
+    loadImageGeneratorModal();
   }
   
   function handlePromptSelect(event) {
@@ -448,14 +428,8 @@
   }
   
   // Sincronizza authModalMode con isAuthModalOpen
-  $: {
-    try {
-      if (get(isAuthModalOpen) && !authModalMode) {
-        authModalMode = 'login';
-      }
-    } catch (error) {
-      // Ignora errori durante l'inizializzazione
-    }
+  $: if ($isAuthModalOpen && !authModalMode) {
+    authModalMode = 'login';
   }
   
   onDestroy(() => {
@@ -519,9 +493,6 @@
   {/if}
   {#if $isImageGeneratorOpen && ImageGeneratorModal}
     <svelte:component this={ImageGeneratorModal} />
-  {/if}
-  {#if $isPaymentModalOpen && PaymentModal}
-    <svelte:component this={PaymentModal} />
   {/if}
   
   <!-- Dialog components -->

@@ -66,6 +66,7 @@ export const isHelpCenterModalOpen = writable(false);
 export const isReleaseNotesModalOpen = writable(false);
 export const isTermsModalOpen = writable(false);
 export const isDownloadAppModalOpen = writable(false);
+export const isWorkspaceSettingsModalOpen = writable(false);
 export const isImageGeneratorOpen = writable(false);
 
 // Store per modalità incognito
